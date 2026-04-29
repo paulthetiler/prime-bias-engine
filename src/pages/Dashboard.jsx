@@ -141,15 +141,15 @@ function AnalysisCard({ analysis }) {
         <div className={cn('text-3xl font-bold', dirColor)}>{mainDirection}</div>
       </div>
 
-      {/* Grade + Score + Action Row */}
+      {/* Grade + Target + Action Row */}
       <div className="grid grid-cols-3 gap-2">
         <div className={cn('rounded-lg border p-3 text-center', gradeColors[grade])}>
           <div className="text-3xl font-bold">{grade}</div>
           <div className="text-[10px] uppercase tracking-wider opacity-70">Grade</div>
         </div>
         <div className="rounded-lg border border-border bg-secondary p-3 text-center">
-          <div className="text-3xl font-bold font-mono">{confidenceScore}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Score</div>
+          <div className="text-2xl font-bold font-mono">{analysis.targetInfo?.target ? analysis.targetInfo.target.toFixed(4) : '—'}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Target</div>
         </div>
         <div className={cn('rounded-lg p-3 text-center flex flex-col items-center justify-center', actionColors[tradeAction])}>
           <div className="text-lg font-bold">{tradeAction}</div>
