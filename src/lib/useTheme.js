@@ -4,7 +4,7 @@ export function useTheme() {
   const [theme, setTheme] = useState(() => {
     const stored = localStorage.getItem('theme');
     if (stored) return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return 'light';
   });
 
   useEffect(() => {
