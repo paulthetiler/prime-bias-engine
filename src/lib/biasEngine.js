@@ -1,7 +1,6 @@
 // PrimeBias Engine - faithful recreation of the Excel Bias Tool logic
 
-// Timeframe weights from the Excel weight table (Close, MACD, RSI, Boli per timeframe)
-// These are the scoring weights that convert +1/-1/0 inputs into weighted scores
+// Indicator weights per timeframe (Close, MACD, RSI, Boli)
 const WEIGHTS = {
   month: { close: 40, macd: 30, rsi: 10, boli: 20 },
   week:  { close: 30, macd: 40, rsi: 10, boli: 20 },
@@ -12,7 +11,7 @@ const WEIGHTS = {
   m5:    { close: 0,  macd: 10, rsi: 50, boli: 40 },
 };
 
-// Timeframe display config matching Excel layout
+// Timeframe display config
 const TIMEFRAMES = [
   { key: 'month', label: 'Monthly',  shortLabel: 'M',   row: 1, group: 'broadstroke' },
   { key: 'week',  label: 'Weekly',   shortLabel: 'W',   row: 2, group: 'broadstroke' },
@@ -21,26 +20,6 @@ const TIMEFRAMES = [
   { key: 'h1',    label: '1 Hour',   shortLabel: '1H',  row: 5, group: 'trigger' },
   { key: 'm15',   label: '15 Min',   shortLabel: '15m', row: 6, group: 'trigger' },
   { key: 'm5',    label: '5 Min',    shortLabel: '5m',  row: 7, group: 'trigger' },
-];
-
-// Timeframe weight for the grading system (how much each TF contributes to overall confidence)
-const TF_GRADE_WEIGHTS = {
-  month: 2,
-  week: 5,
-  day: 10,
-  h4: 30,
-  h1: 33,
-  m15: 10,
-  m5: 5,
-};
-
-// Grade thresholds from Excel
-const GRADE_THRESHOLDS = [
-  { grade: 'A', label: 'Very Good', min: 75, max: 84 },
-  { grade: 'B', label: 'Good',      min: 60, max: 74 },
-  { grade: 'C', label: 'Risky',     min: 50, max: 59 },
-  { grade: 'D', label: 'Dangerous', min: 40, max: 49 },
-  { grade: 'F', label: 'Fail',      min: -100, max: 39 },
 ];
 
 // Default empty inputs
@@ -53,179 +32,168 @@ function getDefaultInputs() {
 }
 
 // Calculate weighted score for a single timeframe
-// Each indicator input (+1/-1/0) is multiplied by its weight
+// Returns a signed integer total and a result: +1=BUY, -1=SELL, 0=neutral
 function calcTimeframeScore(tfKey, indicators) {
   const w = WEIGHTS[tfKey];
-  const buyScore =
-    (indicators.close === 1 ? w.close : 0) +
-    (indicators.macd === 1 ? w.macd : 0) +
-    (indicators.rsi === 1 ? w.rsi : 0) +
-    (indicators.boli === 1 ? w.boli : 0);
-  const sellScore =
-    (indicators.close === -1 ? w.close : 0) +
-    (indicators.macd === -1 ? w.macd : 0) +
-    (indicators.rsi === -1 ? w.rsi : 0) +
-    (indicators.boli === -1 ? w.boli : 0);
-
-  // Weighted total: positive values come from BUY weight, negative from SELL weight
   const total =
     (indicators.close * w.close) +
-    (indicators.macd * w.macd) +
-    (indicators.rsi * w.rsi) +
-    (indicators.boli * w.boli);
+    (indicators.macd  * w.macd)  +
+    (indicators.rsi   * w.rsi)   +
+    (indicators.boli  * w.boli);
 
-  // Result: +1 if total > 0, -1 if total < 0, else check if any inputs exist
   let result = 0;
   if (total > 0) result = 1;
   else if (total < 0) result = -1;
 
   const bias = result === 1 ? 'BUY' : result === -1 ? 'SELL' : '';
-
-  return { total, result, bias, buyScore, sellScore };
+  return { total, result, bias, indicators };
 }
 
-// Calculate the full bias analysis from inputs
+// ─── Main bias calculation ────────────────────────────────────────────────────
 function calculateBias(inputs) {
   const tfResults = {};
-  
-  // Step 1: Calculate each timeframe
   TIMEFRAMES.forEach(tf => {
-    const indicators = inputs[tf.key] || { close: 0, macd: 0, rsi: 0, boli: 0 };
-    tfResults[tf.key] = {
-      ...calcTimeframeScore(tf.key, indicators),
-      indicators,
-    };
+    const ind = inputs[tf.key] || { close: 0, macd: 0, rsi: 0, boli: 0 };
+    tfResults[tf.key] = calcTimeframeScore(tf.key, ind);
   });
 
-  // Step 2: Deep Trend (Monthly result)
+  // ── 1. DEEP TREND  (M only, as per Excel)
   const deepResult = tfResults.month.result;
-  const deepTrend = deepResult === 1 ? 'BULL' : deepResult === -1 ? 'BEAR' : 'NEUTRAL';
+  const deepTrend  = deepResult === 1 ? 'BULL' : deepResult === -1 ? 'BEAR' : 'NEUTRAL';
 
-  // Step 3: DD (Dominant Direction from M + W + D)
-  const broadstrokeSum = tfResults.month.result + tfResults.week.result + tfResults.day.result;
-  const ddResult = broadstrokeSum > 0 ? 1 : broadstrokeSum < 0 ? -1 : 0;
-  const ddBias = ddResult === 1 ? 'BUY' : ddResult === -1 ? 'SELL' : 'NEUTRAL';
+  // Strength for Deep: sum of weighted totals for M + W + D
+  const bsWeightedSum =
+    tfResults.month.total + tfResults.week.total + tfResults.day.total;
+  const deepStrength = Math.abs(bsWeightedSum) >= 100 ? 'STRONG' : 'WEAK';
 
-  // Step 4: Now (execution from 1hr + 15m + 5m)
-  const nowSum = tfResults.h1.result + tfResults.m15.result + tfResults.m5.result;
-  const nowResult = nowSum > 0 ? 1 : nowSum < 0 ? -1 : 0;
-  const nowBias = nowResult === 1 ? 'BUY' : nowResult === -1 ? 'SELL' : 'NEUTRAL';
+  // ── 2. DD (Dominant Direction) — Daily result only (the "close-in" trend from M/W/D)
+  // Excel DD = the Daily (D) row result, as it is the most recent broadstroke timeframe
+  const ddResult = tfResults.day.result;
+  const ddBias   = ddResult === 1 ? 'BUY' : ddResult === -1 ? 'SELL' : 'NEUTRAL';
 
-  // Step 5: Calculate grading - weighted score system
-  // Each TF contributes its weight to POS or NEG bucket based on result alignment
-  let posScore = 0;
-  let negScore = 0;
-  let lightsScore = 5; // base lights score from Excel
+  // DD strength based on Daily weighted total
+  const ddAbsSum = Math.abs(tfResults.day.total);
+  const ddStrength = ddAbsSum >= 80 ? 'STRONG' : ddAbsSum >= 30 ? 'MEDIUM' : 'WEAK';
 
-  TIMEFRAMES.forEach(tf => {
-    const weight = TF_GRADE_WEIGHTS[tf.key];
-    const result = tfResults[tf.key].result;
-    if (result === 1) posScore += weight;
-    else if (result === -1) negScore += weight;
-  });
+  // ── 3. NOW (4H + 1H + 15m + 5m) — weighted sum
+  const nowWeightedSum =
+    tfResults.h4.total + tfResults.h1.total + tfResults.m15.total + tfResults.m5.total;
+  const nowResult = nowWeightedSum > 0 ? 1 : nowWeightedSum < 0 ? -1 : 0;
+  const nowBias   = nowResult === 1 ? 'BUY' : nowResult === -1 ? 'SELL' : 'NEUTRAL';
 
-  // Direction determined by which side has more weight
-  const mainDirection = posScore >= negScore ? 'BUY' : 'SELL';
-  const confidenceScore = Math.max(posScore, negScore) + lightsScore;
+  const nowAbsSum = Math.abs(nowWeightedSum);
+  const nowStrength = nowAbsSum >= 150 ? 'STRONG' : nowAbsSum >= 50 ? 'MEDIUM' : 'WEAK';
 
-  // Step 6: Determine grade
+  // ── 4. OVERALL TREND direction — majority vote across all 7 TF results
+  //    (same as Excel TREND cell: count BUY vs SELL results)
+  const buyCount  = TIMEFRAMES.filter(tf => tfResults[tf.key].result === 1).length;
+  const sellCount = TIMEFRAMES.filter(tf => tfResults[tf.key].result === -1).length;
+  // Tie-break: use weighted totals
+  const allWeightedSum = TIMEFRAMES.reduce((s, tf) => s + tfResults[tf.key].total, 0);
+  const mainDirection = allWeightedSum >= 0 ? 'BUY' : 'SELL';
+
+  // ── 5. EXTRA CHECK  (Excel "Extra Check" logic)
+  //    1H result and 15M result must BOTH be non-zero AND agree.
+  //    If either is 0 OR they disagree → No Trade.
+  const h1res  = tfResults.h1.result;
+  const m15res = tfResults.m15.result;
+  const extraCheckPass = (h1res !== 0) && (m15res !== 0) && (h1res === m15res);
+  const extraCheckNote = extraCheckPass
+    ? (h1res === 1 ? 'BUY signal confirmed' : 'SELL signal confirmed')
+    : `No Trade — 1H = ${h1res > 0 ? '+1' : h1res < 0 ? '-1' : '0'}, 15M = ${m15res > 0 ? '+1' : m15res < 0 ? '-1' : '0'}`;
+
+  // ── 6. GRADE  (based on alignment of DD + NOW + Extra Check)
+  //    A — DD & NOW agree, extra check passes, 4H aligns
+  //    B — DD & NOW agree, extra check passes
+  //    C — DD & NOW agree but extra check fails (Scalp only)
+  //    D — DD & NOW disagree but same as mainDirection
+  //    F — complete conflict / no clear signal
   let grade = 'F';
-  let gradeLabel = 'Fail';
-  for (const t of GRADE_THRESHOLDS) {
-    if (confidenceScore >= t.min && confidenceScore <= t.max) {
-      grade = t.grade;
-      gradeLabel = t.label;
-      break;
-    }
-  }
-  // Handle F for scores above 85 (also F per Excel: "-40 +85" = Fail)
-  if (confidenceScore > 84) {
-    grade = 'F';
-    gradeLabel = 'Fail';
+  let gradeLabel = 'No Trade';
+
+  const ddNowAgree = (ddResult !== 0) && (nowResult !== 0) && (ddResult === nowResult);
+  const h4aligns   = tfResults.h4.result === (mainDirection === 'BUY' ? 1 : -1);
+
+  if (ddNowAgree && extraCheckPass && h4aligns) {
+    grade = 'A'; gradeLabel = 'Very Good';
+  } else if (ddNowAgree && extraCheckPass) {
+    grade = 'B'; gradeLabel = 'Good';
+  } else if (ddNowAgree && !extraCheckPass) {
+    grade = 'C'; gradeLabel = 'Scalp';
+  } else if (!ddNowAgree && ddResult === (mainDirection === 'BUY' ? 1 : -1)) {
+    grade = 'D'; gradeLabel = 'Dangerous';
+  } else {
+    grade = 'F'; gradeLabel = 'No Trade';
   }
 
-  // Step 7: Trend strength
-  const allAligned = TIMEFRAMES.every(tf => tfResults[tf.key].result === (mainDirection === 'BUY' ? 1 : -1));
-  const broadstrokeAligned = ['month', 'week', 'day'].every(k => tfResults[k].result === (mainDirection === 'BUY' ? 1 : -1));
-  
-  let strength = 'WEAK';
-  if (allAligned) strength = 'STRONG';
-  else if (broadstrokeAligned && Math.abs(broadstrokeSum) === 3) strength = 'STRONG';
-  else if (Math.abs(broadstrokeSum) >= 2) strength = 'MEDIUM';
+  // ── 7. TARGET label (Excel "Target" cell)
+  let targetNote = '';
+  const dirLabel = mainDirection === 'BUY' ? 'BUY' : 'SELL';
+  if (grade === 'A') targetNote = `STRONG ${dirLabel}`;
+  else if (grade === 'B') targetNote = `MED ${dirLabel}`;
+  else if (grade === 'C') targetNote = `SCALP ${dirLabel}`;
+  else if (grade === 'D') targetNote = `WAIT`;
+  else targetNote = `NO TRADE`;
 
-  // Step 8: Warnings
-  const warnings = [];
-  
-  // Extended warning: all 7 timeframes aligned = overextended
-  if (allAligned && confidenceScore >= 95) {
-    warnings.push('EXTENDED - All timeframes aligned, market may be overextended');
-  }
-  
-  // Mixed signals between broadstroke and trigger
-  if (ddResult !== 0 && nowResult !== 0 && ddResult !== nowResult) {
-    warnings.push('MIXED - Broadstroke and execution timeframes disagree');
-  }
+  // ── 8. TRADE ACTION
+  let tradeAction = 'NO_TRADE';
+  let status = 'No Trade';
 
-  // M5 deciding factor warning
-  if (tfResults.m5.result !== 0 && tfResults.m5.result !== ddResult) {
-    warnings.push('M5 against trend - wait for alignment or scalp only');
-  }
-
-  // No clear direction
-  if (broadstrokeSum === 0) {
-    warnings.push('No clear broadstroke direction - exercise caution');
-  }
-
-  // Step 9: Trade action
-  let tradeAction = 'TRADE';
-  let status = 'Ready';
-  
-  if (grade === 'F') {
-    tradeAction = 'NO_TRADE';
-    status = 'No Trade';
+  if (grade === 'A' || grade === 'B') {
+    tradeAction = 'TRADE';
+    status = 'Ready';
+  } else if (grade === 'C') {
+    tradeAction = 'TRADE';
+    status = 'Scalp';
   } else if (grade === 'D') {
     tradeAction = 'WAIT';
     status = 'Dangerous';
-  } else if (warnings.some(w => w.includes('MIXED'))) {
-    tradeAction = 'WAIT';
-    status = 'Wait';
-  } else if (warnings.some(w => w.includes('EXTENDED'))) {
-    tradeAction = 'WAIT';
-    status = 'Extended';
   }
 
-  // Step 10: Target recommendation from Excel notes
-  let targetNote = '';
-  if (grade === 'A') targetNote = 'A Target & Runner';
-  else if (grade === 'B') targetNote = 'B Target';
-  else if (grade === 'C') targetNote = 'C Target / Scalp';
-  else if (grade === 'D') targetNote = 'Wait / Scalp only';
+  // ── 9. WARNINGS
+  const warnings = [];
+  if (!extraCheckPass) {
+    warnings.push(`Extra Check: ${extraCheckNote}`);
+  }
+  if (ddNowAgree && ddResult !== deepResult && deepResult !== 0) {
+    warnings.push('DD/NOW conflict with Deep Trend — counter-trend setup');
+  }
+  if (ddResult !== 0 && nowResult !== 0 && ddResult !== nowResult) {
+    warnings.push('MIXED — DD and NOW disagree, caution advised');
+  }
+
+  // ── 10. Confidence score (display only)
+  const alignedCount = TIMEFRAMES.filter(tf =>
+    tfResults[tf.key].result === (mainDirection === 'BUY' ? 1 : -1)
+  ).length;
+  const confidenceScore = Math.round((alignedCount / TIMEFRAMES.length) * 100);
 
   return {
     timeframes: tfResults,
     deepTrend,
     deepResult,
+    deepStrength,
     ddBias,
     ddResult,
-    broadstrokeSum,
+    ddStrength,
     nowBias,
     nowResult,
-    nowSum,
+    nowStrength,
     mainDirection,
-    confidenceScore: Math.min(confidenceScore, 100),
+    confidenceScore,
     grade,
     gradeLabel,
-    strength,
+    strength: ddStrength, // used by BiasResult "signal" label
     warnings,
     tradeAction,
     status,
     targetNote,
-    posScore,
-    negScore,
+    extraCheckPass,
+    extraCheckNote,
   };
 }
 
-// Asset list from the Summary sheet
+// ─── Asset list ───────────────────────────────────────────────────────────────
 const ASSETS = [
   'AUD/CAD','AUD/CHF','AUD/JPY','AUD/NZD','AUD/USD',
   'CAD/CHF','CAD/JPY','CHF/JPY','EUR/AUD','EUR/CAD',
@@ -257,57 +225,35 @@ const BASE_ATR = {
 const TARGET_WEIGHTS = {
   A: 1.25,
   B: 1,
-  C: 1.5,
-  D: 3,
-  scalp: 1.75,
-  careful: 2.5,
+  C: 0.75,
+  D: 0.5,
 };
 
 // Get ATR for an asset, considering top 5 overrides
 function getATRForAsset(asset, topAssets) {
-  // Check if asset is in top 5 with override
   for (let i = 0; i < topAssets.length; i++) {
     if (topAssets[i].asset === asset && topAssets[i].atr) {
       return topAssets[i].atr;
     }
   }
-  // Fall back to base ATR
   return BASE_ATR[asset] || 0;
 }
 
 // Calculate target price from ATR
 function calculateTarget(atr, grade, status) {
   if (!atr || atr === 0) return null;
-  
-  const baseUnit = atr / 9;
-  let target = null;
-  let targetType = '';
-  
-  // Determine which target to use based on status first, then grade
-  if (status === 'Scalp') {
-    target = baseUnit / TARGET_WEIGHTS.scalp;
-    targetType = 'Scalp';
-  } else if (status === 'Careful') {
-    target = baseUnit / TARGET_WEIGHTS.careful;
-    targetType = 'Careful';
-  } else if (grade === 'F') {
-    target = baseUnit / TARGET_WEIGHTS.careful;
-    targetType = 'Careful';
-  } else if (grade === 'A') {
-    target = baseUnit * TARGET_WEIGHTS.A;
-    targetType = 'A';
-  } else if (grade === 'B') {
-    target = baseUnit * TARGET_WEIGHTS.B;
-    targetType = 'B';
-  } else if (grade === 'C') {
-    target = baseUnit / TARGET_WEIGHTS.C;
-    targetType = 'C';
-  } else if (grade === 'D') {
-    target = baseUnit / TARGET_WEIGHTS.D;
-    targetType = 'D';
-  }
-  
-  return { target: target ? parseFloat(target.toFixed(6)) : null, targetType };
+  const baseUnit = atr;
+  const multiplier = TARGET_WEIGHTS[grade] || 0.5;
+  const target = baseUnit * multiplier;
+  return { target: parseFloat(target.toFixed(6)), targetType: grade };
 }
 
-export { TIMEFRAMES, WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS, ASSETS, BASE_ATR, TARGET_WEIGHTS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget };
+// Unused but kept for legacy export compatibility
+const GRADE_THRESHOLDS = [];
+const TF_GRADE_WEIGHTS = {};
+
+export {
+  TIMEFRAMES, WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS,
+  ASSETS, BASE_ATR, TARGET_WEIGHTS,
+  getDefaultInputs, calculateBias, getATRForAsset, calculateTarget,
+};

@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle, MinusCir
 export default function BiasResult({ results }) {
   if (!results) return null;
 
-  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, ddBias, nowBias, warnings, targetNote } = results;
+  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, warnings, targetNote, extraCheckPass, extraCheckNote } = results;
 
   const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
   const dirBg = mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border';
@@ -55,12 +55,21 @@ export default function BiasResult({ results }) {
 
       {/* Trend Breakdown */}
       <div className="grid grid-cols-3 gap-2">
-        <TrendPill label="Deep" value={deepTrend} />
-        <TrendPill label="DD" value={ddBias} />
-        <TrendPill label="Now" value={nowBias} />
+        <TrendPill label="Deep" value={deepTrend} sub={deepStrength} />
+        <TrendPill label="DD" value={ddBias} sub={ddStrength} />
+        <TrendPill label="Now" value={nowBias} sub={nowStrength} />
       </div>
 
-
+      {/* Extra Check */}
+      <div className={cn(
+        'rounded-lg border p-3 text-xs',
+        extraCheckPass
+          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+          : 'bg-red-500/10 border-red-500/30 text-red-300'
+      )}>
+        <div className="font-semibold mb-0.5">Extra Check</div>
+        <div>{extraCheckNote}</div>
+      </div>
 
       {/* Warnings */}
       {warnings.length > 0 && (
@@ -77,12 +86,13 @@ export default function BiasResult({ results }) {
   );
 }
 
-function TrendPill({ label, value }) {
+function TrendPill({ label, value, sub }) {
   const color = value === 'BUY' || value === 'BULL' ? 'text-emerald-400' : value === 'SELL' || value === 'BEAR' ? 'text-red-400' : 'text-muted-foreground';
   return (
     <div className="rounded-lg bg-secondary/80 border border-border p-2 text-center">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={cn('text-sm font-bold', color)}>{value || '—'}</div>
+      {sub && <div className="text-[9px] text-muted-foreground mt-0.5">{sub}</div>}
     </div>
   );
 }
