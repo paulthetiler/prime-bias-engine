@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Crosshair, BarChart3, Clock } from 'lucide-react';
+import { LayoutDashboard, Crosshair, BarChart3, Clock, Moon, Sun } from 'lucide-react';
+import { useTheme } from '@/lib/useTheme';
 
 const NAV_ITEMS = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -12,6 +13,7 @@ const NAV_ITEMS = [
 
 export default function BottomNav() {
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border safe-area-bottom">
@@ -32,6 +34,13 @@ export default function BottomNav() {
             </Link>
           );
         })}
+        <button
+          onClick={toggleTheme}
+          className="flex flex-col items-center gap-0.5 py-2 px-4 rounded-lg transition-colors text-muted-foreground hover:text-primary"
+        >
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          <span className="text-[10px] font-medium">Theme</span>
+        </button>
       </div>
     </nav>
   );
