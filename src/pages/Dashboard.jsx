@@ -4,6 +4,7 @@ import { TrendingUp, TrendingDown, MinusCircle, AlertTriangle } from 'lucide-rea
 
 export default function Dashboard() {
   const [activeAssets, setActiveAssets] = useState({});
+  const [timeToNextHour, setTimeToNextHour] = useState('');
 
   useEffect(() => {
     const load = () => {
@@ -17,6 +18,20 @@ export default function Dashboard() {
       window.removeEventListener('biasUpdated', load);
       window.removeEventListener('storage', load);
     };
+  }, []);
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const nextHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0, 0);
+      const diff = nextHour - now;
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setTimeToNextHour(`${mins}m ${secs}s`);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const analyses = Object.values(activeAssets);
@@ -40,8 +55,11 @@ export default function Dashboard() {
           <h1 className="text-lg font-bold tracking-tight">PrimeBias</h1>
           <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
         </div>
-        <div className="text-right text-sm">
-          <span className="text-muted-foreground">{analyses.length} assets</span>
+        <div className="text-right text-sm space-y-1">
+          <div className="text-muted-foreground">{analyses.length} assets</div>
+          <div className="text-xs bg-secondary rounded px-2 py-1 font-mono text-primary">
+            {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+          </div>
         </div>
       </div>
 
