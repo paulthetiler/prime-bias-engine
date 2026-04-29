@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget } from '@/lib/biasEngine';
 import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
+import AssetQuickSwitch from '@/components/bias/AssetQuickSwitch';
 import { Button } from '@/components/ui/button';
 import { Input as InputField } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -66,15 +67,19 @@ export default function Input() {
     return () => window.removeEventListener('atrUpdated', handleAtrUpdate);
   }, []);
 
-  // Load analysis from active set
+  // Load analysis from active set and sync active assets
   useEffect(() => {
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+    setActiveAssets(active);
     if (instrument && active[instrument]) {
       const data = active[instrument];
       setInputs(data.inputs || getDefaultInputs());
       setResults(data.results || null);
     }
   }, [instrument, topAssets]);
+
+  // Track active assets for quick switch
+  const [activeAssets, setActiveAssets] = useState({});
 
   // Load instrument from session storage if coming from Dashboard
   useEffect(() => {
@@ -169,6 +174,17 @@ export default function Input() {
           </Button>
         </div>
       </div>
+
+      {/* Quick Asset Switcher */}
+      {Object.values(activeAssets).length > 0 && (
+        <div className="px-1">
+          <AssetQuickSwitch 
+            analyses={Object.values(activeAssets)}
+            currentInstrument={instrument}
+            onInstrumentChange={setInstrument}
+          />
+        </div>
+      )}
 
       {/* Instrument Selector with Add/Remove */}
       <div className="space-y-2">
