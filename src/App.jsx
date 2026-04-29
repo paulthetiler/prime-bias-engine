@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -12,6 +13,7 @@ import Input from '@/pages/Input';
 import Engine from '@/pages/Engine';
 import History from '@/pages/History';
 import ATR from '@/pages/ATR';
+import Settings from '@/pages/Settings';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -34,16 +36,19 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <Routes>
-      <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/input" element={<Input />} />
-        <Route path="/engine" element={<Engine />} />
-        <Route path="/history" element={<History />} />
-        <Route path="/atr" element={<ATR />} />
-      </Route>
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <AnimatePresence mode="wait">
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/input" element={<Input />} />
+          <Route path="/engine" element={<Engine />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/atr" element={<ATR />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </AnimatePresence>
   );
 };
 

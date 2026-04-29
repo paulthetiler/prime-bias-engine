@@ -11,6 +11,8 @@ export default function Dashboard() {
   const [activeAssets, setActiveAssets] = useState({});
   const [timeToNextHour, setTimeToNextHour] = useState('');
   const [viewMode, setViewMode] = useState('grid');
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const load = () => {
@@ -40,6 +42,34 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const handlePullRefresh = (e) => {
+    const touch = e.touches[0];
+    if (window.scrollY === 0) {
+      const distance = touch.clientY - (pullDistance || 0);
+      if (distance > 0) {
+        setPullDistance(Math.min(distance, 80));
+      }
+    }
+  };
+
+  const handlePullEnd = () => {
+    if (pullDistance > 60) {
+      setIsRefreshing(true);
+      setTimeout(() => {
+        const load = () => {
+          const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+          setActiveAssets(active);
+        };
+        load();
+        window.dispatchEvent(new Event('biasUpdated'));
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }, 600);
+    } else {
+      setPullDistance(0);
+    }
+  };
+
   const analyses = Object.values(activeAssets);
 
   if (analyses.length === 0) {
@@ -58,7 +88,27 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div 
+      className="p-4 space-y-4"
+      onTouchMove={handlePullRefresh}
+      onTouchEnd={handlePullEnd}
+    >
+      {pullDistance > 0 && (
+        <div className="h-16 flex items-center justify-center overflow-hidden">
+          <div className="text-center">
+            <div className="inline-block">
+              <div 
+                className="w-10 h-10 rounded-full border-3 border-primary/20 border-t-primary transition-transform"
+                style={{ 
+                  transform: `rotate(${(pullDistance / 80) * 360}deg) scale(${Math.min(pullDistance / 40, 1)})`,
+                  opacity: Math.min(pullDistance / 40, 1)
+                }}
+              />
+            </div>
+            {isRefreshing && <p className="text-xs text-muted-foreground mt-2">Refreshing...</p>}
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between pt-2">
         <div>
           <h1 className="text-lg font-bold tracking-tight">PrimeBias</h1>
