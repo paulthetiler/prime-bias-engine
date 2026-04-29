@@ -90,10 +90,14 @@ export default function Input() {
     setActiveAssets(active);
     if (instrument && active[instrument]) {
       const data = active[instrument];
-      setInputs(data.inputs || getDefaultInputs());
-      setResults(data.results || null);
+      const loadedInputs = data.inputs || getDefaultInputs();
+      setInputs(loadedInputs);
+      // Always recalculate fresh results (never use stale cached results)
+      const freshResults = calculateBias(loadedInputs);
+      setResults(freshResults);
       setExtraCheck(data.extraCheck || { h1: null, m15: null });
     } else if (instrument) {
+      setInputs(getDefaultInputs());
       setExtraCheck({ h1: null, m15: null });
     }
   }, [instrument, topAssets]);

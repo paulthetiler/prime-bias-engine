@@ -6,6 +6,7 @@ import AssetsList from '@/components/bias/AssetsList';
 import LiveGrid from '@/components/bias/LiveGrid';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { calculateBias } from '@/lib/biasEngine';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -18,6 +19,12 @@ export default function Dashboard() {
   useEffect(() => {
     const load = () => {
       const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+      // Recalculate fresh results for all assets to avoid stale cache
+      Object.keys(active).forEach(key => {
+        if (active[key].inputs) {
+          active[key].results = calculateBias(active[key].inputs);
+        }
+      });
       setActiveAssets(active);
     };
     load();
@@ -182,7 +189,7 @@ function AnalysisCard({ analysis }) {
   const { instrument, results } = analysis;
   if (!results) return null;
   
-  const { mainDirection, grade, confidenceScore, tradeAction, deepTrend, ddBias, nowBias, warnings } = results;
+  const { mainDirection, grade, confidenceScore, tradeAction, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, warnings } = results;
 
   const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
   const dirBg = mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border';
@@ -245,9 +252,9 @@ function AnalysisCard({ analysis }) {
 
       {/* Trend Breakdown */}
       <div className="grid grid-cols-3 gap-2">
-        <TrendPill label="Deep" value={deepTrend} />
-        <TrendPill label="DD" value={ddBias} />
-        <TrendPill label="Now" value={nowBias} />
+        <TrendPill label="Deep" value={deepTrend} sub={deepStrength} />
+        <TrendPill label="DD" value={ddBias} sub={ddStrength} />
+        <TrendPill label="Now" value={nowBias} sub={nowStrength} />
       </div>
 
       {/* Warnings */}
@@ -265,12 +272,13 @@ function AnalysisCard({ analysis }) {
   );
 }
 
-function TrendPill({ label, value }) {
+function TrendPill({ label, value, sub }) {
   const color = value === 'BUY' || value === 'BULL' ? 'text-emerald-400' : value === 'SELL' || value === 'BEAR' ? 'text-red-400' : 'text-muted-foreground';
   return (
     <div className="rounded-lg bg-secondary/80 border border-border p-2 text-center">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={cn('text-sm font-bold', color)}>{value || '—'}</div>
+      {sub && <div className="text-[9px] text-muted-foreground mt-0.5">{sub}</div>}
     </div>
   );
 }
