@@ -165,19 +165,14 @@ export default function Input() {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between pt-2">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Market Input</h1>
-          <div className="text-right text-xs text-muted-foreground mt-2">
-            <div className="text-[11px]">time left in hour</div>
-            <div className="bg-secondary rounded px-3 py-1.5 font-mono text-primary text-base font-semibold inline-block mt-1">
-              {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
-            </div>
+    <div className="p-3 space-y-2.5">
+      {/* Header — compact single row */}
+      <div className="flex items-center justify-between pt-1">
+        <h1 className="text-base font-bold tracking-tight">Market Input</h1>
+        <div className="flex items-center gap-2">
+          <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-xs font-semibold">
+            {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
           </div>
-        </div>
-        <div className="flex gap-2">
           <Button 
             variant="ghost" 
             size="icon" 
@@ -188,12 +183,12 @@ export default function Input() {
               window.dispatchEvent(new Event('biasUpdated'));
               toast.success('History cleared');
             }}
-            className="h-9 w-9 text-destructive hover:text-destructive"
+            className="h-8 w-8 text-destructive hover:text-destructive"
             title="Clear history"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 h-9">
+          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1 h-8 px-3">
             <Save className="w-4 h-4" />
             Save
           </Button>
