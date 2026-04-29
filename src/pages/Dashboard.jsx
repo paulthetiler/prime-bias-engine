@@ -208,17 +208,18 @@ function AnalysisCard({ analysis }) {
         <div className="text-sm font-semibold text-foreground">
           {instrument}
         </div>
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => {
-            // Navigate to Input and set the selected instrument
             sessionStorage.setItem('selectedInstrument', instrument);
             window.location.pathname = '/input';
           }}
-          className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-          title="Edit values"
+          className="rounded-full gap-1.5"
         >
-          <Edit2 className="w-4 h-4" />
-        </button>
+          <Edit2 className="w-3.5 h-3.5" />
+          Edit
+        </Button>
       </div>
 
       {/* Main Direction Card */}
