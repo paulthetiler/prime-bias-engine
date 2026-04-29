@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget } from '@/lib/biasEngine';
 import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
+import ExtraCheck from '@/components/bias/ExtraCheck';
 import AssetQuickSwitch from '@/components/bias/AssetQuickSwitch';
 import { Button } from '@/components/ui/button';
 import { Input as InputField } from '@/components/ui/input';
@@ -31,6 +32,11 @@ export default function Input() {
     { asset: '', atr: null },
   ]);
   const [open, setOpen] = useState(false);
+  const [extraCheck, setExtraCheck] = useState({ h1: null, m15: null });
+
+  const handleExtraCheckChange = (key, value) => {
+    setExtraCheck(prev => ({ ...prev, [key]: value }));
+  };
 
   // Timer countdown
   useEffect(() => {
@@ -303,6 +309,13 @@ export default function Input() {
           ))}
         </div>
       </div>
+
+      {/* Extra Check */}
+      <ExtraCheck
+        h1={extraCheck.h1}
+        m15={extraCheck.m15}
+        onChange={handleExtraCheckChange}
+      />
 
       {/* Results Toggle */}
       <button

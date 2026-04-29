@@ -109,21 +109,11 @@ function calculateBias(inputs) {
   const allWeightedSum = TIMEFRAMES.reduce((s, tf) => s + tfResults[tf.key].total, 0);
   const mainDirection = allWeightedSum >= 0 ? 'BUY' : 'SELL';
 
-  // ── 5. EXTRA CHECK  (Excel "Extra Check" logic)
-  //    1H result and 15M result must BOTH be non-zero AND agree.
-  //    If either is 0 OR they disagree → No Trade.
-  const h1res  = tfResults.h1.result;
-  const m15res = tfResults.m15.result;
-  const extraCheckPass = (h1res !== 0) && (m15res !== 0) && (h1res === m15res);
-  const extraCheckNote = extraCheckPass
-    ? (h1res === 1 ? 'BUY signal confirmed' : 'SELL signal confirmed')
-    : `No Trade — 1H = ${h1res > 0 ? '+1' : h1res < 0 ? '-1' : '0'}, 15M = ${m15res > 0 ? '+1' : m15res < 0 ? '-1' : '0'}`;
-
-  // ── 6. GRADE  (based on alignment of DD + NOW + Extra Check)
-  //    A — DD & NOW agree, extra check passes, 4H aligns
-  //    B — DD & NOW agree, extra check passes
-  //    C — DD & NOW agree but extra check fails (Scalp only)
-  //    D — DD & NOW disagree but same as mainDirection
+  // ── 5. GRADE  (based on alignment of DD + NOW + 4H)
+  //    A — DD & NOW agree, 4H aligns
+  //    B — DD & NOW agree, 4H does not align
+  //    C — DD & NOW agree but plusMinus is weak (≤0)
+  //    D — DD & NOW disagree but DD aligns with mainDirection
   //    F — complete conflict / no clear signal
   let grade = 'F';
   let gradeLabel = 'No Trade';
@@ -131,11 +121,9 @@ function calculateBias(inputs) {
   const ddNowAgree = (ddResult !== 0) && (nowResult !== 0) && (ddResult === nowResult);
   const h4aligns   = tfResults.h4.result === (mainDirection === 'BUY' ? 1 : -1);
 
-  if (ddNowAgree && extraCheckPass && h4aligns) {
-    grade = 'A'; gradeLabel = 'Very Good';
-  } else if (ddNowAgree && extraCheckPass) {
+  if (ddNowAgree && h4aligns) {
     grade = 'B'; gradeLabel = 'Good';
-  } else if (ddNowAgree && !extraCheckPass) {
+  } else if (ddNowAgree) {
     grade = 'C'; gradeLabel = 'Scalp';
   } else if (!ddNowAgree && ddResult === (mainDirection === 'BUY' ? 1 : -1)) {
     grade = 'D'; gradeLabel = 'Dangerous';
@@ -169,9 +157,6 @@ function calculateBias(inputs) {
 
   // ── 9. WARNINGS
   const warnings = [];
-  if (!extraCheckPass) {
-    warnings.push(`Extra Check: ${extraCheckNote}`);
-  }
   if (ddNowAgree && ddResult !== deepResult && deepResult !== 0) {
     warnings.push('DD/NOW conflict with Deep Trend — counter-trend setup');
   }
@@ -196,6 +181,7 @@ function calculateBias(inputs) {
     nowBias,
     nowResult,
     nowStrength,
+    plusMinusScore,
     mainDirection,
     confidenceScore,
     grade,
@@ -205,8 +191,6 @@ function calculateBias(inputs) {
     tradeAction,
     status,
     targetNote,
-    extraCheckPass,
-    extraCheckNote,
   };
 }
 
