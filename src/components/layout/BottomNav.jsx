@@ -36,7 +36,10 @@ export default function BottomNav() {
         })}
         <button
           onClick={toggleTheme}
-          className="flex flex-col items-center gap-0.5 py-2 px-4 rounded-lg transition-colors text-muted-foreground hover:text-primary"
+          className={cn(
+            'flex flex-col items-center gap-0.5 py-2 px-4 rounded-lg transition-colors',
+            theme === 'dark' ? 'text-primary' : 'text-muted-foreground hover:text-primary'
+          )}
         >
           {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           <span className="text-[10px] font-medium">Theme</span>
