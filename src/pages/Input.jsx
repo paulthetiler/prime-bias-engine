@@ -74,7 +74,7 @@ export default function Input() {
       setInputs(data.inputs || getDefaultInputs());
       setResults(data.results || null);
     }
-  }, [instrument]);
+  }, [instrument, topAssets]);
 
   // Load instrument from session storage if coming from Dashboard
   useEffect(() => {
