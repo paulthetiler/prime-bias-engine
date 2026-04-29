@@ -181,7 +181,7 @@ export default function Input() {
               setInstrument('');
               setInputs(getDefaultInputs());
               window.dispatchEvent(new Event('biasUpdated'));
-              toast.success('History cleared');
+              toast.success('Cleared');
             }}
             className="h-8 w-8 text-destructive hover:text-destructive"
             title="Clear history"

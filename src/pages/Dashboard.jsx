@@ -89,7 +89,7 @@ export default function Dashboard() {
         <h1 className="text-xl font-bold mb-2">PrimeBias</h1>
         <p className="text-muted-foreground text-sm mb-6">Go to the Bias Tool tab to add assets for analysis</p>
         <Link to="/input">
-          <Button className="rounded-full">Input</Button>
+          <Button className="rounded-full">Bias Tool</Button>
         </Link>
       </div>
     );
