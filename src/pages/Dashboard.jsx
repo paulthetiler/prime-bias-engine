@@ -3,42 +3,62 @@ import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, MinusCircle, AlertTriangle } from 'lucide-react';
 
 export default function Dashboard() {
-  const [analysis, setAnalysis] = useState(null);
+  const [activeAssets, setActiveAssets] = useState({});
 
   useEffect(() => {
-    const stored = localStorage.getItem('primebias_current');
-    if (stored) setAnalysis(JSON.parse(stored));
-  }, []);
-
-  // Listen for updates from input page
-  useEffect(() => {
-    const handler = () => {
-      const stored = localStorage.getItem('primebias_current');
-      if (stored) setAnalysis(JSON.parse(stored));
+    const load = () => {
+      const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+      setActiveAssets(active);
     };
-    window.addEventListener('storage', handler);
-    window.addEventListener('biasUpdated', handler);
+    load();
+    window.addEventListener('biasUpdated', load);
+    window.addEventListener('storage', load);
     return () => {
-      window.removeEventListener('storage', handler);
-      window.removeEventListener('biasUpdated', handler);
+      window.removeEventListener('biasUpdated', load);
+      window.removeEventListener('storage', load);
     };
   }, []);
 
-  if (!analysis || !analysis.results) {
+  const analyses = Object.values(activeAssets);
+
+  if (analyses.length === 0) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center">
         <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mb-4">
           <Crosshair className="w-10 h-10 text-muted-foreground" />
         </div>
         <h1 className="text-xl font-bold mb-2">PrimeBias</h1>
-        <p className="text-muted-foreground text-sm mb-6">Go to the Input tab to start your first bias analysis</p>
+        <p className="text-muted-foreground text-sm mb-6">Go to the Input tab to add assets for analysis</p>
       </div>
     );
   }
 
-  const { instrument, results } = analysis;
-  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, ddBias, nowBias, warnings, targetNote } = results;
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between pt-2">
+        <div>
+          <h1 className="text-lg font-bold tracking-tight">PrimeBias</h1>
+          <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+        </div>
+        <div className="text-right text-sm">
+          <span className="text-muted-foreground">{analyses.length} assets</span>
+        </div>
+      </div>
 
+      <div className="grid grid-cols-1 gap-3">
+        {analyses.map(a => (
+          <AnalysisCard key={a.instrument} analysis={a} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AnalysisCard({ analysis }) {
+  const { instrument, results } = analysis;
+  if (!results) return null;
+  
+  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, strength, deepTrend, ddBias, nowBias, warnings } = results;
   const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
   const dirBg = mainDirection === 'BUY' ? 'from-emerald-500/20 to-emerald-500/5' : mainDirection === 'SELL' ? 'from-red-500/20 to-red-500/5' : 'from-secondary to-secondary/50';
 
@@ -53,64 +73,61 @@ export default function Dashboard() {
   const actionColors = { TRADE: 'bg-emerald-500', WAIT: 'bg-yellow-500', NO_TRADE: 'bg-red-500' };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className={cn('rounded-xl border border-border bg-card p-4 space-y-3', dirBg)}>
       {/* Header */}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold tracking-tight">PrimeBias</h1>
-          <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-        </div>
-        <div className="text-right">
-          <div className="text-sm font-semibold">{instrument}</div>
+          <div className="font-semibold text-sm">{instrument}</div>
           <div className={cn('text-[10px] uppercase tracking-wider', dirColor)}>{strength}</div>
         </div>
-      </div>
-
-      {/* Hero Card */}
-      <div className={cn('rounded-2xl bg-gradient-to-b p-6 text-center border border-border', dirBg)}>
-        <div className="flex items-center justify-center gap-3 mb-2">
-          {mainDirection === 'BUY' ? <TrendingUp className="w-8 h-8 text-emerald-400" /> : mainDirection === 'SELL' ? <TrendingDown className="w-8 h-8 text-red-400" /> : <MinusCircle className="w-8 h-8" />}
-          <span className={cn('text-4xl font-extrabold tracking-tight', dirColor)}>{mainDirection}</span>
-        </div>
-        <div className="text-sm text-muted-foreground mb-4">{strength} • {status}</div>
-        
-        <div className={cn('inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold', actionColors[tradeAction], tradeAction === 'WAIT' ? 'text-black' : 'text-white')}>
-          {tradeAction === 'TRADE' ? 'TRADE' : tradeAction === 'WAIT' ? 'WAIT' : 'NO TRADE'}
+        <div className={cn('inline-flex items-center justify-center w-10 h-10 rounded-lg', 
+          mainDirection === 'BUY' ? 'bg-emerald-500/20' : mainDirection === 'SELL' ? 'bg-red-500/20' : 'bg-secondary'
+        )}>
+          {mainDirection === 'BUY' ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : mainDirection === 'SELL' ? <TrendingDown className="w-5 h-5 text-red-400" /> : <MinusCircle className="w-5 h-5" />}
         </div>
       </div>
 
-      {/* Score Row */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className={cn('rounded-xl border-2 p-4 text-center bg-card', gradeColors[grade])}>
-          <div className="text-4xl font-black">{grade}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{gradeLabel}</div>
+      {/* Bias + Grade + Score Row */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="flex items-center gap-2">
+          <span className={cn('text-xl font-extrabold', dirColor)}>{mainDirection}</span>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4 text-center">
-          <div className="text-4xl font-black font-mono">{confidenceScore}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Confidence</div>
+        <div className={cn('rounded-lg border p-2 text-center bg-card/50', gradeColors[grade])}>
+          <div className="font-bold text-sm">{grade}</div>
+          <div className="text-[8px] uppercase tracking-wider text-muted-foreground">{gradeLabel}</div>
         </div>
-        <div className="rounded-xl border border-border bg-card p-4 text-center">
-          <div className="text-lg font-bold text-muted-foreground mt-2">{targetNote || '—'}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">Target</div>
+        <div className="rounded-lg border border-border bg-card/50 p-2 text-center">
+          <div className="font-bold text-sm font-mono">{confidenceScore}</div>
+          <div className="text-[8px] uppercase tracking-wider text-muted-foreground">Score</div>
         </div>
       </div>
 
-      {/* Trend Breakdown */}
-      <div className="grid grid-cols-3 gap-3">
-        <TrendCard label="DEEP" value={deepTrend} />
-        <TrendCard label="DD" value={ddBias} />
-        <TrendCard label="NOW" value={nowBias} />
+      {/* Trends Compact */}
+      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+        <div className="text-muted-foreground">
+          <div className="text-[10px]">DEEP</div>
+          <div className={deepTrend === 'BULL' ? 'text-emerald-400' : deepTrend === 'BEAR' ? 'text-red-400' : 'text-muted-foreground'} style={{fontSize: '11px', fontWeight: 'bold'}}>{deepTrend || '—'}</div>
+        </div>
+        <div className="text-muted-foreground">
+          <div className="text-[10px]">DD</div>
+          <div className={ddBias === 'BUY' ? 'text-emerald-400' : ddBias === 'SELL' ? 'text-red-400' : 'text-muted-foreground'} style={{fontSize: '11px', fontWeight: 'bold'}}>{ddBias || '—'}</div>
+        </div>
+        <div className="text-muted-foreground">
+          <div className="text-[10px]">NOW</div>
+          <div className={nowBias === 'BUY' ? 'text-emerald-400' : nowBias === 'SELL' ? 'text-red-400' : 'text-muted-foreground'} style={{fontSize: '11px', fontWeight: 'bold'}}>{nowBias || '—'}</div>
+        </div>
+      </div>
+
+      {/* Action Badge */}
+      <div className={cn('text-center py-1.5 rounded-lg text-xs font-bold', actionColors[tradeAction], tradeAction === 'WAIT' ? 'text-black' : 'text-white')}>
+        {tradeAction === 'TRADE' ? 'TRADE' : tradeAction === 'WAIT' ? 'WAIT' : 'NO TRADE'}
       </div>
 
       {/* Warnings */}
       {warnings.length > 0 && (
-        <div className="space-y-2">
-          {warnings.map((w, i) => (
-            <div key={i} className="flex items-start gap-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 p-3">
-              <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
-              <span className="text-xs text-yellow-300">{w}</span>
-            </div>
-          ))}
+        <div className="flex items-start gap-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-2">
+          <AlertTriangle className="w-3 h-3 text-yellow-400 shrink-0 mt-0.5" />
+          <span className="text-[10px] text-yellow-300 leading-tight">{warnings[0]}</span>
         </div>
       )}
     </div>
@@ -122,15 +139,5 @@ function Crosshair(props) {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <circle cx="12" cy="12" r="10" /><line x1="22" y1="12" x2="18" y2="12" /><line x1="6" y1="12" x2="2" y2="12" /><line x1="12" y1="6" x2="12" y2="2" /><line x1="12" y1="22" x2="12" y2="18" />
     </svg>
-  );
-}
-
-function TrendCard({ label, value }) {
-  const color = value === 'BUY' || value === 'BULL' ? 'text-emerald-400' : value === 'SELL' || value === 'BEAR' ? 'text-red-400' : 'text-muted-foreground';
-  return (
-    <div className="rounded-xl bg-card border border-border p-3 text-center">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
-      <div className={cn('text-sm font-bold', color)}>{value || 'NEUTRAL'}</div>
-    </div>
   );
 }

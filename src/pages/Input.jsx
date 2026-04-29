@@ -17,25 +17,26 @@ export default function Input() {
   const [showResult, setShowResult] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Load current analysis from localStorage
+  // Load analysis from active set
   useEffect(() => {
-    const stored = localStorage.getItem('primebias_current');
-    if (stored) {
-      const data = JSON.parse(stored);
-      if (data.inputs) setInputs(data.inputs);
-      if (data.instrument) setInstrument(data.instrument);
-      if (data.results) setResults(data.results);
+    const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+    if (instrument && active[instrument]) {
+      const data = active[instrument];
+      setInputs(data.inputs || getDefaultInputs());
+      setResults(data.results || null);
     }
-  }, []);
+  }, [instrument]);
 
   // Recalculate on every input change
   useEffect(() => {
+    if (!instrument) return;
     const res = calculateBias(inputs);
     setResults(res);
     
-    // Store current state
-    const current = { instrument, inputs, results: res, timestamp: new Date().toISOString() };
-    localStorage.setItem('primebias_current', JSON.stringify(current));
+    // Store in active set
+    const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+    active[instrument] = { instrument, inputs, results: res, timestamp: new Date().toISOString() };
+    localStorage.setItem('primebias_active', JSON.stringify(active));
     window.dispatchEvent(new Event('biasUpdated'));
   }, [inputs, instrument]);
 
@@ -85,17 +86,38 @@ export default function Input() {
         </div>
       </div>
 
-      {/* Instrument Selector */}
-      <Select value={instrument} onValueChange={setInstrument}>
-        <SelectTrigger className="h-12 text-base">
-          <SelectValue placeholder="Select instrument..." />
-        </SelectTrigger>
-        <SelectContent className="max-h-72">
-          {ASSETS.map(a => (
-            <SelectItem key={a} value={a}>{a}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* Instrument Selector with Add/Remove */}
+      <div className="space-y-2">
+        <Select value={instrument} onValueChange={setInstrument}>
+          <SelectTrigger className="h-12 text-base">
+            <SelectValue placeholder="Select instrument..." />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            {ASSETS.map(a => (
+              <SelectItem key={a} value={a}>{a}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {instrument && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+                delete active[instrument];
+                localStorage.setItem('primebias_active', JSON.stringify(active));
+                setInstrument('');
+                window.dispatchEvent(new Event('biasUpdated'));
+                toast.success('Removed from active');
+              }}
+            >
+              Remove
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Instructions */}
       <div className="text-xs text-muted-foreground px-1">
