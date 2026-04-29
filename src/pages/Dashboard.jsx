@@ -119,63 +119,80 @@ function AnalysisCard({ analysis }) {
   if (!results) return null;
   
   const { mainDirection, grade, confidenceScore, tradeAction, deepTrend, ddBias, nowBias, warnings } = results;
+
   const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
-  const actionBg = tradeAction === 'TRADE' ? 'bg-emerald-500' : tradeAction === 'WAIT' ? 'bg-amber-500' : 'bg-red-500';
+  const dirBg = mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border';
+
+  const gradeColors = {
+    A: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30',
+    B: 'text-blue-400 bg-blue-500/15 border-blue-500/30',
+    C: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
+    D: 'text-orange-400 bg-orange-500/15 border-orange-500/30',
+    F: 'text-red-400 bg-red-500/15 border-red-500/30',
+  };
+
+  const actionColors = {
+    TRADE: 'bg-emerald-500 text-white',
+    WAIT: 'bg-yellow-500 text-black',
+    NO_TRADE: 'bg-red-500 text-white',
+  };
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">Pair</div>
-          <div className="text-lg font-bold text-foreground">{instrument}</div>
+    <div className="space-y-3">
+      {/* Instrument Header */}
+      <div className="rounded-lg border border-border bg-secondary p-3 text-sm font-semibold text-foreground">
+        {instrument}
+      </div>
+
+      {/* Main Direction Card */}
+      <div className={cn('rounded-xl border-2 p-4 text-center', dirBg)}>
+        <div className={cn('text-3xl font-bold', dirColor)}>{mainDirection}</div>
+      </div>
+
+      {/* Grade + Score + Action Row */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className={cn('rounded-lg border p-3 text-center', gradeColors[grade])}>
+          <div className="text-3xl font-bold">{grade}</div>
+          <div className="text-[10px] uppercase tracking-wider opacity-70">Grade</div>
         </div>
-        <div className="text-right">
-          <div className="text-xs text-muted-foreground mb-1">Direction</div>
-          <div className={cn('text-2xl font-black', dirColor)}>{mainDirection}</div>
+        <div className="rounded-lg border border-border bg-secondary p-3 text-center">
+          <div className="text-3xl font-bold font-mono">{confidenceScore}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Score</div>
+        </div>
+        <div className={cn('rounded-lg p-3 text-center flex flex-col items-center justify-center', actionColors[tradeAction])}>
+          <div className="text-lg font-bold">{tradeAction}</div>
+          <div className="text-[10px] uppercase tracking-wider opacity-80">Action</div>
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-3 gap-3 border-t border-b border-border py-3">
-        <div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Grade</div>
-          <div className="text-xl font-bold text-foreground">{grade}</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Score</div>
-          <div className="text-xl font-mono font-bold text-foreground">{confidenceScore}</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Action</div>
-          <div className={cn('inline-block px-2 py-1 rounded text-xs font-bold text-white', actionBg)}>
-            {tradeAction}
-          </div>
-        </div>
-      </div>
-
-      {/* Trends */}
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Deep</div>
-          <div className="text-sm font-semibold text-foreground">{deepTrend || '—'}</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">DD</div>
-          <div className="text-sm font-semibold text-foreground">{ddBias || '—'}</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Now</div>
-          <div className="text-sm font-semibold text-foreground">{nowBias || '—'}</div>
-        </div>
+      {/* Trend Breakdown */}
+      <div className="grid grid-cols-3 gap-2">
+        <TrendPill label="Deep" value={deepTrend} />
+        <TrendPill label="DD" value={ddBias} />
+        <TrendPill label="Now" value={nowBias} />
       </div>
 
       {/* Warnings */}
       {warnings.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2 text-[10px] text-amber-300">
-          ⚠ {warnings[0]}
+        <div className="space-y-1.5">
+          {warnings.map((w, i) => (
+            <div key={i} className="flex items-start gap-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-2.5 text-xs text-yellow-300">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{w}</span>
+            </div>
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function TrendPill({ label, value }) {
+  const color = value === 'BUY' || value === 'BULL' ? 'text-emerald-400' : value === 'SELL' || value === 'BEAR' ? 'text-red-400' : 'text-muted-foreground';
+  return (
+    <div className="rounded-lg bg-secondary/80 border border-border p-2 text-center">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={cn('text-sm font-bold', color)}>{value || '—'}</div>
     </div>
   );
 }
