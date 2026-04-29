@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Crosshair, BarChart3, Clock, Moon, Sun, Settings } from 'lucide-react';
-import { useTheme } from '@/lib/useTheme';
+import { LayoutDashboard, Crosshair, BarChart3, Clock, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/engine', icon: BarChart3, label: 'Engine' },
@@ -13,7 +12,6 @@ const NAV_ITEMS = [
 
 export default function BottomNav() {
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t border-border select-none" style={{ paddingBottom: `calc(0.25rem + var(--safe-area-bottom))` }}>
@@ -34,16 +32,7 @@ export default function BottomNav() {
             </Link>
           );
         })}
-        <button
-          onClick={toggleTheme}
-          className={cn(
-            'flex flex-col items-center gap-0.5 py-2 px-4 rounded-lg transition-colors',
-            theme === 'dark' ? 'text-primary' : 'text-muted-foreground hover:text-primary'
-          )}
-        >
-          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          <span className="text-[10px] font-medium">Theme</span>
-        </button>
+
       </div>
     </nav>
   );
