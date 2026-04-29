@@ -116,11 +116,11 @@ export default function Dashboard() {
           <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
         </div>
         <div className="flex gap-2 items-center">
-          <div className="text-right text-sm space-y-1">
-            <div className="text-muted-foreground">{analyses.length} assets</div>
+          <div className="text-right space-y-1">
+            <div className="text-sm text-muted-foreground">{analyses.length} assets</div>
             <div className="space-y-0.5">
               <div className="text-[10px] text-muted-foreground">time left in hour</div>
-              <div className="text-xs bg-secondary rounded px-2 py-1 font-mono text-primary">
+              <div className="bg-secondary rounded px-3 py-1.5 font-mono text-primary text-base font-semibold inline-block">
                 {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
               </div>
             </div>
