@@ -57,8 +57,11 @@ export default function Dashboard() {
         </div>
         <div className="text-right text-sm space-y-1">
           <div className="text-muted-foreground">{analyses.length} assets</div>
-          <div className="text-xs bg-secondary rounded px-2 py-1 font-mono text-primary">
-            {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+          <div className="space-y-0.5">
+            <div className="text-[10px] text-muted-foreground">time left in hour</div>
+            <div className="text-xs bg-secondary rounded px-2 py-1 font-mono text-primary">
+              {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+            </div>
           </div>
         </div>
       </div>
