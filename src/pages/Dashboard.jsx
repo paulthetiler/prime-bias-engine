@@ -75,14 +75,12 @@ export default function Dashboard() {
             size="icon"
             onClick={() => {
               localStorage.removeItem('primebias_active');
-              localStorage.removeItem('primebias_top_assets');
               setActiveAssets({});
               window.dispatchEvent(new Event('biasUpdated'));
-              window.dispatchEvent(new Event('atrUpdated'));
-              toast.success('Everything cleared');
+              toast.success('Analyses cleared');
             }}
             className="h-9 w-9 text-destructive hover:text-destructive"
-            title="Clear all data"
+            title="Clear analyses"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
