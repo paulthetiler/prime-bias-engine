@@ -119,7 +119,7 @@ export default function Dashboard() {
       )}
       <div className="flex items-center justify-between pt-2">
         <div>
-          <h1 className="text-lg font-bold tracking-tight">PrimeBias</h1>
+          <h1 className="text-lg font-bold tracking-tight">Summary</h1>
           <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
         </div>
         <div className="flex gap-2 items-center">
