@@ -7,7 +7,7 @@ import BiasResult from '@/components/bias/BiasResult';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input as InputField } from '@/components/ui/input';
-import { Save, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Input() {
@@ -17,6 +17,8 @@ export default function Input() {
   const [results, setResults] = useState(null);
   const [showResult, setShowResult] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [baseAtr, setBaseAtr] = useState(null);
+  const [targetInfo, setTargetInfo] = useState(null);
   const [topAssets, setTopAssets] = useState([
     { asset: '', atr: null },
     { asset: '', atr: null },
@@ -24,8 +26,26 @@ export default function Input() {
     { asset: '', atr: null },
     { asset: '', atr: null },
   ]);
-  const [baseAtr, setBaseAtr] = useState(null);
-  const [targetInfo, setTargetInfo] = useState(null);
+
+  // Load top assets from ATR page
+  useEffect(() => {
+    const saved = localStorage.getItem('primebias_top_assets');
+    if (saved) {
+      setTopAssets(JSON.parse(saved));
+    }
+  }, []);
+
+  // Listen for ATR changes
+  useEffect(() => {
+    const handleAtrUpdate = () => {
+      const saved = localStorage.getItem('primebias_top_assets');
+      if (saved) {
+        setTopAssets(JSON.parse(saved));
+      }
+    };
+    window.addEventListener('atrUpdated', handleAtrUpdate);
+    return () => window.removeEventListener('atrUpdated', handleAtrUpdate);
+  }, []);
 
   // Load analysis from active set
   useEffect(() => {
@@ -63,7 +83,6 @@ export default function Input() {
 
   const handleReset = () => {
     setInputs(getDefaultInputs());
-    setResults(null);
   };
 
   const handleSave = async () => {
@@ -92,52 +111,10 @@ export default function Input() {
       {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-lg font-bold tracking-tight">Market Input</h1>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={handleReset} className="h-9 w-9">
-            <RotateCcw className="w-4 h-4" />
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 h-9">
-            <Save className="w-4 h-4" />
-            Save
-          </Button>
-        </div>
-      </div>
-
-      {/* Top 5 Assets & ATR Overrides */}
-      <div className="space-y-3 bg-secondary/50 rounded-lg p-3 border border-border">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Top 5 Assets & ATR Overrides</div>
-        <div className="space-y-2">
-          {topAssets.map((item, idx) => (
-            <div key={idx} className="flex gap-2 items-end">
-              <Select value={item.asset || ''} onValueChange={(val) => {
-                const newTop = [...topAssets];
-                newTop[idx].asset = val;
-                setTopAssets(newTop);
-              }}>
-                <SelectTrigger className="flex-1 h-9 text-sm">
-                  <SelectValue placeholder={`Top ${idx + 1}`} />
-                </SelectTrigger>
-                <SelectContent className="max-h-48">
-                  {ASSETS.map(a => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <InputField
-                type="number"
-                step="0.0001"
-                placeholder="ATR"
-                value={item.atr || ''}
-                onChange={(e) => {
-                  const newTop = [...topAssets];
-                  newTop[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
-                  setTopAssets(newTop);
-                }}
-                className="w-24 h-9"
-              />
-            </div>
-          ))}
-        </div>
+        <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 h-9">
+          <Save className="w-4 h-4" />
+          Save
+        </Button>
       </div>
 
       {/* Instrument Selector with Add/Remove */}

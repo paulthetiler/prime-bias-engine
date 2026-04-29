@@ -11,6 +11,7 @@ import Dashboard from '@/pages/Dashboard';
 import Input from '@/pages/Input';
 import Engine from '@/pages/Engine';
 import History from '@/pages/History';
+import ATR from '@/pages/ATR';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -39,6 +40,7 @@ const AuthenticatedApp = () => {
         <Route path="/input" element={<Input />} />
         <Route path="/engine" element={<Engine />} />
         <Route path="/history" element={<History />} />
+        <Route path="/atr" element={<ATR />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
