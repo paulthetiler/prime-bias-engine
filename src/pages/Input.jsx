@@ -7,7 +7,7 @@ import BiasResult from '@/components/bias/BiasResult';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input as InputField } from '@/components/ui/input';
-import { Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Input() {
@@ -111,10 +111,27 @@ export default function Input() {
       {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-lg font-bold tracking-tight">Market Input</h1>
-        <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 h-9">
-          <Save className="w-4 h-4" />
-          Save
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => {
+              localStorage.removeItem('primebias_active');
+              setInstrument('');
+              setInputs(getDefaultInputs());
+              window.dispatchEvent(new Event('biasUpdated'));
+              toast.success('History cleared');
+            }}
+            className="h-9 w-9 text-destructive hover:text-destructive"
+            title="Clear history"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 h-9">
+            <Save className="w-4 h-4" />
+            Save
+          </Button>
+        </div>
       </div>
 
       {/* Instrument Selector with Add/Remove */}
