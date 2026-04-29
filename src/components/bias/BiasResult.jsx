@@ -30,6 +30,25 @@ export default function BiasResult({ results }) {
   const nowColor = nowBias === 'BUY' ? 'text-emerald-400' : nowBias === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
   const nowScoreColor = plusMinusScore > 0 ? 'text-emerald-400' : plusMinusScore < 0 ? 'text-red-400' : 'text-muted-foreground';
 
+  // Strength colour inherits direction: buy-side = green shades, sell-side = red/pink shades, neutral = grey
+  // STRONG = full colour, MEDIUM = mid, WEAK = pale/muted
+  function strengthColor(direction, strength) {
+    const isBuy  = direction === 'BUY'  || direction === 'BULL';
+    const isSell = direction === 'SELL' || direction === 'BEAR';
+    if (!isBuy && !isSell) return 'text-muted-foreground';
+    if (isBuy) {
+      if (strength === 'STRONG') return 'text-emerald-400';
+      if (strength === 'MEDIUM') return 'text-emerald-500';
+      if (strength === 'WEAK')   return 'text-emerald-700';
+      return 'text-muted-foreground';
+    }
+    // sell-side
+    if (strength === 'STRONG') return 'text-red-400';
+    if (strength === 'MEDIUM') return 'text-orange-400';
+    if (strength === 'WEAK')   return 'text-rose-600';
+    return 'text-muted-foreground';
+  }
+
   return (
     <div className="space-y-3">
 
@@ -42,7 +61,7 @@ export default function BiasResult({ results }) {
             <span className={cn('text-2xl font-bold', dirColor)}>{mainDirection}</span>
           </div>
           <div className="text-right">
-            <div className="text-sm font-semibold text-muted-foreground">{ddStrength}</div>
+            <div className={cn('text-sm font-semibold', strengthColor(mainDirection, ddStrength))}>{ddStrength}</div>
             <div className="text-[10px] text-muted-foreground">signal</div>
           </div>
         </div>
@@ -60,7 +79,7 @@ export default function BiasResult({ results }) {
             <div className={cn('text-xl font-bold font-mono', nowScoreColor)}>
               {plusMinusScore > 0 ? `+${plusMinusScore}` : plusMinusScore}
             </div>
-            <div className="text-[10px] text-muted-foreground">{nowStrength}</div>
+            <div className={cn('text-[10px]', strengthColor(nowBias, nowStrength))}>{nowStrength}</div>
           </div>
         </div>
       </div>
@@ -105,13 +124,29 @@ export default function BiasResult({ results }) {
   );
 }
 
+function strengthColor(direction, strength) {
+  const isBuy  = direction === 'BUY'  || direction === 'BULL';
+  const isSell = direction === 'SELL' || direction === 'BEAR';
+  if (!isBuy && !isSell) return 'text-muted-foreground';
+  if (isBuy) {
+    if (strength === 'STRONG') return 'text-emerald-400';
+    if (strength === 'MEDIUM') return 'text-emerald-500';
+    if (strength === 'WEAK')   return 'text-emerald-700';
+    return 'text-muted-foreground';
+  }
+  if (strength === 'STRONG') return 'text-red-400';
+  if (strength === 'MEDIUM') return 'text-orange-400';
+  if (strength === 'WEAK')   return 'text-rose-600';
+  return 'text-muted-foreground';
+}
+
 function TrendPill({ label, value, sub }) {
   const color = value === 'BUY' || value === 'BULL' ? 'text-emerald-400' : value === 'SELL' || value === 'BEAR' ? 'text-red-400' : 'text-muted-foreground';
   return (
     <div className="rounded-lg bg-secondary/80 border border-border p-2 text-center">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={cn('text-sm font-bold', color)}>{value || '—'}</div>
-      {sub && <div className="text-[9px] text-muted-foreground mt-0.5">{sub}</div>}
+      {sub && <div className={cn('text-[9px] mt-0.5', strengthColor(value, sub))}>{sub}</div>}
     </div>
   );
 }
