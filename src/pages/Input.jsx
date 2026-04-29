@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 
 export default function Input() {
   const navigate = useNavigate();
-  const [instrument, setInstrument] = useState('');
+  const [instrument, setInstrument] = useState(() => localStorage.getItem('primebias_instrument') || '');
   const [inputs, setInputs] = useState(getDefaultInputs());
   const [results, setResults] = useState(null);
   const [showResult, setShowResult] = useState(true);
@@ -132,6 +132,7 @@ export default function Input() {
     const prevExtraCheck = active[instrument]?.extraCheck || extraCheck;
     active[instrument] = { instrument, inputs, results: res, timestamp: new Date().toISOString(), atr: atrValue, targetInfo: targetData, extraCheck: prevExtraCheck };
     localStorage.setItem('primebias_active', JSON.stringify(active));
+    localStorage.setItem('primebias_instrument', instrument);
     window.dispatchEvent(new Event('biasUpdated'));
   }, [inputs, instrument, topAssets]);
 
@@ -259,6 +260,7 @@ export default function Input() {
                 const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
                 delete active[instrument];
                 localStorage.setItem('primebias_active', JSON.stringify(active));
+                localStorage.removeItem('primebias_instrument');
                 setInstrument('');
                 window.dispatchEvent(new Event('biasUpdated'));
                 toast.success('Removed from active');
