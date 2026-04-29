@@ -240,12 +240,12 @@ function AnalysisCard({ analysis }) {
           <div className="text-3xl font-bold">{grade}</div>
           <div className="text-[10px] uppercase tracking-wider opacity-70">Grade</div>
         </div>
-        <div className="rounded-lg border border-border bg-secondary p-3 text-center">
-          <div className="text-2xl font-bold font-mono">{analysis.targetInfo?.target ? analysis.targetInfo.target.toFixed(4) : '—'}</div>
+        <div className="rounded-lg border border-border bg-secondary p-3 text-center min-w-0">
+          <div className="text-xl font-bold font-mono truncate">{analysis.targetInfo?.target ? analysis.targetInfo.target.toFixed(4) : '—'}</div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Target</div>
         </div>
-        <div className={cn('rounded-lg p-3 text-center flex flex-col items-center justify-center', actionColors[tradeAction])}>
-          <div className="text-lg font-bold">{tradeAction}</div>
+        <div className={cn('rounded-lg p-3 text-center flex flex-col items-center justify-center min-w-0', actionColors[tradeAction])}>
+          <div className="text-sm font-bold leading-tight">{tradeAction === 'NO_TRADE' ? 'NO\nTRADE' : tradeAction}</div>
           <div className="text-[10px] uppercase tracking-wider opacity-80">Action</div>
         </div>
       </div>
