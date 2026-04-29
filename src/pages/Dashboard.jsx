@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, MinusCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, MinusCircle, AlertTriangle, Trash2, Edit2 } from 'lucide-react';
 import AssetsList from '@/components/bias/AssetsList';
 import LiveGrid from '@/components/bias/LiveGrid';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [activeAssets, setActiveAssets] = useState({});
   const [timeToNextHour, setTimeToNextHour] = useState('');
   const [viewMode, setViewMode] = useState('grid');
@@ -202,9 +203,22 @@ function AnalysisCard({ analysis }) {
 
   return (
     <div className="space-y-3">
-      {/* Instrument Header */}
-      <div className="text-sm font-semibold text-foreground mb-2">
-        {instrument}
+      {/* Instrument Header with Edit Button */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-sm font-semibold text-foreground">
+          {instrument}
+        </div>
+        <button
+          onClick={() => {
+            // Navigate to Input and set the selected instrument
+            sessionStorage.setItem('selectedInstrument', instrument);
+            window.location.pathname = '/input';
+          }}
+          className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+          title="Edit values"
+        >
+          <Edit2 className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Main Direction Card */}

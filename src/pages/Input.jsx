@@ -60,6 +60,15 @@ export default function Input() {
     }
   }, [instrument]);
 
+  // Load instrument from session storage if coming from Dashboard
+  useEffect(() => {
+    const selectedInstrument = sessionStorage.getItem('selectedInstrument');
+    if (selectedInstrument) {
+      setInstrument(selectedInstrument);
+      sessionStorage.removeItem('selectedInstrument');
+    }
+  }, []);
+
   // Recalculate on every input change
   useEffect(() => {
     if (!instrument) return;
