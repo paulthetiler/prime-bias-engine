@@ -37,26 +37,30 @@ export default function BiasResult({ results }) {
         <div className="text-sm text-muted-foreground">{strength} signal</div>
       </div>
 
-      {/* Grade + Target + Action + ±1 Row */}
-      <div className="grid grid-cols-4 gap-2">
-       <div className={cn('rounded-lg border p-3 text-center', gradeColors[grade])}>
-         <div className="text-3xl font-bold">{grade}</div>
-         <div className="text-[10px] uppercase tracking-wider opacity-70">{gradeLabel}</div>
-       </div>
-       <div className="rounded-lg border border-border bg-secondary p-3 text-center">
-         <div className="text-xl font-bold font-mono leading-tight">{targetNote || '—'}</div>
-         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Target</div>
-       </div>
-       <div className={cn('rounded-lg p-3 text-center flex flex-col items-center justify-center', actionColors[tradeAction])}>
-         <div className="text-sm font-bold leading-tight">{actionLabels[tradeAction]}</div>
-         <div className="text-[10px] uppercase tracking-wider opacity-80">{status}</div>
-       </div>
-       <div className="rounded-lg border border-border bg-secondary p-3 text-center">
-         <div className={cn('text-3xl font-bold font-mono', plusMinusScore > 0 ? 'text-emerald-400' : plusMinusScore < 0 ? 'text-red-400' : 'text-muted-foreground')}>
-           {plusMinusScore > 0 ? `+${plusMinusScore}` : plusMinusScore}
-         </div>
-         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">±1</div>
-       </div>
+      {/* Grade + Action row */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className={cn('rounded-lg border p-3 text-center', gradeColors[grade])}>
+          <div className="text-2xl font-bold">{grade} <span className="text-sm font-semibold opacity-80">{gradeLabel}</span></div>
+          <div className="text-[10px] uppercase tracking-wider opacity-60">Grade</div>
+        </div>
+        <div className={cn('rounded-lg p-3 text-center flex flex-col items-center justify-center', actionColors[tradeAction])}>
+          <div className="text-base font-bold leading-tight">{actionLabels[tradeAction]}</div>
+          <div className="text-[10px] uppercase tracking-wider opacity-80">{status}</div>
+        </div>
+      </div>
+
+      {/* Target + Now Score row */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-border bg-secondary p-3 text-center">
+          <div className="text-sm font-bold font-mono leading-tight truncate">{targetNote || '—'}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Target</div>
+        </div>
+        <div className="rounded-lg border border-border bg-secondary p-3 text-center">
+          <div className={cn('text-2xl font-bold font-mono', plusMinusScore > 0 ? 'text-emerald-400' : plusMinusScore < 0 ? 'text-red-400' : 'text-muted-foreground')}>
+            {plusMinusScore > 0 ? `+${plusMinusScore}` : plusMinusScore}
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Now Score</div>
+        </div>
       </div>
 
       {/* Trend Breakdown */}
