@@ -5,8 +5,6 @@ import { LayoutDashboard, Crosshair, BarChart3, Clock, Moon, Sun } from 'lucide-
 import { useTheme } from '@/lib/useTheme';
 
 const NAV_ITEMS = [
-  { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/input', icon: Crosshair, label: 'Input' },
   { path: '/engine', icon: BarChart3, label: 'Engine' },
   { path: '/atr', icon: Clock, label: 'ATR' },
   { path: '/history', icon: Clock, label: 'History' },
