@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, MinusCircle, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, MinusCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import AssetsList from '@/components/bias/AssetsList';
 import LiveGrid from '@/components/bias/LiveGrid';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const [activeAssets, setActiveAssets] = useState({});
@@ -59,14 +60,32 @@ export default function Dashboard() {
           <h1 className="text-lg font-bold tracking-tight">PrimeBias</h1>
           <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
         </div>
-        <div className="text-right text-sm space-y-1">
-          <div className="text-muted-foreground">{analyses.length} assets</div>
-          <div className="space-y-0.5">
-            <div className="text-[10px] text-muted-foreground">time left in hour</div>
-            <div className="text-xs bg-secondary rounded px-2 py-1 font-mono text-primary">
-              {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+        <div className="flex gap-2 items-center">
+          <div className="text-right text-sm space-y-1">
+            <div className="text-muted-foreground">{analyses.length} assets</div>
+            <div className="space-y-0.5">
+              <div className="text-[10px] text-muted-foreground">time left in hour</div>
+              <div className="text-xs bg-secondary rounded px-2 py-1 font-mono text-primary">
+                {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+              </div>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              localStorage.removeItem('primebias_active');
+              localStorage.removeItem('primebias_top_assets');
+              setActiveAssets({});
+              window.dispatchEvent(new Event('biasUpdated'));
+              window.dispatchEvent(new Event('atrUpdated'));
+              toast.success('Everything cleared');
+            }}
+            className="h-9 w-9 text-destructive hover:text-destructive"
+            title="Clear all data"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
