@@ -35,7 +35,18 @@ export default function Input() {
   const [extraCheck, setExtraCheck] = useState({ h1: null, m15: null });
 
   const handleExtraCheckChange = (key, value) => {
-    setExtraCheck(prev => ({ ...prev, [key]: value }));
+    setExtraCheck(prev => {
+      const updated = { ...prev, [key]: value };
+      // Persist extraCheck with active analysis
+      if (instrument) {
+        const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+        if (active[instrument]) {
+          active[instrument].extraCheck = updated;
+          localStorage.setItem('primebias_active', JSON.stringify(active));
+        }
+      }
+      return updated;
+    });
   };
 
   // Timer countdown
@@ -81,6 +92,9 @@ export default function Input() {
       const data = active[instrument];
       setInputs(data.inputs || getDefaultInputs());
       setResults(data.results || null);
+      setExtraCheck(data.extraCheck || { h1: null, m15: null });
+    } else if (instrument) {
+      setExtraCheck({ h1: null, m15: null });
     }
   }, [instrument, topAssets]);
 
@@ -109,9 +123,10 @@ export default function Input() {
     const targetData = calculateTarget(atrValue, res.grade, res.status);
     setTargetInfo(targetData);
     
-    // Store in active set
+    // Store in active set (preserve extraCheck)
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
-    active[instrument] = { instrument, inputs, results: res, timestamp: new Date().toISOString(), atr: atrValue, targetInfo: targetData };
+    const prevExtraCheck = active[instrument]?.extraCheck || extraCheck;
+    active[instrument] = { instrument, inputs, results: res, timestamp: new Date().toISOString(), atr: atrValue, targetInfo: targetData, extraCheck: prevExtraCheck };
     localStorage.setItem('primebias_active', JSON.stringify(active));
     window.dispatchEvent(new Event('biasUpdated'));
   }, [inputs, instrument, topAssets]);
