@@ -261,7 +261,7 @@ function AnalysisCard({ analysis }) {
       {warnings.length > 0 && (
         <div className="space-y-1.5">
           {warnings.map((w, i) => (
-            <div key={i} className="flex items-start gap-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-2.5 text-xs text-yellow-300">
+            <div key={i} className="flex items-start gap-2 rounded-lg bg-yellow-100 dark:bg-yellow-500/10 border border-yellow-300 dark:border-yellow-500/20 p-2.5 text-xs text-yellow-800 dark:text-yellow-300">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{w}</span>
             </div>
