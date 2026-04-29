@@ -291,7 +291,7 @@ export default function Input() {
 
       {/* No instrument selected helper */}
       {!instrument && (
-        <div className="text-xs text-amber-500 px-1 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
+        <div className="text-xs text-amber-700 dark:text-amber-400 px-1 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
           Select an instrument above to start analysis
         </div>
       )}
