@@ -35,8 +35,9 @@ export default function LiveGrid({ analyses }) {
 
   return (
     <div className="space-y-4">
-      {/* Live Grid */}
-      <div className="overflow-x-auto border border-border rounded-lg bg-card">
+      {/* Mobile Card View / Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto border border-border rounded-lg bg-card">
+        {/* Desktop Table */}
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-secondary">
@@ -64,39 +65,18 @@ export default function LiveGrid({ analyses }) {
 
               return (
                 <tr key={`${instrument}-${tf.key}`} className="hover:bg-accent/30 transition-colors">
-                  {/* Pair (only show once per asset) */}
                   {isFirstRow ? (
                     <td className="px-3 py-2 font-semibold text-foreground align-top" rowSpan={TIMEFRAMES.length}>
                       {instrument}
                     </td>
                   ) : null}
-
-                  {/* Timeframe */}
                   <td className="px-2 py-2 text-center text-sm text-muted-foreground">{tf.shortLabel}</td>
-
-                  {/* Input indicators */}
-                  <td className="px-2 py-2 text-center">
-                    <IndicatorBox value={indicators.close} />
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    <IndicatorBox value={indicators.macd} />
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    <IndicatorBox value={indicators.rsi} />
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    <IndicatorBox value={indicators.boli} />
-                  </td>
-
-                  {/* Total */}
+                  <td className="px-2 py-2 text-center"><IndicatorBox value={indicators.close} /></td>
+                  <td className="px-2 py-2 text-center"><IndicatorBox value={indicators.macd} /></td>
+                  <td className="px-2 py-2 text-center"><IndicatorBox value={indicators.rsi} /></td>
+                  <td className="px-2 py-2 text-center"><IndicatorBox value={indicators.boli} /></td>
                   <td className="px-2 py-2 text-center text-sm font-mono text-muted-foreground">{total}</td>
-
-                  {/* Bias */}
-                  <td className={cn('px-2 py-2 text-center text-sm font-semibold rounded', biasBg)}>
-                    {bias || '—'}
-                  </td>
-
-                  {/* Summary (only show once per asset) */}
+                  <td className={cn('px-2 py-2 text-center text-sm font-semibold rounded', biasBg)}>{bias || '—'}</td>
                   {isFirstRow && isLastRow ? (
                     <td className="px-3 py-2 align-top" rowSpan={TIMEFRAMES.length}>
                       <div className="space-y-1.5">
@@ -119,6 +99,44 @@ export default function LiveGrid({ analyses }) {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card Stack */}
+      <div className="md:hidden space-y-3">
+        {analyses.map(a => {
+          const { instrument, results } = a;
+          if (!results) return null;
+
+          const { mainDirection, grade, confidenceScore, tradeAction } = results;
+          const dirBg = mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border';
+          const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+          const actionBg = tradeAction === 'TRADE' ? 'bg-emerald-500' : tradeAction === 'WAIT' ? 'bg-amber-500' : 'bg-red-500';
+
+          return (
+            <div key={instrument} className={cn('rounded-lg border-2 p-4', dirBg)}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="text-lg font-bold">{instrument}</div>
+                <div className="text-3xl font-bold" style={{ color: dirColor === 'text-emerald-400' ? '#4ade80' : dirColor === 'text-red-400' ? '#f87171' : '#999' }}>
+                  {mainDirection}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="bg-secondary rounded p-2 text-center">
+                  <div className="text-[10px] text-muted-foreground uppercase">Grade</div>
+                  <div className="text-2xl font-bold">{grade}</div>
+                </div>
+                <div className="bg-secondary rounded p-2 text-center">
+                  <div className="text-[10px] text-muted-foreground uppercase">Score</div>
+                  <div className="text-lg font-mono font-bold">{confidenceScore}</div>
+                </div>
+                <div className={cn('rounded p-2 text-center text-white font-bold text-sm', actionBg)}>
+                  {tradeAction}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Summary Panel */}
