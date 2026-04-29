@@ -36,7 +36,7 @@ export default function TopNav() {
             size="sm"
             className="rounded-full"
           >
-            Input
+            Bias Tool
           </Button>
         </Link>
       </div>

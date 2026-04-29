@@ -168,7 +168,7 @@ export default function Input() {
     <div className="p-3 space-y-2.5">
       {/* Header — compact single row */}
       <div className="flex items-center justify-between pt-1">
-        <h1 className="text-base font-bold tracking-tight">Market Input</h1>
+        <h1 className="text-base font-bold tracking-tight">Bias Tool</h1>
         <div className="flex items-center gap-2">
           <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-xs font-semibold">
             {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
