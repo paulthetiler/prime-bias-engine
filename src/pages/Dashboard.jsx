@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, MinusCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import AssetsList from '@/components/bias/AssetsList';
@@ -49,6 +50,9 @@ export default function Dashboard() {
         </div>
         <h1 className="text-xl font-bold mb-2">PrimeBias</h1>
         <p className="text-muted-foreground text-sm mb-6">Go to the Input tab to add assets for analysis</p>
+        <Link to="/input">
+          <Button className="rounded-full">Input</Button>
+        </Link>
       </div>
     );
   }
