@@ -140,12 +140,10 @@ export default function Input() {
       <div className="flex items-center justify-between pt-2">
         <div>
           <h1 className="text-lg font-bold tracking-tight">Market Input</h1>
-          <div className="text-right text-xs text-muted-foreground mt-1">
-            <div className="space-y-0.5">
-              <div className="text-[10px]">time left in hour</div>
-              <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-[11px] inline-block">
-                {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
-              </div>
+          <div className="text-right text-xs text-muted-foreground mt-2">
+            <div className="text-[11px]">time left in hour</div>
+            <div className="bg-secondary rounded px-3 py-1.5 font-mono text-primary text-base font-semibold inline-block mt-1">
+              {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
             </div>
           </div>
         </div>
