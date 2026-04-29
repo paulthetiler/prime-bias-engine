@@ -289,6 +289,13 @@ export default function Input() {
         </div>
       )}
 
+      {/* No instrument selected helper */}
+      {!instrument && (
+        <div className="text-xs text-amber-500 px-1 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
+          Select an instrument above to start analysis
+        </div>
+      )}
+
       {/* Instructions */}
       <div className="text-xs text-muted-foreground px-1">
         Tap each indicator to cycle: <span className="text-muted-foreground">0</span> → <span className="text-emerald-400">+1</span> → <span className="text-red-400">−1</span> → <span className="text-muted-foreground">0</span>
