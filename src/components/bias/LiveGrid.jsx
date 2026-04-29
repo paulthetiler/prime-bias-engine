@@ -36,22 +36,22 @@ export default function LiveGrid({ analyses }) {
   return (
     <div className="space-y-4">
       {/* Live Grid */}
-      <div className="overflow-x-auto border-2 border-primary bg-background">
-        <table className="w-full text-xs font-bold">
+      <div className="overflow-x-auto border border-border rounded-lg bg-card">
+        <table className="w-full text-xs">
           <thead>
-            <tr>
-              <th className="bg-yellow-400 text-black px-2 py-2 text-left border border-black">Pair</th>
-              <th className="bg-yellow-400 text-black px-2 py-2 text-center border border-black w-8">TF</th>
-              <th className="bg-cyan-400 text-black px-2 py-2 text-center border border-black w-8">C</th>
-              <th className="bg-cyan-400 text-black px-2 py-2 text-center border border-black w-8">M</th>
-              <th className="bg-cyan-400 text-black px-2 py-2 text-center border border-black w-8">R</th>
-              <th className="bg-cyan-400 text-black px-2 py-2 text-center border border-black w-8">B</th>
-              <th className="bg-yellow-400 text-black px-2 py-2 text-center border border-black w-8">Σ</th>
-              <th className="bg-yellow-400 text-black px-2 py-2 text-center border border-black min-w-12">Bias</th>
-              <th className="bg-cyan-400 text-black px-2 py-2 text-left border border-black flex-1 min-w-48">Grade / Score / Action</th>
+            <tr className="border-b border-border bg-secondary">
+              <th className="px-3 py-2 text-left font-semibold text-foreground text-xs">Pair</th>
+              <th className="px-2 py-2 text-center font-semibold text-foreground text-xs w-8">TF</th>
+              <th className="px-2 py-2 text-center font-semibold text-muted-foreground text-[10px] w-10">Close</th>
+              <th className="px-2 py-2 text-center font-semibold text-muted-foreground text-[10px] w-10">MACD</th>
+              <th className="px-2 py-2 text-center font-semibold text-muted-foreground text-[10px] w-10">RSI</th>
+              <th className="px-2 py-2 text-center font-semibold text-muted-foreground text-[10px] w-10">Boli</th>
+              <th className="px-2 py-2 text-center font-semibold text-foreground text-xs w-8">Total</th>
+              <th className="px-2 py-2 text-center font-semibold text-foreground text-xs min-w-16">Bias</th>
+              <th className="px-3 py-2 text-left font-semibold text-foreground text-xs flex-1">Summary</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-black/30">
+          <tbody className="divide-y divide-border/50">
             {gridData.map((row, idx) => {
               const { instrument, tf, data, overall } = row;
               const isFirstRow = idx === 0 || gridData[idx - 1].instrument !== instrument;
@@ -60,50 +60,55 @@ export default function LiveGrid({ analyses }) {
               if (!data) return null;
 
               const { indicators, total, bias } = data;
-              const biasBg = bias === 'BUY' ? 'bg-emerald-500' : bias === 'SELL' ? 'bg-red-500' : 'bg-gray-400';
-              const actionBg = overall.tradeAction === 'TRADE' ? 'bg-emerald-500' : overall.tradeAction === 'WAIT' ? 'bg-yellow-400' : 'bg-red-500';
+              const biasBg = bias === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : bias === 'SELL' ? 'bg-red-500/15 text-red-400' : 'bg-secondary text-muted-foreground';
 
               return (
-                <tr key={`${instrument}-${tf.key}`} className="border-b border-black/30">
+                <tr key={`${instrument}-${tf.key}`} className="hover:bg-accent/30 transition-colors">
                   {/* Pair (only show once per asset) */}
                   {isFirstRow ? (
-                    <td className="px-2 py-1 bg-yellow-400 text-black font-bold border-r border-black align-top" rowSpan={TIMEFRAMES.length}>
-                      <div>{instrument}</div>
+                    <td className="px-3 py-2 font-semibold text-foreground align-top" rowSpan={TIMEFRAMES.length}>
+                      {instrument}
                     </td>
                   ) : null}
 
                   {/* Timeframe */}
-                  <td className="px-2 py-1 bg-yellow-400 text-black text-center border-r border-black">{tf.shortLabel}</td>
+                  <td className="px-2 py-2 text-center text-sm text-muted-foreground">{tf.shortLabel}</td>
 
                   {/* Input indicators */}
-                  <td className="px-2 py-1 bg-white border-r border-black text-center">
+                  <td className="px-2 py-2 text-center">
                     <IndicatorBox value={indicators.close} />
                   </td>
-                  <td className="px-2 py-1 bg-white border-r border-black text-center">
+                  <td className="px-2 py-2 text-center">
                     <IndicatorBox value={indicators.macd} />
                   </td>
-                  <td className="px-2 py-1 bg-white border-r border-black text-center">
+                  <td className="px-2 py-2 text-center">
                     <IndicatorBox value={indicators.rsi} />
                   </td>
-                  <td className="px-2 py-1 bg-white border-r border-black text-center">
+                  <td className="px-2 py-2 text-center">
                     <IndicatorBox value={indicators.boli} />
                   </td>
 
                   {/* Total */}
-                  <td className="px-2 py-1 bg-yellow-400 text-black text-center border-r border-black">{total}</td>
+                  <td className="px-2 py-2 text-center text-sm font-mono text-muted-foreground">{total}</td>
 
                   {/* Bias */}
-                  <td className={cn('px-2 py-1 text-center border-r border-black text-white', biasBg)}>
+                  <td className={cn('px-2 py-2 text-center text-sm font-semibold rounded', biasBg)}>
                     {bias || '—'}
                   </td>
 
                   {/* Summary (only show once per asset) */}
                   {isFirstRow && isLastRow ? (
-                    <td className="px-2 py-1 bg-cyan-400 text-black align-top border-l border-black" rowSpan={TIMEFRAMES.length}>
-                      <div className="space-y-0.5 font-bold">
-                        <div>Grade: <span className="text-lg">{overall.grade}</span></div>
-                        <div>Score: <span className="font-mono text-lg">{overall.confidenceScore}</span></div>
-                        <div className={cn('px-1 py-0.5 text-center text-white', actionBg)}>
+                    <td className="px-3 py-2 align-top" rowSpan={TIMEFRAMES.length}>
+                      <div className="space-y-1.5">
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">Grade</div>
+                          <div className="text-lg font-bold text-foreground">{overall.grade}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground">Score</div>
+                          <div className="font-mono font-bold text-foreground">{overall.confidenceScore}</div>
+                        </div>
+                        <div className={cn('px-2 py-1 rounded text-xs font-bold text-white text-center', overall.tradeAction === 'TRADE' ? 'bg-emerald-500' : overall.tradeAction === 'WAIT' ? 'bg-amber-500' : 'bg-red-500')}>
                           {overall.tradeAction}
                         </div>
                       </div>
@@ -118,34 +123,34 @@ export default function LiveGrid({ analyses }) {
 
       {/* Summary Panel */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-yellow-400 text-black border-2 border-black p-3 space-y-1 font-bold">
-          <div className="text-xs uppercase tracking-widest">Activity</div>
+        <div className="bg-card border border-border rounded-lg p-3 space-y-2">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Activity</div>
           <div className="flex justify-between text-sm">
             <div className="text-center">
-              <div className="text-lg">{summary.buys}</div>
-              <div className="text-[10px]">BUY</div>
+              <div className="text-lg font-bold text-emerald-400">{summary.buys}</div>
+              <div className="text-[10px] text-muted-foreground">BUY</div>
             </div>
             <div className="text-center">
-              <div className="text-lg">{summary.sells}</div>
-              <div className="text-[10px]">SELL</div>
+              <div className="text-lg font-bold text-red-400">{summary.sells}</div>
+              <div className="text-[10px] text-muted-foreground">SELL</div>
             </div>
             <div className="text-center">
-              <div className="text-lg">{summary.trades}</div>
-              <div className="text-[10px]">TRADE</div>
+              <div className="text-lg font-bold text-amber-400">{summary.trades}</div>
+              <div className="text-[10px] text-muted-foreground">TRADE</div>
             </div>
           </div>
         </div>
 
-        <div className="bg-cyan-400 text-black border-2 border-black p-3 space-y-1 font-bold">
-          <div className="text-xs uppercase tracking-widest">Stats</div>
+        <div className="bg-card border border-border rounded-lg p-3 space-y-2">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stats</div>
           <div className="flex justify-between text-sm">
             <div className="text-center">
-              <div className="text-lg">{summary.total}</div>
-              <div className="text-[10px]">Assets</div>
+              <div className="text-lg font-bold text-foreground">{summary.total}</div>
+              <div className="text-[10px] text-muted-foreground">Assets</div>
             </div>
             <div className="text-center">
-              <div className="text-lg">{avgGradeChar}</div>
-              <div className="text-[10px]">Avg Grade</div>
+              <div className="text-lg font-bold text-foreground">{avgGradeChar}</div>
+              <div className="text-[10px] text-muted-foreground">Avg Grade</div>
             </div>
           </div>
         </div>
@@ -155,12 +160,12 @@ export default function LiveGrid({ analyses }) {
 }
 
 function IndicatorBox({ value }) {
-  const bgColor = value === 1 ? 'bg-emerald-500' : value === -1 ? 'bg-black' : 'bg-white';
-  const textColor = value === 0 ? 'text-black' : 'text-white';
+  const bgColor = value === 1 ? 'bg-emerald-500/20' : value === -1 ? 'bg-red-500/20' : 'bg-secondary';
+  const textColor = value === 1 ? 'text-emerald-400' : value === -1 ? 'text-red-400' : 'text-muted-foreground';
   
   return (
-    <div className={cn('w-6 h-6 flex items-center justify-center font-bold text-xs border border-black', bgColor, textColor)}>
-      {value === 1 ? '+' : value === -1 ? '−' : ''}
+    <div className={cn('w-6 h-6 flex items-center justify-center font-bold text-xs rounded', bgColor, textColor)}>
+      {value === 1 ? '+' : value === -1 ? '−' : '0'}
     </div>
   );
 }

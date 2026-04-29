@@ -119,52 +119,60 @@ function AnalysisCard({ analysis }) {
   if (!results) return null;
   
   const { mainDirection, grade, confidenceScore, tradeAction, deepTrend, ddBias, nowBias, warnings } = results;
-  const dirBg = mainDirection === 'BUY' ? 'bg-emerald-500' : mainDirection === 'SELL' ? 'bg-red-500' : 'bg-gray-500';
-  const actionBg = tradeAction === 'TRADE' ? 'bg-emerald-500' : tradeAction === 'WAIT' ? 'bg-yellow-400' : 'bg-red-500';
+  const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+  const actionBg = tradeAction === 'TRADE' ? 'bg-emerald-500' : tradeAction === 'WAIT' ? 'bg-amber-500' : 'bg-red-500';
 
   return (
-    <div className="border-2 border-black bg-white space-y-0">
-      {/* Header: Instrument + Direction */}
-      <div className="flex border-b-2 border-black">
-        <div className="flex-1 bg-yellow-400 text-black border-r-2 border-black p-2 font-bold text-sm">
-          {instrument}
+    <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Pair</div>
+          <div className="text-lg font-bold text-foreground">{instrument}</div>
         </div>
-        <div className={cn('flex-1 text-white font-black text-lg flex items-center justify-center py-2', dirBg)}>
-          {mainDirection}
-        </div>
-      </div>
-
-      {/* Grade / Score Row */}
-      <div className="flex border-b-2 border-black">
-        <div className="flex-1 bg-cyan-400 text-black border-r-2 border-black p-2 font-bold text-sm text-center">
-          Grade: {grade}
-        </div>
-        <div className="flex-1 bg-cyan-400 text-black p-2 font-bold text-sm text-center">
-          Score: {confidenceScore}
+        <div className="text-right">
+          <div className="text-xs text-muted-foreground mb-1">Direction</div>
+          <div className={cn('text-2xl font-black', dirColor)}>{mainDirection}</div>
         </div>
       </div>
 
-      {/* Trends Row */}
-      <div className="flex border-b-2 border-black text-center text-xs font-bold">
-        <div className="flex-1 bg-yellow-400 text-black border-r-2 border-black p-1.5">
-          Deep<br/>{deepTrend || '—'}
+      {/* Metrics Row */}
+      <div className="grid grid-cols-3 gap-3 border-t border-b border-border py-3">
+        <div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Grade</div>
+          <div className="text-xl font-bold text-foreground">{grade}</div>
         </div>
-        <div className="flex-1 bg-yellow-400 text-black border-r-2 border-black p-1.5">
-          DD<br/>{ddBias || '—'}
+        <div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Score</div>
+          <div className="text-xl font-mono font-bold text-foreground">{confidenceScore}</div>
         </div>
-        <div className="flex-1 bg-yellow-400 text-black p-1.5">
-          Now<br/>{nowBias || '—'}
+        <div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Action</div>
+          <div className={cn('inline-block px-2 py-1 rounded text-xs font-bold text-white', actionBg)}>
+            {tradeAction}
+          </div>
         </div>
       </div>
 
-      {/* Action Button */}
-      <div className={cn('text-center py-2 text-white font-black text-sm', actionBg)}>
-        {tradeAction === 'TRADE' ? 'TRADE' : tradeAction === 'WAIT' ? 'WAIT' : 'NO TRADE'}
+      {/* Trends */}
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Deep</div>
+          <div className="text-sm font-semibold text-foreground">{deepTrend || '—'}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">DD</div>
+          <div className="text-sm font-semibold text-foreground">{ddBias || '—'}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Now</div>
+          <div className="text-sm font-semibold text-foreground">{nowBias || '—'}</div>
+        </div>
       </div>
 
       {/* Warnings */}
       {warnings.length > 0 && (
-        <div className="bg-yellow-300 text-black border-t-2 border-black p-2 text-[10px] font-bold">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded p-2 text-[10px] text-amber-300">
           ⚠ {warnings[0]}
         </div>
       )}
