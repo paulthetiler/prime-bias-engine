@@ -5,10 +5,12 @@ import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, ca
 import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input as InputField } from '@/components/ui/input';
-import { Save, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Save, ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export default function Input() {
   const navigate = useNavigate();
@@ -26,6 +28,7 @@ export default function Input() {
     { asset: '', atr: null },
     { asset: '', atr: null },
   ]);
+  const [open, setOpen] = useState(false);
 
   // Load top assets from ATR page
   useEffect(() => {
@@ -136,16 +139,47 @@ export default function Input() {
 
       {/* Instrument Selector with Add/Remove */}
       <div className="space-y-2">
-        <Select value={instrument} onValueChange={setInstrument}>
-          <SelectTrigger className="h-12 text-base">
-            <SelectValue placeholder="Select instrument..." />
-          </SelectTrigger>
-          <SelectContent className="max-h-72">
-            {ASSETS.map(a => (
-              <SelectItem key={a} value={a}>{a}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+       <Popover open={open} onOpenChange={setOpen}>
+         <PopoverTrigger asChild>
+           <Button
+             variant="outline"
+             role="combobox"
+             aria-expanded={open}
+             className="h-12 w-full justify-between text-base font-normal"
+           >
+             {instrument || "Select instrument..."}
+             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+           </Button>
+         </PopoverTrigger>
+         <PopoverContent className="w-full p-0" align="start">
+           <Command>
+             <CommandInput placeholder="Search instruments..." />
+             <CommandEmpty>No instrument found.</CommandEmpty>
+             <CommandList>
+               <CommandGroup>
+                 {ASSETS.map((asset) => (
+                   <CommandItem
+                     key={asset}
+                     value={asset}
+                     onSelect={(currentValue) => {
+                       setInstrument(currentValue === instrument ? "" : currentValue);
+                       setOpen(false);
+                     }}
+                   >
+                     <Check
+                       className={cn(
+                         "mr-2 h-4 w-4",
+                         instrument === asset ? "opacity-100" : "opacity-0"
+                       )}
+                     />
+                     {asset}
+                   </CommandItem>
+                 ))}
+               </CommandGroup>
+             </CommandList>
+           </Command>
+         </PopoverContent>
+       </Popover>
         {instrument && (
           <div className="flex gap-2">
             <Button
