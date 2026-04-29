@@ -21,6 +21,7 @@ export default function Input() {
   const [saving, setSaving] = useState(false);
   const [baseAtr, setBaseAtr] = useState(null);
   const [targetInfo, setTargetInfo] = useState(null);
+  const [timeToNextHour, setTimeToNextHour] = useState('');
   const [topAssets, setTopAssets] = useState([
     { asset: '', atr: null },
     { asset: '', atr: null },
@@ -29,6 +30,21 @@ export default function Input() {
     { asset: '', atr: null },
   ]);
   const [open, setOpen] = useState(false);
+
+  // Timer countdown
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const nextHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0, 0);
+      const diff = nextHour - now;
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setTimeToNextHour(`${mins}m ${secs}s`);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Load top assets from ATR page
   useEffect(() => {
@@ -122,7 +138,17 @@ export default function Input() {
     <div className="p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between pt-2">
-        <h1 className="text-lg font-bold tracking-tight">Market Input</h1>
+        <div>
+          <h1 className="text-lg font-bold tracking-tight">Market Input</h1>
+          <div className="text-right text-xs text-muted-foreground mt-1">
+            <div className="space-y-0.5">
+              <div className="text-[10px]">time left in hour</div>
+              <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-[11px] inline-block">
+                {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="flex gap-2">
           <Button 
             variant="ghost" 
