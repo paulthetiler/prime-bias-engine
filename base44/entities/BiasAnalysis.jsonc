@@ -1,0 +1,81 @@
+{
+  "name": "BiasAnalysis",
+  "type": "object",
+  "properties": {
+    "instrument": {
+      "type": "string",
+      "description": "Trading pair or index name"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the analysis was performed"
+    },
+    "inputs": {
+      "type": "object",
+      "description": "All timeframe indicator inputs as JSON"
+    },
+    "results": {
+      "type": "object",
+      "description": "Computed bias results as JSON"
+    },
+    "overall_bias": {
+      "type": "string",
+      "enum": [
+        "BUY",
+        "SELL",
+        "NEUTRAL"
+      ],
+      "description": "Final directional bias"
+    },
+    "grade": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "F"
+      ],
+      "description": "Trade grade"
+    },
+    "confidence_score": {
+      "type": "number",
+      "description": "Confidence score 0-100"
+    },
+    "trade_action": {
+      "type": "string",
+      "enum": [
+        "TRADE",
+        "WAIT",
+        "NO_TRADE"
+      ],
+      "description": "Recommended action"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Warning messages"
+    },
+    "notes": {
+      "type": "string",
+      "description": "User notes"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "win",
+        "loss",
+        "breakeven",
+        "pending"
+      ],
+      "default": "pending",
+      "description": "Trade outcome recorded later"
+    }
+  },
+  "required": [
+    "instrument"
+  ]
+}
