@@ -45,10 +45,15 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3">
-        {analyses.map(a => (
-          <AnalysisCard key={a.instrument} analysis={a} />
-        ))}
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3">
+          {analyses.map(a => (
+            <AnalysisCard key={a.instrument} analysis={a} />
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground px-1">
+          <strong>Grade:</strong> A–F confidence. <strong>Score:</strong> Absolute strength. <strong>DEEP/DD/NOW:</strong> Trend direction by timeframe.
+        </p>
       </div>
     </div>
   );
