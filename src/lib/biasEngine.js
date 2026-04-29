@@ -239,4 +239,75 @@ const ASSETS = [
   'Dollar','Hong HS50','AUD200','SMI',
 ];
 
-export { TIMEFRAMES, WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS, ASSETS, getDefaultInputs, calculateBias };
+// Base ATR values for each asset
+const BASE_ATR = {
+  'AUD/CAD': 0.0055, 'AUD/CHF': 0.0062, 'AUD/JPY': 0.78, 'AUD/NZD': 0.0082, 'AUD/USD': 0.0078,
+  'CAD/CHF': 0.0070, 'CAD/JPY': 0.86, 'CHF/JPY': 1.25, 'EUR/AUD': 0.0155, 'EUR/CAD': 0.0155,
+  'EUR/CHF': 0.0095, 'EUR/GBP': 0.0095, 'EUR/JPY': 1.35, 'EUR/NZD': 0.0188, 'EUR/USD': 0.0120,
+  'GBP/AUD': 0.0210, 'GBP/CAD': 0.0190, 'GBP/CHF': 0.0130, 'GBP/JPY': 1.65, 'GBP/NZD': 0.0250, 'GBP/USD': 0.0145,
+  'NZD/CAD': 0.0068, 'NZD/CHF': 0.0075, 'NZD/JPY': 0.95, 'NZD/USD': 0.0095,
+  'USD/CAD': 0.0095, 'USD/CHF': 0.0110, 'USD/JPY': 1.50,
+  'DAX': 200, 'FTSE': 150, 'DOW': 250, 'SP500': 80, 'US100': 200, 'CAC40': 120, 'JAP225': 800,
+  'GOLD': 25, 'GOLD/USD': 25, 'OIL': 2.5, 'GAS': 0.35, 'BITCOIN': 3500, 'ETHUSDT': 250,
+  'Copper': 0.025, 'Aluminum': 35, 'Zinc': 85, 'Lead': 45, 'Carbon': 0.95,
+  'Dollar': 1.5, 'Hong HS50': 800, 'AUD200': 350, 'SMI': 250,
+};
+
+// Target weight multipliers
+const TARGET_WEIGHTS = {
+  A: 1.25,
+  B: 1,
+  C: 1.5,
+  D: 3,
+  scalp: 1.75,
+  careful: 2.5,
+};
+
+// Get ATR for an asset, considering top 5 overrides
+function getATRForAsset(asset, topAssets) {
+  // Check if asset is in top 5 with override
+  for (let i = 0; i < topAssets.length; i++) {
+    if (topAssets[i].asset === asset && topAssets[i].atr) {
+      return topAssets[i].atr;
+    }
+  }
+  // Fall back to base ATR
+  return BASE_ATR[asset] || 0;
+}
+
+// Calculate target price from ATR
+function calculateTarget(atr, grade, status) {
+  if (!atr || atr === 0) return null;
+  
+  const baseUnit = atr / 9;
+  let target = null;
+  let targetType = '';
+  
+  // Determine which target to use based on status first, then grade
+  if (status === 'Scalp') {
+    target = baseUnit / TARGET_WEIGHTS.scalp;
+    targetType = 'Scalp';
+  } else if (status === 'Careful') {
+    target = baseUnit / TARGET_WEIGHTS.careful;
+    targetType = 'Careful';
+  } else if (grade === 'F') {
+    target = baseUnit / TARGET_WEIGHTS.careful;
+    targetType = 'Careful';
+  } else if (grade === 'A') {
+    target = baseUnit * TARGET_WEIGHTS.A;
+    targetType = 'A';
+  } else if (grade === 'B') {
+    target = baseUnit * TARGET_WEIGHTS.B;
+    targetType = 'B';
+  } else if (grade === 'C') {
+    target = baseUnit / TARGET_WEIGHTS.C;
+    targetType = 'C';
+  } else if (grade === 'D') {
+    target = baseUnit / TARGET_WEIGHTS.D;
+    targetType = 'D';
+  }
+  
+  return { target: target ? parseFloat(target.toFixed(6)) : null, targetType };
+}
+
+export { TIMEFRAMES, WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS, ASSETS, BASE_ATR, TARGET_WEIGHTS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget };

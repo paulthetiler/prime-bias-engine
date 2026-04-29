@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias } from '@/lib/biasEngine';
+import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget } from '@/lib/biasEngine';
 import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input as InputField } from '@/components/ui/input';
 import { Save, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,6 +17,15 @@ export default function Input() {
   const [results, setResults] = useState(null);
   const [showResult, setShowResult] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [topAssets, setTopAssets] = useState([
+    { asset: '', atr: null },
+    { asset: '', atr: null },
+    { asset: '', atr: null },
+    { asset: '', atr: null },
+    { asset: '', atr: null },
+  ]);
+  const [baseAtr, setBaseAtr] = useState(null);
+  const [targetInfo, setTargetInfo] = useState(null);
 
   // Load analysis from active set
   useEffect(() => {
@@ -33,12 +43,19 @@ export default function Input() {
     const res = calculateBias(inputs);
     setResults(res);
     
+    // Calculate ATR and target
+    const atrValue = getATRForAsset(instrument, topAssets);
+    setBaseAtr(atrValue);
+    
+    const targetData = calculateTarget(atrValue, res.grade, res.status);
+    setTargetInfo(targetData);
+    
     // Store in active set
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
-    active[instrument] = { instrument, inputs, results: res, timestamp: new Date().toISOString() };
+    active[instrument] = { instrument, inputs, results: res, timestamp: new Date().toISOString(), atr: atrValue, targetInfo: targetData };
     localStorage.setItem('primebias_active', JSON.stringify(active));
     window.dispatchEvent(new Event('biasUpdated'));
-  }, [inputs, instrument]);
+  }, [inputs, instrument, topAssets]);
 
   const handleTFChange = (tfKey, indicators) => {
     setInputs(prev => ({ ...prev, [tfKey]: indicators }));
@@ -86,6 +103,43 @@ export default function Input() {
         </div>
       </div>
 
+      {/* Top 5 Assets & ATR Overrides */}
+      <div className="space-y-3 bg-secondary/50 rounded-lg p-3 border border-border">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Top 5 Assets & ATR Overrides</div>
+        <div className="space-y-2">
+          {topAssets.map((item, idx) => (
+            <div key={idx} className="flex gap-2 items-end">
+              <Select value={item.asset || ''} onValueChange={(val) => {
+                const newTop = [...topAssets];
+                newTop[idx].asset = val;
+                setTopAssets(newTop);
+              }}>
+                <SelectTrigger className="flex-1 h-9 text-sm">
+                  <SelectValue placeholder={`Top ${idx + 1}`} />
+                </SelectTrigger>
+                <SelectContent className="max-h-48">
+                  {ASSETS.map(a => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <InputField
+                type="number"
+                step="0.0001"
+                placeholder="ATR"
+                value={item.atr || ''}
+                onChange={(e) => {
+                  const newTop = [...topAssets];
+                  newTop[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
+                  setTopAssets(newTop);
+                }}
+                className="w-24 h-9"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Instrument Selector with Add/Remove */}
       <div className="space-y-2">
         <Select value={instrument} onValueChange={setInstrument}>
@@ -118,6 +172,23 @@ export default function Input() {
           </div>
         )}
       </div>
+
+      {/* Live ATR & Target Display */}
+      {instrument && (
+        <div className="grid grid-cols-2 gap-3 bg-accent/30 rounded-lg p-3 border border-border">
+          <div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">ATR Used</div>
+            <div className="text-lg font-mono font-bold text-foreground">{baseAtr ? baseAtr.toFixed(6) : '—'}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Target</div>
+            <div className="text-lg font-mono font-bold text-foreground">
+              {targetInfo?.target ? targetInfo.target.toFixed(6) : '—'}
+              {targetInfo?.targetType && <span className="text-xs text-muted-foreground ml-1">({targetInfo.targetType})</span>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Instructions */}
       <div className="text-xs text-muted-foreground px-1">
