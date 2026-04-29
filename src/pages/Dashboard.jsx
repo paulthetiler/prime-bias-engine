@@ -72,14 +72,6 @@ export default function Dashboard() {
 
       <div className="flex gap-2 mb-3">
         <Button
-          variant={viewMode === 'grid' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setViewMode('grid')}
-          className="h-8 text-xs"
-        >
-          Grid
-        </Button>
-        <Button
           variant={viewMode === 'list' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setViewMode('list')}
@@ -98,14 +90,14 @@ export default function Dashboard() {
       </div>
 
       <div className="space-y-3">
-        {viewMode === 'grid' ? (
-          <LiveGrid analyses={analyses} />
-        ) : viewMode === 'list' ? (
+        {viewMode === 'list' ? (
           <AssetsList analyses={analyses} />
         ) : (
-          <div className="grid grid-cols-1 gap-3">
+          <div className="space-y-4">
             {analyses.map(a => (
-              <AnalysisCard key={a.instrument} analysis={a} />
+              <div key={a.instrument} className="rounded-lg border border-border bg-card p-4">
+                <AnalysisCard analysis={a} />
+              </div>
             ))}
           </div>
         )}
@@ -140,7 +132,7 @@ function AnalysisCard({ analysis }) {
   return (
     <div className="space-y-3">
       {/* Instrument Header */}
-      <div className="rounded-lg border border-border bg-secondary p-3 text-sm font-semibold text-foreground">
+      <div className="text-sm font-semibold text-foreground mb-2">
         {instrument}
       </div>
 
