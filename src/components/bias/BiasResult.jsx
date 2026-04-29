@@ -54,7 +54,7 @@ export default function BiasResult({ results }) {
 
       {/* ── FINAL TREND ── Deep + DD driven direction */}
       <div className="rounded-xl border border-border bg-secondary/40 p-3">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Final Trend</div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Trend</div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {mainDirection === 'BUY' ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : mainDirection === 'SELL' ? <TrendingDown className="w-5 h-5 text-red-400" /> : <MinusCircle className="w-5 h-5" />}
@@ -76,10 +76,10 @@ export default function BiasResult({ results }) {
             <span className={cn('text-2xl font-bold', nowColor)}>{nowBias || '—'}</span>
           </div>
           <div className="text-right">
-            <div className={cn('text-xl font-bold font-mono', nowScoreColor)}>
-              {plusMinusScore > 0 ? `+${plusMinusScore}` : plusMinusScore}
+            <div className={cn('text-sm font-semibold', strengthColor(nowBias, nowStrength))}>{nowStrength}</div>
+            <div className="text-[10px] text-muted-foreground">
+              {plusMinusScore > 0 ? `+${plusMinusScore}` : plusMinusScore} score
             </div>
-            <div className={cn('text-[10px]', strengthColor(nowBias, nowStrength))}>{nowStrength}</div>
           </div>
         </div>
       </div>
