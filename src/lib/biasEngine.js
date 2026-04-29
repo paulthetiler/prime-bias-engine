@@ -181,7 +181,6 @@ function calculateBias(inputs) {
     nowBias,
     nowResult,
     nowStrength,
-    plusMinusScore,
     mainDirection,
     confidenceScore,
     grade,
