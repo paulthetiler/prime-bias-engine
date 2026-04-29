@@ -26,51 +26,71 @@ export default function BiasResult({ results }) {
 
   const actionLabels = { TRADE: 'TRADE', WAIT: 'WAIT', NO_TRADE: 'NO TRADE' };
 
+  // Now momentum color — based on nowBias direction, NOT mainDirection
+  const nowColor = nowBias === 'BUY' ? 'text-emerald-400' : nowBias === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+  const nowScoreColor = plusMinusScore > 0 ? 'text-emerald-400' : plusMinusScore < 0 ? 'text-red-400' : 'text-muted-foreground';
+
   return (
     <div className="space-y-3">
-      {/* Main Result Card */}
-      <div className={cn('rounded-xl border-2 p-4 text-center', dirBg)}>
-        <div className="flex items-center justify-center gap-2 mb-1">
-          {mainDirection === 'BUY' ? <TrendingUp className="w-6 h-6 text-emerald-400" /> : mainDirection === 'SELL' ? <TrendingDown className="w-6 h-6 text-red-400" /> : <MinusCircle className="w-6 h-6" />}
-          <span className={cn('text-3xl font-bold', dirColor)}>{mainDirection}</span>
+
+      {/* ── FINAL TREND ── Deep + DD driven direction */}
+      <div className="rounded-xl border border-border bg-secondary/40 p-3">
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Final Trend</div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {mainDirection === 'BUY' ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : mainDirection === 'SELL' ? <TrendingDown className="w-5 h-5 text-red-400" /> : <MinusCircle className="w-5 h-5" />}
+            <span className={cn('text-2xl font-bold', dirColor)}>{mainDirection}</span>
+          </div>
+          <div className="text-right">
+            <div className="text-sm font-semibold text-muted-foreground">{ddStrength}</div>
+            <div className="text-[10px] text-muted-foreground">signal</div>
+          </div>
         </div>
-        <div className="text-sm text-muted-foreground">{strength} signal</div>
       </div>
 
-      {/* Grade + Action row */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className={cn('rounded-lg border p-3 text-center', gradeColors[grade])}>
-          <div className="text-2xl font-bold">{grade} <span className="text-sm font-semibold opacity-80">{gradeLabel}</span></div>
-          <div className="text-[10px] uppercase tracking-wider opacity-60">Grade</div>
+      {/* ── NOW MOMENTUM ── separate from final trend */}
+      <div className="rounded-xl border border-border bg-secondary/40 p-3">
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Now Momentum</div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {nowBias === 'BUY' ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : nowBias === 'SELL' ? <TrendingDown className="w-5 h-5 text-red-400" /> : <MinusCircle className="w-5 h-5 text-muted-foreground" />}
+            <span className={cn('text-2xl font-bold', nowColor)}>{nowBias || '—'}</span>
+          </div>
+          <div className="text-right">
+            <div className={cn('text-xl font-bold font-mono', nowScoreColor)}>
+              {plusMinusScore > 0 ? `+${plusMinusScore}` : plusMinusScore}
+            </div>
+            <div className="text-[10px] text-muted-foreground">{nowStrength}</div>
+          </div>
         </div>
+      </div>
+
+      {/* ── ACTION + GRADE ── */}
+      <div className="grid grid-cols-2 gap-2">
         <div className={cn('rounded-lg p-3 text-center flex flex-col items-center justify-center', actionColors[tradeAction])}>
           <div className="text-base font-bold leading-tight">{actionLabels[tradeAction]}</div>
           <div className="text-[10px] uppercase tracking-wider opacity-80">{status}</div>
         </div>
-      </div>
-
-      {/* Target + Now Score row */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg border border-border bg-secondary p-3 text-center">
-          <div className="text-sm font-bold font-mono leading-tight truncate">{targetNote || '—'}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Target</div>
-        </div>
-        <div className="rounded-lg border border-border bg-secondary p-3 text-center">
-          <div className={cn('text-2xl font-bold font-mono', plusMinusScore > 0 ? 'text-emerald-400' : plusMinusScore < 0 ? 'text-red-400' : 'text-muted-foreground')}>
-            {plusMinusScore > 0 ? `+${plusMinusScore}` : plusMinusScore}
-          </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Now Score</div>
+        <div className={cn('rounded-lg border p-3 text-center', gradeColors[grade])}>
+          <div className="text-2xl font-bold">{grade} <span className="text-sm font-semibold opacity-80">{gradeLabel}</span></div>
+          <div className="text-[10px] uppercase tracking-wider opacity-60">Grade</div>
         </div>
       </div>
 
-      {/* Trend Breakdown */}
+      {/* ── TARGET ── */}
+      <div className="rounded-lg border border-border bg-secondary p-3 text-center">
+        <div className="text-sm font-bold font-mono">{targetNote || '—'}</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Target</div>
+      </div>
+
+      {/* ── BLOCK BREAKDOWN ── */}
       <div className="grid grid-cols-3 gap-2">
         <TrendPill label="Deep" value={deepTrend} sub={deepStrength} />
         <TrendPill label="DD" value={ddBias} sub={ddStrength} />
         <TrendPill label="Now" value={nowBias} sub={nowStrength} />
       </div>
 
-      {/* Warnings */}
+      {/* ── WARNINGS ── */}
       {warnings.length > 0 && (
         <div className="space-y-1.5">
           {warnings.map((w, i) => (
