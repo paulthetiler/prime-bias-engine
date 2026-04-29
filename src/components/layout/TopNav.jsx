@@ -21,7 +21,7 @@ export default function TopNav() {
             <ChevronLeft className="w-5 h-5" />
           </Button>
         )}
-        <Link to="/" asChild>
+        <Link to="/">
           <Button
             variant={location.pathname === '/' ? 'default' : 'outline'}
             size="sm"
@@ -30,7 +30,7 @@ export default function TopNav() {
             Dashboard
           </Button>
         </Link>
-        <Link to="/input" asChild>
+        <Link to="/input">
           <Button
             variant={location.pathname === '/input' ? 'default' : 'outline'}
             size="sm"
