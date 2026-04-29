@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget } from '@/lib/biasEngine';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input as InputField } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Save, ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown } from 'lucide-react';
+import { Save, ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +33,8 @@ export default function Input() {
   ]);
   const [open, setOpen] = useState(false);
   const [extraCheck, setExtraCheck] = useState({ h1: null, m15: null });
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle, saving, saved
+  const autoSaveTimeoutRef = useRef(null);
 
   const handleExtraCheckChange = (key, value) => {
     setExtraCheck(prev => {
@@ -134,6 +136,25 @@ export default function Input() {
     localStorage.setItem('primebias_active', JSON.stringify(active));
     localStorage.setItem('primebias_instrument', instrument);
     window.dispatchEvent(new Event('biasUpdated'));
+    
+    // Auto-save to database
+    setAutoSaveStatus('saving');
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      await base44.entities.BiasAnalysis.create({
+        instrument,
+        timestamp: new Date().toISOString(),
+        inputs,
+        results: res,
+        overall_bias: res?.mainDirection || 'NEUTRAL',
+        grade: res?.grade || 'F',
+        confidence_score: res?.confidenceScore || 0,
+        trade_action: res?.tradeAction || 'NO_TRADE',
+        warnings: res?.warnings || [],
+      });
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus('idle'), 2000);
+    }, 1500);
   }, [inputs, instrument, topAssets]);
 
   const handleTFChange = (tfKey, indicators) => {
@@ -193,6 +214,20 @@ export default function Input() {
             <Save className="w-4 h-4" />
             Save
           </Button>
+          <div className="h-8 px-2 rounded text-xs font-medium flex items-center gap-1" title={autoSaveStatus === 'saving' ? 'Auto-saving...' : autoSaveStatus === 'saved' ? 'Auto-saved' : ''}>
+            {autoSaveStatus === 'saving' && (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span className="text-muted-foreground">Saving...</span>
+              </>
+            )}
+            {autoSaveStatus === 'saved' && (
+              <>
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span className="text-emerald-600 dark:text-emerald-300">Saved</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
