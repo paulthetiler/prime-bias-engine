@@ -27,7 +27,7 @@ export default function TopNav() {
             size="sm"
             className="rounded-full"
           >
-            Dashboard
+            Summary
           </Button>
         </Link>
         <Link to="/input">

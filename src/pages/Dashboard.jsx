@@ -87,7 +87,7 @@ export default function Dashboard() {
           <Crosshair className="w-10 h-10 text-muted-foreground" />
         </div>
         <h1 className="text-xl font-bold mb-2">PrimeBias</h1>
-        <p className="text-muted-foreground text-sm mb-6">Go to the Input tab to add assets for analysis</p>
+        <p className="text-muted-foreground text-sm mb-6">Go to the Bias Tool tab to add assets for analysis</p>
         <Link to="/input">
           <Button className="rounded-full">Input</Button>
         </Link>
