@@ -57,32 +57,49 @@ function calculateBias(inputs) {
     tfResults[tf.key] = calcTimeframeScore(tf.key, ind);
   });
 
-  // ── 1. DEEP TREND  (M only, as per Excel)
+  // ── 1. DEEP TREND  (M only for direction)
   const deepResult = tfResults.month.result;
   const deepTrend  = deepResult === 1 ? 'BULL' : deepResult === -1 ? 'BEAR' : 'NEUTRAL';
 
-  // Strength for Deep: sum of weighted totals for M + W + D
-  const bsWeightedSum =
-    tfResults.month.total + tfResults.week.total + tfResults.day.total;
-  const deepStrength = Math.abs(bsWeightedSum) >= 100 ? 'STRONG' : 'WEAK';
+  // Deep strength: count how many of M/W/D agree with deepResult
+  // Rule: any neutral in M/W/D caps strength at WEAK
+  const deepGroup = [tfResults.month.result, tfResults.week.result, tfResults.day.result];
+  const deepHasNeutral = deepGroup.some(r => r === 0);
+  const deepAgreeCount = deepGroup.filter(r => r === deepResult && deepResult !== 0).length;
+  let deepStrength = 'WEAK';
+  if (!deepHasNeutral && deepAgreeCount === 3) deepStrength = 'STRONG';
+  else if (!deepHasNeutral && deepAgreeCount === 2) deepStrength = 'MEDIUM';
+  // else WEAK (neutral present, or only 1 agrees)
 
-  // ── 2. DD (Dominant Direction) — Daily result only (the "close-in" trend from M/W/D)
-  // Excel DD = the Daily (D) row result, as it is the most recent broadstroke timeframe
+  // ── 2. DD (Dominant Direction) — Daily result only
   const ddResult = tfResults.day.result;
   const ddBias   = ddResult === 1 ? 'BUY' : ddResult === -1 ? 'SELL' : 'NEUTRAL';
 
-  // DD strength based on Daily weighted total
-  const ddAbsSum = Math.abs(tfResults.day.total);
-  const ddStrength = ddAbsSum >= 80 ? 'STRONG' : ddAbsSum >= 30 ? 'MEDIUM' : 'WEAK';
+  // DD strength: count how many of D/4H/1H agree with ddResult
+  // Rule: any neutral in D/4H/1H caps strength at WEAK
+  const ddGroup = [tfResults.day.result, tfResults.h4.result, tfResults.h1.result];
+  const ddHasNeutral = ddGroup.some(r => r === 0);
+  const ddAgreeCount = ddGroup.filter(r => r === ddResult && ddResult !== 0).length;
+  let ddStrength = 'WEAK';
+  if (!ddHasNeutral && ddAgreeCount === 3) ddStrength = 'STRONG';
+  else if (!ddHasNeutral && ddAgreeCount === 2) ddStrength = 'MEDIUM';
+  // else WEAK
 
-  // ── 3. NOW (4H + 1H + 15m + 5m) — weighted sum
+  // ── 3. NOW (4H + 1H + 15m + 5m) — weighted sum for direction
   const nowWeightedSum =
     tfResults.h4.total + tfResults.h1.total + tfResults.m15.total + tfResults.m5.total;
   const nowResult = nowWeightedSum > 0 ? 1 : nowWeightedSum < 0 ? -1 : 0;
   const nowBias   = nowResult === 1 ? 'BUY' : nowResult === -1 ? 'SELL' : 'NEUTRAL';
 
-  const nowAbsSum = Math.abs(nowWeightedSum);
-  const nowStrength = nowAbsSum >= 150 ? 'STRONG' : nowAbsSum >= 50 ? 'MEDIUM' : 'WEAK';
+  // Now strength: count how many of 1H/15M/5M agree with nowResult
+  // Rule: any neutral in 1H/15M/5M caps strength at WEAK
+  const nowGroup = [tfResults.h1.result, tfResults.m15.result, tfResults.m5.result];
+  const nowHasNeutral = nowGroup.some(r => r === 0);
+  const nowAgreeCount = nowGroup.filter(r => r === nowResult && nowResult !== 0).length;
+  let nowStrength = 'WEAK';
+  if (!nowHasNeutral && nowAgreeCount === 3) nowStrength = 'STRONG';
+  else if (!nowHasNeutral && nowAgreeCount === 2) nowStrength = 'MEDIUM';
+  // else WEAK
 
   // ── 4. OVERALL TREND direction — majority vote across all 7 TF results
   //    (same as Excel TREND cell: count BUY vs SELL results)
