@@ -64,33 +64,42 @@ export default function History() {
       ) : (
         <div className="space-y-2">
           {analyses.map(a => (
-            <button
-              key={a.id}
-              onClick={() => setSelected(a)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:bg-accent/50 transition-colors text-left"
-            >
-              <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center shrink-0',
-                a.overall_bias === 'BUY' ? 'bg-emerald-500/15' : a.overall_bias === 'SELL' ? 'bg-red-500/15' : 'bg-secondary'
-              )}>
-                {a.overall_bias === 'BUY' ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : <TrendingDown className="w-5 h-5 text-red-400" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm">{a.instrument}</span>
-                  <span className={cn('text-xs font-bold', gradeColors[a.grade])}>{a.grade}</span>
-                  <span className="text-[10px] font-mono text-muted-foreground">{a.confidence_score}</span>
+            <div key={a.id} className="flex items-center gap-2">
+              <button
+                onClick={() => setSelected(a)}
+                className="flex-1 flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:bg-accent/50 transition-colors text-left min-w-0"
+              >
+                <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center shrink-0',
+                  a.overall_bias === 'BUY' ? 'bg-emerald-500/15' : a.overall_bias === 'SELL' ? 'bg-red-500/15' : 'bg-secondary'
+                )}>
+                  {a.overall_bias === 'BUY' ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : <TrendingDown className="w-5 h-5 text-red-400" />}
                 </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {a.timestamp ? format(new Date(a.timestamp), 'dd MMM yyyy HH:mm') : format(new Date(a.created_date), 'dd MMM yyyy HH:mm')}
-                  {a.outcome && a.outcome !== 'pending' && (
-                    <span className={cn('ml-2 uppercase font-semibold',
-                      a.outcome === 'win' ? 'text-emerald-400' : a.outcome === 'loss' ? 'text-red-400' : 'text-muted-foreground'
-                    )}>• {a.outcome}</span>
-                  )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{a.instrument}</span>
+                    <span className={cn('text-xs font-bold', gradeColors[a.grade])}>{a.grade}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">{a.confidence_score}</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {a.timestamp ? format(new Date(a.timestamp), 'dd MMM yyyy HH:mm') : format(new Date(a.created_date), 'dd MMM yyyy HH:mm')}
+                    {a.outcome && a.outcome !== 'pending' && (
+                      <span className={cn('ml-2 uppercase font-semibold',
+                        a.outcome === 'win' ? 'text-emerald-400' : a.outcome === 'loss' ? 'text-red-400' : 'text-muted-foreground'
+                      )}>• {a.outcome}</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </button>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="shrink-0 h-10 w-10 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => deleteMutation.mutate(a.id)}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
           ))}
         </div>
       )}
