@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, MinusCircle, AlertTriangle } from 'lucide-react';
+import AssetsList from '@/components/bias/AssetsList';
+import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const [activeAssets, setActiveAssets] = useState({});
   const [timeToNextHour, setTimeToNextHour] = useState('');
+  const [viewMode, setViewMode] = useState('list');
 
   useEffect(() => {
     const load = () => {
@@ -66,12 +69,35 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="flex gap-2 mb-3">
+        <Button
+          variant={viewMode === 'list' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setViewMode('list')}
+          className="h-8 text-xs"
+        >
+          List
+        </Button>
+        <Button
+          variant={viewMode === 'cards' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setViewMode('cards')}
+          className="h-8 text-xs"
+        >
+          Cards
+        </Button>
+      </div>
+
       <div className="space-y-3">
-        <div className="grid grid-cols-1 gap-3">
-          {analyses.map(a => (
-            <AnalysisCard key={a.instrument} analysis={a} />
-          ))}
-        </div>
+        {viewMode === 'list' ? (
+          <AssetsList analyses={analyses} />
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            {analyses.map(a => (
+              <AnalysisCard key={a.instrument} analysis={a} />
+            ))}
+          </div>
+        )}
         <p className="text-[10px] text-muted-foreground px-1">
           <strong>Grade:</strong> A–F confidence. <strong>Score:</strong> Absolute strength. <strong>DEEP/DD/NOW:</strong> Trend direction by timeframe.
         </p>
