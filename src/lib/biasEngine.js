@@ -49,6 +49,26 @@ function calcTimeframeScore(tfKey, indicators) {
   return { total, result, bias, indicators };
 }
 
+// Raw signal sum for a group of indicators (-1/0/+1 each)
+// Used for NOW strength per Excel: sum of raw values, not weighted score counting
+function rawSum(indicators, tfKey) {
+  // For H1/M15/M5: close is disabled (0), so sum macd+rsi+boli
+  // For others: sum all four
+  return (indicators.close || 0) + (indicators.macd || 0) + (indicators.rsi || 0) + (indicators.boli || 0);
+}
+
+// Strength from raw summed value per Excel logic:
+//   |sum| = 1 → WEAK
+//   |sum| = 2 → MEDIUM
+//   |sum| = 3 or 4 → STRONG
+function strengthFromSum(sum) {
+  const abs = Math.abs(sum);
+  if (abs >= 3) return 'STRONG';
+  if (abs === 2) return 'MEDIUM';
+  if (abs === 1) return 'WEAK';
+  return 'NO TRADE';
+}
+
 // MODE helper: majority vote of an array of results (+1/-1/0)
 // Returns +1 or -1 based on majority; 0 if tied (neutral)
 function mode(results) {
@@ -59,21 +79,24 @@ function mode(results) {
   return 0;
 }
 
-// Strength — exact Excel rules for a group of 3:
-//   3 aligned (no neutrals, no opposites)  → STRONG
-//   2 aligned + 1 opposite                 → MEDIUM
-//   2 aligned + 1 neutral                  → WEAK
-//   anything else (evenly split / all neutral) → NO TRADE
+// Strength for Deep/DD blocks (group of 3 timeframe results)
 function groupStrength(group, direction) {
   if (direction === 0) return 'NO TRADE';
-  const agreeCount   = group.filter(r => r === direction).length;
+  const agreeCount    = group.filter(r => r === direction).length;
   const oppositeCount = group.filter(r => r === -direction).length;
   const neutralCount  = group.filter(r => r === 0).length;
 
-  if (agreeCount === 3)                          return 'STRONG';   // 3 aligned, no neutral
-  if (agreeCount === 2 && oppositeCount === 1)   return 'MEDIUM';   // 2 + 1 opposite
-  if (agreeCount === 2 && neutralCount === 1)    return 'WEAK';     // 2 + 1 neutral
+  if (agreeCount === 3)                        return 'STRONG';
+  if (agreeCount === 2 && oppositeCount === 1) return 'MEDIUM';
+  if (agreeCount === 2 && neutralCount === 1)  return 'WEAK';
   return 'NO TRADE';
+}
+
+// Downgrade grade by N levels: A→B→C→D→F
+function downgrade(grade, levels = 1) {
+  const ladder = ['A', 'B', 'C', 'D', 'F'];
+  const idx = ladder.indexOf(grade);
+  return ladder[Math.min(idx + levels, ladder.length - 1)];
 }
 
 // ─── Main bias calculation ────────────────────────────────────────────────────
@@ -84,7 +107,7 @@ function calculateBias(inputs) {
     tfResults[tf.key] = calcTimeframeScore(tf.key, ind);
   });
 
-  // ── 1. DEEP — MODE of M / W / D (direction only via majority vote)
+  // ── 1. DEEP — MODE of M / W / D
   const deepGroup    = [tfResults.month.result, tfResults.week.result, tfResults.day.result];
   const deepResult   = mode(deepGroup);
   const deepTrend    = deepResult === 1 ? 'BULL' : deepResult === -1 ? 'BEAR' : 'NEUTRAL';
@@ -96,96 +119,117 @@ function calculateBias(inputs) {
   const ddBias     = ddResult === 1 ? 'BUY' : ddResult === -1 ? 'SELL' : 'NEUTRAL';
   const ddStrength = groupStrength(ddGroup, ddResult);
 
-  // ── 3. NOW — MODE of 1H / 15M / 5M
-  const nowGroup    = [tfResults.h1.result, tfResults.m15.result, tfResults.m5.result];
-  const nowResult   = mode(nowGroup);
-  const nowBias     = nowResult === 1 ? 'BUY' : nowResult === -1 ? 'SELL' : 'NEUTRAL';
-  const nowStrength = groupStrength(nowGroup, nowResult);
+  // ── 3. NOW — MODE of 1H / 15M / 5M (direction via majority vote)
+  const nowGroup  = [tfResults.h1.result, tfResults.m15.result, tfResults.m5.result];
+  const nowResult = mode(nowGroup);
+  const nowBias   = nowResult === 1 ? 'BUY' : nowResult === -1 ? 'SELL' : 'NEUTRAL';
 
-  // ── 4. PLUS/MINUS SCORE — raw sum of 1H + 15M + 5M individual results
-  //      Range: -3 to +3. Feeds into grade and target quality.
+  // NOW strength: uses raw value summation per Excel spec (NOT signal counting)
+  // Sum the raw indicator values across H1 + M15 + M5
+  const h1Ind  = inputs.h1  || { close: 0, macd: 0, rsi: 0, boli: 0 };
+  const m15Ind = inputs.m15 || { close: 0, macd: 0, rsi: 0, boli: 0 };
+  const m5Ind  = inputs.m5  || { close: 0, macd: 0, rsi: 0, boli: 0 };
+  // H1/M15/M5 don't use close — sum MACD+RSI+Boli for each, then total
+  const nowRawSum = 
+    (h1Ind.macd + h1Ind.rsi + h1Ind.boli) +
+    (m15Ind.macd + m15Ind.rsi + m15Ind.boli) +
+    (m5Ind.macd + m5Ind.rsi + m5Ind.boli);
+  const nowStrength = nowResult !== 0 ? strengthFromSum(nowRawSum) : 'NO TRADE';
+
+  // ── 4. PLUS/MINUS SCORE — raw sum of 1H + 15M + 5M results
   const plusMinusScore = tfResults.h1.result + tfResults.m15.result + tfResults.m5.result;
 
-  // ── 5. OVERALL DIRECTION — driven by Deep (primary) confirmed by DD
-  //      Deep sets the bias. DD must agree for a tradeable signal.
-  //      If Deep is neutral, fall back to DD. If both neutral → NO TRADE.
+  // ── 5. OVERALL DIRECTION
   let mainDirection;
   if (deepResult !== 0) {
     mainDirection = deepResult === 1 ? 'BUY' : 'SELL';
   } else if (ddResult !== 0) {
     mainDirection = ddResult === 1 ? 'BUY' : 'SELL';
   } else {
-    // All blocks neutral — use mode of all 7 as last resort
     const allResults  = TIMEFRAMES.map(tf => tfResults[tf.key].result);
     const overallMode = mode(allResults);
     mainDirection = overallMode >= 0 ? 'BUY' : 'SELL';
   }
 
-  const dir      = mainDirection === 'BUY' ? 1 : -1;
-  const ddAligns  = ddResult === dir;
-  const nowAligns = nowResult === dir;
+  const dir        = mainDirection === 'BUY' ? 1 : -1;
   const deepAligns = deepResult === dir;
+  const ddAligns   = ddResult === dir;
+  const nowAligns  = nowResult === dir;
 
-  // Agreement flags
-  const ddNowAgree    = ddResult !== 0 && nowResult !== 0 && ddResult === nowResult;
+  // Alignment flags
   const deepDdAgree   = deepResult !== 0 && ddResult !== 0 && deepResult === ddResult;
+  const ddNowAgree    = ddResult !== 0 && nowResult !== 0 && ddResult === nowResult;
   const nowOppositeDD = ddResult !== 0 && nowResult !== 0 && nowResult === -ddResult;
 
-  // ── 6. GRADE — rule-based, plusMinusScore feeds in directly
-  //
-  //  A  — Deep+DD+NOW all agree, plusMinus ≥ +2         → GOOD (full alignment, strong now)
-  //  A  — Deep+DD+NOW all agree, plusMinus = +1          → GOOD
-  //  B  — DD+NOW agree & align, plusMinus ≥ 0            → MED  (DD+Now aligned, Deep may differ)
-  //  C  — DD aligns, NOW neutral or weak (plusMinus 0/-1) → MIN  (trend exists, now lagging)
-  //  D  — DD aligns but NOW is OPPOSITE to DD            → WAIT / DANGER
-  //  F  — DD does not align with direction               → NO TRADE
+  // ── 6. BASE GRADE — count how many of [DEEP, DD, NOW, TREND(dir)] align
+  //    Treat TREND as always aligning (it's derived from the stack), so count Deep+DD+Now
+  //    3/3 aligned → A, 2/3 → B, 1/3 → C, 0/3 → NO TRADE
+  //    Special: if alignment = 2/3 and M5 confirms direction → grade stays B (M5 decides)
+  const alignedBlocks = [deepAligns, ddAligns, nowAligns].filter(Boolean).length;
 
   let grade       = 'F';
   let gradeLabel  = 'No Trade';
   let status      = 'No Trade';
   let tradeAction = 'NO_TRADE';
 
-  if (deepDdAgree && ddAligns && nowAligns && plusMinusScore >= 1) {
-    // All three blocks agree AND now momentum is positive
+  if (alignedBlocks === 3) {
     grade = 'A'; gradeLabel = 'Ready'; status = 'Ready'; tradeAction = 'TRADE';
 
-  } else if (ddNowAgree && ddAligns && plusMinusScore >= 0) {
-    // DD + NOW agree (Deep may differ), momentum neutral or positive
-    grade = 'B'; gradeLabel = 'Good'; status = 'Ready'; tradeAction = 'TRADE';
+  } else if (alignedBlocks === 2) {
+    // M5 decides direction on 2/4 alignment
+    const m5Aligns = tfResults.m5.result === dir;
+    if (m5Aligns) {
+      // M5 confirms, but cap at C if NOW is WEAK
+      grade = nowStrength === 'WEAK' ? 'C' : 'B';
+      gradeLabel = grade === 'B' ? 'Good' : 'Scalp';
+      status = 'Ready'; tradeAction = 'TRADE';
+    } else {
+      grade = 'C'; gradeLabel = 'Scalp'; status = 'Scalp'; tradeAction = 'TRADE';
+    }
 
-  } else if (ddAligns && !nowOppositeDD && plusMinusScore >= -1) {
-    // DD aligns, NOW is not opposing (neutral or lagging)
+  } else if (alignedBlocks === 1) {
     grade = 'C'; gradeLabel = 'Scalp'; status = 'Scalp'; tradeAction = 'TRADE';
-
-  } else if (ddAligns && nowOppositeDD) {
-    // DD aligns but NOW is actively opposite — dangerous, do not trade
-    grade = 'D'; gradeLabel = 'Wait'; status = 'Danger'; tradeAction = 'WAIT';
-
-  } else if (!ddAligns && deepAligns) {
-    // Deep aligns but DD hasn't confirmed — trend off, wait for DD
-    grade = 'D'; gradeLabel = 'Wait'; status = 'Trend Off'; tradeAction = 'WAIT';
 
   } else {
     grade = 'F'; gradeLabel = 'No Trade'; status = 'No Trade'; tradeAction = 'NO_TRADE';
   }
 
-  // ── 7. TARGET label — reflects grade + block conflict + plusMinus
-  const dirLabel = mainDirection === 'BUY' ? 'BUY' : 'SELL';
-  let targetNote = '';
-  if (grade === 'A') {
-    targetNote = `GOOD ${dirLabel}`;
-  } else if (grade === 'B') {
-    // Downgrade target if Deep conflicts
-    targetNote = deepDdAgree ? `MED ${dirLabel}` : `MIN ${dirLabel}`;
-  } else if (grade === 'C') {
-    targetNote = `MIN ${dirLabel}`;
-  } else if (grade === 'D') {
-    targetNote = status === 'Danger' ? `DANGER` : `WAIT`;
-  } else {
-    targetNote = `NO TRADE`;
+  // ── 7. DOWNGRADE RULES (applied after base grade)
+  if (grade !== 'F') {
+    // Rule 1: NOW strength is WEAK → downgrade 1 level
+    if (nowStrength === 'WEAK') {
+      grade = downgrade(grade, 1);
+    }
+
+    // Rule 2: DD conflicts with NOW → downgrade 1 level
+    if (nowOppositeDD) {
+      grade = downgrade(grade, 1);
+    }
+
+    // Rule 3: Mixed BUY/SELL signals across stack → downgrade 1 level
+    const hasMixed = deepAligns !== ddAligns || ddAligns !== nowAligns;
+    if (hasMixed) {
+      grade = downgrade(grade, 1);
+    }
+
+    // Re-derive labels after downgrades
+    if (grade === 'A') { gradeLabel = 'Ready'; status = 'Ready'; tradeAction = 'TRADE'; }
+    else if (grade === 'B') { gradeLabel = 'Good'; status = 'Ready'; tradeAction = 'TRADE'; }
+    else if (grade === 'C') { gradeLabel = 'Scalp'; status = 'Scalp'; tradeAction = 'TRADE'; }
+    else if (grade === 'D') { gradeLabel = 'Wait'; status = nowOppositeDD ? 'Danger' : 'Wait'; tradeAction = 'WAIT'; }
+    else { gradeLabel = 'No Trade'; status = 'No Trade'; tradeAction = 'NO_TRADE'; }
   }
 
-  // ── 8. WARNINGS — block conflicts
+  // ── 8. TARGET label
+  const dirLabel = mainDirection === 'BUY' ? 'BUY' : 'SELL';
+  let targetNote = '';
+  if (grade === 'A') targetNote = `GOOD ${dirLabel}`;
+  else if (grade === 'B') targetNote = deepDdAgree ? `MED ${dirLabel}` : `MIN ${dirLabel}`;
+  else if (grade === 'C') targetNote = `MIN ${dirLabel}`;
+  else if (grade === 'D') targetNote = status === 'Danger' ? 'DANGER' : 'WAIT';
+  else targetNote = 'NO TRADE';
+
+  // ── 9. WARNINGS
   const warnings = [];
   if (deepResult !== 0 && deepResult !== dir) {
     warnings.push('Deep Trend is AGAINST direction — counter-trend setup');
@@ -199,9 +243,12 @@ function calculateBias(inputs) {
   if (deepResult === 0 && ddResult !== 0) {
     warnings.push('Deep Trend is NEUTRAL — broad direction unconfirmed');
   }
+  if (nowStrength === 'WEAK' && nowResult !== 0) {
+    warnings.push('NOW momentum is WEAK — reduced confidence in execution timing');
+  }
 
-  // ── 9. Confidence score — % of all 7 TFs aligned with direction
-  const alignedCount  = TIMEFRAMES.filter(tf => tfResults[tf.key].result === dir).length;
+  // ── 10. Confidence score
+  const alignedCount    = TIMEFRAMES.filter(tf => tfResults[tf.key].result === dir).length;
   const confidenceScore = Math.round((alignedCount / TIMEFRAMES.length) * 100);
 
   return {
