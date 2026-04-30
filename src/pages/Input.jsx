@@ -76,24 +76,21 @@ export default function Input() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load top assets from ATR page
+  // Load top assets from ATR page (top 5 + extras combined)
+  const loadAllAssets = () => {
+    const top = JSON.parse(localStorage.getItem('primebias_top_assets') || '[]');
+    const extra = JSON.parse(localStorage.getItem('primebias_extra_assets') || '[]');
+    setTopAssets([...top, ...extra]);
+  };
+
   useEffect(() => {
-    const saved = localStorage.getItem('primebias_top_assets');
-    if (saved) {
-      setTopAssets(JSON.parse(saved));
-    }
+    loadAllAssets();
   }, []);
 
   // Listen for ATR changes
   useEffect(() => {
-    const handleAtrUpdate = () => {
-      const saved = localStorage.getItem('primebias_top_assets');
-      if (saved) {
-        setTopAssets(JSON.parse(saved));
-      }
-    };
-    window.addEventListener('atrUpdated', handleAtrUpdate);
-    return () => window.removeEventListener('atrUpdated', handleAtrUpdate);
+    window.addEventListener('atrUpdated', loadAllAssets);
+    return () => window.removeEventListener('atrUpdated', loadAllAssets);
   }, []);
 
   // Load analysis from active set and sync active assets

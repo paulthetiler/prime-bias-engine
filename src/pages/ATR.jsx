@@ -14,20 +14,27 @@ export default function ATR() {
     { asset: '', atr: null },
     { asset: '', atr: null },
   ]);
+  const [extraAssets, setExtraAssets] = useState([]);
 
   // Load from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('primebias_top_assets');
-    if (saved) {
-      setTopAssets(JSON.parse(saved));
-    }
+    if (saved) setTopAssets(JSON.parse(saved));
+    const savedExtra = localStorage.getItem('primebias_extra_assets');
+    if (savedExtra) setExtraAssets(JSON.parse(savedExtra));
   }, []);
 
-  // Save to localStorage on change
+  // Save top assets to localStorage on change
   useEffect(() => {
     localStorage.setItem('primebias_top_assets', JSON.stringify(topAssets));
     window.dispatchEvent(new Event('atrUpdated'));
   }, [topAssets]);
+
+  // Save extra assets to localStorage on change
+  useEffect(() => {
+    localStorage.setItem('primebias_extra_assets', JSON.stringify(extraAssets));
+    window.dispatchEvent(new Event('atrUpdated'));
+  }, [extraAssets]);
 
   const handleReset = () => {
     setTopAssets([
@@ -37,6 +44,7 @@ export default function ATR() {
       { asset: '', atr: null },
       { asset: '', atr: null },
     ]);
+    setExtraAssets([]);
     toast.success('ATR overrides cleared');
   };
 
@@ -92,14 +100,59 @@ export default function ATR() {
         </div>
       </div>
 
-      {/* Add New */}
-      <Button
-        variant="outline"
-        className="w-full gap-2"
-        onClick={() => setTopAssets(prev => [...prev, { asset: '', atr: null }])}
-      >
-        <Plus className="w-4 h-4" /> Add New
-      </Button>
+      {/* Extra Assets */}
+      <div className="space-y-3 bg-secondary/50 rounded-lg p-3 border border-border">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Additional Assets</div>
+        {extraAssets.length > 0 && (
+          <div className="space-y-2">
+            {extraAssets.map((item, idx) => (
+              <div key={idx} className="flex gap-2 items-end">
+                <Select value={item.asset || ''} onValueChange={(val) => {
+                  const updated = [...extraAssets];
+                  updated[idx].asset = val;
+                  setExtraAssets(updated);
+                }}>
+                  <SelectTrigger className="flex-1 h-9 text-sm">
+                    <SelectValue placeholder="Asset" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-48">
+                    {ASSETS.map(a => (
+                      <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  step="0.00001"
+                  placeholder="ATR"
+                  value={item.atr || ''}
+                  onChange={(e) => {
+                    const updated = [...extraAssets];
+                    updated[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
+                    setExtraAssets(updated);
+                  }}
+                  className="w-28 h-9 text-sm"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-destructive hover:text-destructive shrink-0"
+                  onClick={() => setExtraAssets(prev => prev.filter((_, i) => i !== idx))}
+                >
+                  ×
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        <Button
+          variant="outline"
+          className="w-full gap-2"
+          onClick={() => setExtraAssets(prev => [...prev, { asset: '', atr: null }])}
+        >
+          <Plus className="w-4 h-4" /> Add New
+        </Button>
+      </div>
 
       {/* Info */}
       <div className="text-xs text-muted-foreground bg-accent/20 rounded-lg p-3 border border-border space-y-1">
