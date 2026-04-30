@@ -59,9 +59,9 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
   const showWhy = settings?.showWhyThisTrade !== false;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 md:p-0" onClick={onClose}>
       <div
-        className="w-full max-w-md bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-md md:max-w-[520px] bg-card rounded-2xl border border-border shadow-2xl max-h-[calc(100vh-32px)] md:max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
