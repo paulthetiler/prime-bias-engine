@@ -3,7 +3,7 @@ import { ASSETS } from '@/lib/biasEngine';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ATR() {
@@ -91,6 +91,15 @@ export default function ATR() {
           ))}
         </div>
       </div>
+
+      {/* Add New */}
+      <Button
+        variant="outline"
+        className="w-full gap-2"
+        onClick={() => setTopAssets(prev => [...prev, { asset: '', atr: null }])}
+      >
+        <Plus className="w-4 h-4" /> Add New
+      </Button>
 
       {/* Info */}
       <div className="text-xs text-muted-foreground bg-accent/20 rounded-lg p-3 border border-border space-y-1">
