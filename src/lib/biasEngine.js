@@ -14,10 +14,16 @@
 //   DD   = [Day, H4, H1]        → direction = majority; Day anchors
 //   NOW  = [H1, M15, M5]        → direction = majority; H1 anchors
 //
-// BLOCK STRENGTH (confirmed from all 5 examples):
+// BLOCK STRENGTH — DEEP/DD (confirmed from all 5 examples):
 //   3 matching                   → STRONG
 //   2 matching + 1 OPPOSITE      → MEDIUM
 //   2 matching + 1 NEUTRAL (0)   → WEAK
+//
+// BLOCK STRENGTH — NOW (H1 is the anchor):
+//   H1 does NOT match dir (opposite or neutral) → WEAK  ← key difference
+//   H1 matches + all 3 match                   → STRONG
+//   H1 matches + not all 3                     → MEDIUM
+//   Example: H1=BUY, M15=SELL, M5=SELL → NOW=SELL/WEAK (H1 conflicts)
 //
 // GRADE SCORING (individual TF weights, BUY vs SELL tally):
 //   Month=2, Week=5, Day=10, H4=30, H1=33, M15=10, M5=5  (base total = 95)
@@ -140,8 +146,8 @@ function calcBlockDir(r0, r1, r2) {
   return 0;
 }
 
-// ─── Block strength ───────────────────────────────────────────────────────────
-// Confirmed rule (all 5 Excel examples verified):
+// ─── Block strength (DEEP / DD) ───────────────────────────────────────────────
+// Confirmed rule for DEEP and DD blocks:
 //   3 matching                → STRONG
 //   2 matching + 1 opposite   → MEDIUM
 //   2 matching + 1 neutral    → WEAK
@@ -152,7 +158,24 @@ function calcBlockStrength(r0, r1, r2, dir) {
   if (matches === 3)                        return 'STRONG';
   if (matches === 2 && neutrals === 0)      return 'MEDIUM'; // 1 opposite
   if (matches === 2 && neutrals >= 1)       return 'WEAK';   // 1 neutral
-  return 'WEAK'; // fallback (1 match — shouldn't occur for non-zero dir)
+  return 'WEAK';
+}
+
+// ─── NOW block strength (H1, M15, M5) ────────────────────────────────────────
+// NOW uses a different rule from DEEP/DD because H1 is the anchor.
+// If H1 CONFLICTS with the NOW direction (i.e. M15+M5 set the direction but H1
+// is opposite), the result is always WEAK regardless of M15/M5 agreement.
+//
+// Confirmed rules:
+//   H1 matches + M15 matches + M5 matches → STRONG
+//   H1 matches + (M15 or M5 neutral/opposite, 2 total matching) → MEDIUM
+//   H1 does NOT match (opposite or neutral) → WEAK
+function calcNowStrength(rH1, rM15, rM5, dir) {
+  if (dir === 0) return 'NO TRADE';
+  if (rH1 !== dir) return 'WEAK'; // H1 conflicts or neutral → always WEAK
+  const matches = [rH1, rM15, rM5].filter(r => r === dir).length;
+  if (matches === 3) return 'STRONG';
+  return 'MEDIUM'; // H1 matches, not all 3 → MEDIUM
 }
 
 // ─── Grade ────────────────────────────────────────────────────────────────────
@@ -208,7 +231,7 @@ function calculateBias(inputs, extraCheck = null) {
   // 4. NOW block [H1, M15, M5]
   const nowDir      = calcBlockDir(r('h1'), r('m15'), r('m5'));
   const nowBias     = nowDir === 1 ? 'BUY' : nowDir === -1 ? 'SELL' : 'NEUTRAL';
-  const nowStrength = calcBlockStrength(r('h1'), r('m15'), r('m5'), nowDir);
+  const nowStrength = calcNowStrength(r('h1'), r('m15'), r('m5'), nowDir);
 
   // 5. Grade score — individual TF weights
   let buyScore = 0, sellScore = 0;

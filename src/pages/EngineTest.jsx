@@ -69,6 +69,23 @@ const TEST_CASES = [
     },
     expected: { deep: 'BULL / STRONG', dd: 'BUY / STRONG', now: 'BUY / STRONG', direction: 'BUY', score: 95, grade: 'F (Ext)' },
   },
+  {
+    name: 'NOW Regression — H1 conflicts (→ WEAK)',
+    inputs: {
+      // H1=BUY, M15=SELL, M5=SELL → NOW direction=SELL (majority), but H1 conflicts → WEAK
+      month: { close: -1, macd: -1, rsi: 0, boli: 0 },
+      week:  { close: -1, macd: -1, rsi: 0, boli: 0 },
+      day:   { close: -1, macd: -1, rsi: 0, boli: 0 },
+      h4:    { close: -1, macd: -1, rsi: 0, boli: 0 },
+      // H1 → BUY: macd+1, rsi+1 → score = 20+40 = +60 → BUY
+      h1:    { close:  0, macd:  1, rsi: 1, boli: 0 },
+      // M15 → SELL: macd-1, boli-1 → score = -20-40 = -60 → SELL
+      m15:   { close:  0, macd: -1, rsi: 0, boli: -1 },
+      // M5 → SELL: macd-1, boli-1 → score = -10-40 = -50 → SELL
+      m5:    { close:  0, macd: -1, rsi: 0, boli: -1 },
+    },
+    expected: { deep: 'BEAR / STRONG', dd: 'SELL / MEDIUM', now: 'SELL / WEAK', direction: 'SELL', score: 60, grade: 'B' },
+  },
 ];
 
 function match(actual, expected) {
@@ -97,7 +114,7 @@ export default function EngineTest() {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center gap-3 pt-2">
-        <h1 className="text-lg font-bold">Engine Test — 5 Excel Cases</h1>
+        <h1 className="text-lg font-bold">Engine Test — 6 Excel Cases</h1>
         <span className={cn('text-xs font-bold px-2 py-1 rounded', allPass ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400')}>
           {allPass ? '✓ ALL PASS' : '✗ FAILURES DETECTED'}
         </span>
