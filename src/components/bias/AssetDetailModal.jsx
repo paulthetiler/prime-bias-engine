@@ -81,7 +81,7 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
           </div>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 pb-[120px]">
           {/* Direction + Status */}
           <div className="grid grid-cols-2 gap-3">
             <div className={cn('rounded-xl border-2 p-4 text-center', mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border')}>
