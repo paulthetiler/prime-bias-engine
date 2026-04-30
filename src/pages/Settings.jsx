@@ -122,6 +122,7 @@ export default function Settings() {
             <Toggle label="Why this trade?" sub="Show explanation on each card" value={s.showWhyThisTrade} onChange={v => update('showWhyThisTrade', v)} />
             <Toggle label="Alignment" sub="HIGH / MEDIUM / LOW indicator" value={s.showAlignment} onChange={v => update('showAlignment', v)} />
             <Toggle label="Score" sub="Show weighted score" value={s.showScore} onChange={v => update('showScore', v)} />
+            <Toggle label="Backend score" sub="Show raw engine score and breakdowns" value={s.showBackendScore} onChange={v => update('showBackendScore', v)} />
             <Toggle label="Target" sub="Show calculated price target" value={s.showTarget} onChange={v => update('showTarget', v)} />
             <Toggle label="Notes" sub="Show notes on cards" value={s.showNotes} onChange={v => update('showNotes', v)} />
             <Toggle label="Compact mode" sub="Smaller cards, hide block breakdown" value={s.compactMode} onChange={v => update('compactMode', v)} />

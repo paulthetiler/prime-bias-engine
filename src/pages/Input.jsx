@@ -415,7 +415,7 @@ export default function Input() {
             <span>Bias Result</span>
             {showResult ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
-          {showResult && <BiasResult results={results} />}
+          {showResult && <BiasResult results={results} settings={settings} />}
         </>
       )}
 

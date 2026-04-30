@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle, MinusCircle } from 'lucide-react';
 
-export default function BiasResult({ results, rawTimeframes }) {
+export default function BiasResult({ results, rawTimeframes, settings }) {
   if (!results) return null;
 
   const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, plusMinusScore, winningScore, warnings, targetNote, timeframes } = results;
@@ -57,62 +57,46 @@ export default function BiasResult({ results, rawTimeframes }) {
   return (
     <div className="space-y-3">
 
-      {/* ── FINAL TREND ── Deep + DD driven direction */}
-      <div className="rounded-xl border border-border bg-secondary/40 p-3">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Trend</div>
+      {/* ── MAIN RESULT CARD ── Grade, Status, Direction, Target */}
+      <div className="rounded-xl border border-border bg-secondary/40 p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {mainDirection === 'BUY' ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : mainDirection === 'SELL' ? <TrendingDown className="w-5 h-5 text-red-400" /> : <MinusCircle className="w-5 h-5" />}
-            <span className={cn('text-2xl font-bold', dirColor)}>{mainDirection}</span>
-          </div>
-          <div className="text-right">
-            <div className={cn('text-sm font-semibold', strengthColor(mainDirection, ddStrength))}>{ddStrength}</div>
-            <div className="text-[10px] text-muted-foreground">signal</div>
-          </div>
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Grade</span>
+          <span className={cn('text-lg font-bold', gradeColors[grade]?.split(' ')[0])}>{grade} — {gradeLabel}</span>
         </div>
-      </div>
-
-      {/* ── NOW MOMENTUM ── separate from final trend */}
-      <div className="rounded-xl border border-border bg-secondary/40 p-3">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Now Momentum</div>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {nowBias === 'BUY' ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : nowBias === 'SELL' ? <TrendingDown className="w-5 h-5 text-red-400" /> : <MinusCircle className="w-5 h-5 text-muted-foreground" />}
-            <span className={cn('text-2xl font-bold', nowColor)}>{nowBias || '—'}</span>
-          </div>
-          <div className="text-right">
-            <div className={cn('text-sm font-semibold', strengthColor(nowBias, nowStrength))}>{nowStrength}</div>
-            <div className="text-[10px] text-muted-foreground">
-              {plusMinusScore > 0 ? `+${plusMinusScore}` : plusMinusScore} score
-            </div>
-          </div>
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Status</span>
+          <span className="text-sm font-semibold text-foreground">{status}</span>
         </div>
-      </div>
-
-      {/* ── ACTION + GRADE ── */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className={cn('rounded-lg p-3 text-center flex flex-col items-center justify-center', actionColors[tradeAction])}>
-          <div className="text-base font-bold leading-tight">{actionLabels[tradeAction]}</div>
-          <div className="text-[10px] uppercase tracking-wider opacity-80">{status}</div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Direction</span>
+          <span className={cn('text-lg font-bold', dirColor)}>{mainDirection}</span>
         </div>
-        <div className={cn('rounded-lg border p-3 text-center', gradeColors[grade])}>
-          <div className="text-2xl font-bold">{grade} <span className="text-sm font-semibold opacity-80">{gradeLabel}</span></div>
-          <div className="text-[10px] uppercase tracking-wider opacity-60">Grade · {winningScore ?? 0}pts</div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Target</span>
+          <span className="text-sm font-mono font-bold">{targetNote || '—'}</span>
         </div>
-      </div>
-
-      {/* ── TARGET ── */}
-      <div className="rounded-lg border border-border bg-secondary p-3 text-center">
-        <div className="text-sm font-bold font-mono">{targetNote || '—'}</div>
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Target</div>
       </div>
 
       {/* ── BLOCK BREAKDOWN ── */}
-      <div className="grid grid-cols-3 gap-2">
-        <TrendPill label="Deep" value={deepTrend} sub={deepStrength} />
-        <TrendPill label="DD" value={ddBias} sub={ddStrength} />
-        <TrendPill label="Now" value={nowBias} sub={nowStrength} />
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Block Breakdown</div>
+        <div className="grid grid-cols-3 gap-2">
+          <TrendPill label="Deep" value={deepTrend} sub={deepStrength} />
+          <TrendPill label="DD" value={ddBias} sub={ddStrength} />
+          <TrendPill label="Now" value={nowBias} sub={nowStrength} />
+        </div>
       </div>
+
+      {/* ── BACKEND SCORE (optional) ── */}
+      {settings?.showBackendScore && (
+        <div className="rounded-lg border border-border bg-secondary/60 p-3 space-y-1.5">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Backend Score</div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Score</span>
+            <span className="font-mono font-bold text-foreground">{winningScore ?? 0} pts</span>
+          </div>
+        </div>
+      )}
 
       {/* ── WARNINGS ── */}
       {warnings.length > 0 && (

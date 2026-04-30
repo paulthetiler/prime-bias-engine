@@ -7,6 +7,7 @@ const DEFAULTS = {
   showWhyThisTrade: true,
   showAlignment: true,
   showScore: true,
+  showBackendScore: false,
   compactMode: false,
   showTarget: true,
   showNotes: true,
