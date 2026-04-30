@@ -5,139 +5,187 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 const sections = [
   {
     title: '🔍 Overview',
-    content: `PrimeBias is a multi-timeframe bias engine designed to give you a structured, objective read on market direction before you take a trade.
+    content: `PrimeBias is a multi-timeframe bias engine that gives you a fast, structured read on market direction — designed for minimal thinking and quick decisions.
 
-It works by scoring indicators across 7 timeframes — grouped into three blocks:
-• Broadstroke (Deep Trend): The big picture direction
-• DD (Daily Driver): The medium-term bias
-• Now (Momentum): What the market is doing right now
+It scores indicators across 7 timeframes grouped into three blocks:
+• Deep (Broadstroke) — The big-picture trend
+• DD (Daily Driver) — The medium-term bias
+• Now (Momentum) — What the market is doing right now
 
-The engine combines these blocks to produce a final directional bias (BUY / SELL / NEUTRAL), a grade (A–F), and a recommended action (TRADE / WAIT / NO TRADE).`
+The result is a directional bias (BUY / SELL / NEUTRAL), a grade (A–F), a trade action (TRADE / WAIT / NO TRADE), and a block alignment indicator (HIGH / MEDIUM / LOW).`
   },
   {
-    title: '📋 Step 1 — Select an Instrument',
-    content: `Go to the Bias Tool tab and tap "Select instrument..." to choose the asset you want to analyse (e.g. EURUSD, GOLD, US30).
+    title: '📋 Step 1 — Add an Instrument',
+    content: `Tap the "Bias Tool" tab and tap "Select instrument..." to choose an asset (e.g. EURUSD, GOLD, US30).
 
-Once selected, it will be added to your active analysis set and appear on the Dashboard summary.
+The asset is immediately added to your active set and will appear as a card on the Summary dashboard.
 
-You can have multiple instruments active at once and switch between them using the quick-switch tabs at the top.`
+You can have multiple instruments active at once. Switch between them using the quick-switch tabs that appear at the top of the Bias Tool once more than one is active.
+
+To remove an instrument, select it and tap "Remove".`
   },
   {
-    title: '🎛️ Step 2 — Input Your Indicators',
+    title: '🎛️ Step 2 — Enter Your Indicators',
     content: `For each timeframe row, tap the indicator buttons to score them:
 
-  — (grey) = Neutral / no clear signal
-  +1 (green) = Bullish signal
-  −1 (red) = Bearish signal
+  — (grey) = Neutral / no signal
+  +1 (green) = Bullish
+  −1 (red) = Bearish
 
-Each tap cycles through: neutral → +1 → −1 → neutral.
+Default style: each tap cycles → neutral → +1 → −1 → neutral.
 
-The four indicators per timeframe are:
-• Close — Is price closing above or below a key level?
-• MACD — Is MACD bullish or bearish?
-• RSI — Is RSI in bullish or bearish territory?
-• Boli — Is price above or below the Bollinger Band midline?
+The four indicators per row are:
+• Close — price above/below a key level
+• MACD — bullish or bearish momentum
+• RSI — overbought/oversold territory
+• Boli — price above/below Bollinger midline
 
-Note: H1, M15, and M5 timeframes don't use the Close indicator (it's greyed out) as they rely on the three oscillators only.`
+Note: H1, M15, and M5 rows don't use Close (greyed out). They use the three oscillators only.
+
+You can switch to "Button" input style in Settings for explicit B / N / S buttons instead of tap-cycling.`
   },
   {
-    title: '📊 Step 3 — Read the Timeframe Bias',
-    content: `Each row shows a live bias score on the right:
-• BUY (green) — majority of indicators are bullish
-• SELL (red) — majority of indicators are bearish
-• — (grey) — mixed or flat signals
+    title: '⚡ Live Result Banner',
+    content: `As you enter data, a live result banner appears below the instrument selector showing:
+• Main direction (BUY / SELL)
+• Deep / DD / Now block summary
+• Grade and trade action
 
-The score number shows the net weighted total for that timeframe.`
+No need to scroll — the decision is always visible as you type.`
   },
   {
-    title: '🧠 Step 4 — Read the Bias Result',
-    content: `Scroll down or tap "Bias Result" to see the computed output:
-
-Trend — The primary directional bias driven by the Deep and DD blocks.
-
-Now Momentum — Short-term momentum from H1/M15/M5. Can differ from the Trend — this is normal and indicates timing context.
-
-Grade (A–F):
-  A = Very strong alignment across all blocks
-  B = Strong, minor conflict
-  C = Moderate, some mixed signals
-  D = Weak, significant conflict
-  F = No clear bias — do not trade
-
-Trade Action:
-  TRADE = High confidence, aligned setup
-  WAIT = Signals present but not fully aligned
-  NO TRADE = Conflicting or flat — stay out
-
-Target — An ATR-based price target calculated from the grade multiplier.`
-  },
-  {
-    title: '🚦 Step 5 — Extra Check (Red/Green Light)',
-    content: `The Extra Check section gives you a quick red/green confirmation using the H1 and M15 timeframes as a standalone cross-check.
+    title: '🚦 Extra Check (Red / Green Light)',
+    content: `Below the timeframe rows is the Extra Check — a quick red/green confirmation using H1 and M15 as a standalone cross-check.
 
 Set each to +1 or −1:
-• If both match → Green Light (confirmation to proceed)
-• If they conflict → Red Light (caution, hold off)
+• Both match → Green Light ✅ (aligned, proceed)
+• They conflict → Red Light 🔴 (caution, wait)
 
 This is optional but recommended as a final filter before entry.`
   },
   {
-    title: '📏 ATR Setup',
-    content: `Go to the ATR tab to set custom Average True Range values for your top 5 assets.
+    title: '📁 Summary Dashboard',
+    content: `The Summary tab shows all your active analyses as cards.
 
-The ATR is used to calculate the trade target. If no custom ATR is set, the engine uses a built-in default for each asset.
+Each card shows:
+• Direction and trade action
+• Grade and status
+• Deep / DD / Now block breakdown
+• Score, Target, and Alignment (toggle in Settings)
+• "Why this trade?" explanation (toggle in Settings)
+
+Tap any card to open the Full Decision View — a detailed modal with all metrics and the full "Why this trade?" breakdown.
+
+Inside the modal, tap "Edit" to jump directly to that instrument in the Bias Tool.`
+  },
+  {
+    title: '🔎 Alignment Indicator',
+    content: `Each card shows an alignment indicator reflecting how many of the three blocks agree with the main direction:
+
+• HIGH — all three blocks aligned (Deep, DD, Now)
+• MEDIUM — two of three blocks aligned
+• LOW — only one or none aligned
+
+Use this alongside the grade to assess conviction. A B-grade with HIGH alignment is more reliable than an A-grade with LOW alignment.`
+  },
+  {
+    title: '🧠 Why This Trade?',
+    content: `The "Why this trade?" section explains the engine's reasoning in plain language — one bullet for each block plus the score and alignment summary.
+
+Example bullets:
+• "Deep trend is bearish and strong"
+• "DD confirms sell but is medium strength"
+• "Now is currently neutral — not yet aligned"
+• "Weighted score favours sell (60 pts)"
+• "Two of three blocks aligned — medium confidence"
+
+Enable or disable this in Settings → Display → Why this trade?`
+  },
+  {
+    title: '🎓 Grades & Trade Actions',
+    content: `Grade (A–F) reflects how well the bias is confirmed across blocks and score:
+
+  A = Very strong — all blocks aligned, high score
+  B = Strong — minor conflict, well-weighted
+  C = Moderate — some mixed signals
+  D = Weak — significant conflict
+  F = No clear bias / do not trade
+
+  F (Extended) = Extremely one-sided — score so high the market may be overextended. Treat with extra caution.
+
+Trade Action:
+  TRADE = High confidence, aligned setup
+  WAIT = Signals present but not fully aligned yet
+  NO TRADE = Conflicting or flat — stay out`
+  },
+  {
+    title: '🔧 Filters',
+    content: `Use the filter button (top-right of Summary) to narrow down your card list:
+
+• A/B Only — hide C, D, F grades
+• Hide WAIT — show only TRADE and NO TRADE
+• Hide Extended — remove extreme/overextended setups
+• Aligned Only — show only HIGH or MEDIUM alignment
+
+Active filter count is shown on the filter button. Default filters can be set in Settings → Default Filters.`
+  },
+  {
+    title: '📏 ATR Setup',
+    content: `Go to the ATR tab to set custom ATR values for your top 5 assets.
+
+The ATR (Average True Range) is used to calculate the trade target. If no custom value is set, the engine falls back to a built-in default per asset.
 
 How to set it:
 1. Select your asset from the dropdown
-2. Enter the current ATR value (find this on your chart, e.g. the ATR indicator on the daily or H4)
+2. Enter the current ATR (from your chart — e.g. Daily or H4 ATR indicator)
 3. Tap Save
 
-The target on the Bias Tool will update automatically.`
-  },
-  {
-    title: '📁 Dashboard Summary',
-    content: `The Dashboard tab shows all your active analyses at a glance.
-
-Switch between List view (compact) and Cards view (detailed) using the buttons at the top.
-
-Each entry shows:
-• Direction (BUY/SELL/NEUTRAL)
-• Grade
-• Target
-• Trade action
-• Deep / DD / Now breakdown
-• Any warnings
-
-Tap "Edit" on a card to jump directly to that instrument in the Bias Tool.`
+The target shown on the Bias Tool and Dashboard will update automatically.`
   },
   {
     title: '📜 History',
-    content: `Every time you hit Save (or auto-save triggers), a record is stored in History.
+    content: `Every save (manual or auto) creates a record in History.
 
 From the History tab you can:
 • Review past analyses
-• Record trade outcomes (Win / Loss / Breakeven)
+• Record trade outcomes (Win / Loss / Breakeven / Pending)
 • Add personal notes
 • Delete old records
 
-This helps you track the accuracy of your bias reads over time.`
+Use History to track the accuracy of your bias reads over time.`
   },
   {
-    title: '⚠️ Warnings',
-    content: `Yellow warning banners appear when the engine detects conflicting signals, such as:
-• Deep and DD blocks pointing in opposite directions
-• Now momentum strongly opposing the main trend
-• Very low confidence score
+    title: '⚙️ Settings',
+    content: `Settings → Display: Toggle what appears on each dashboard card — Why this trade?, Alignment, Score, Target, Notes, Compact mode.
 
-Warnings don't mean "don't trade" — they mean "be aware of the risk". Use your own judgment and always apply proper risk management.`
+Settings → Input Style: Switch between Tap-cycle (default) and Button input modes.
+
+Settings → Default Filters: Set which filters are pre-applied on the Summary dashboard.
+
+Settings → Advanced Logic: Experimental overrides — M5 override, NOW weakness downgrade, require alignment for A grade.
+
+Settings → Scoring Weights: Adjust the points each timeframe contributes to the grade calculation.
+
+Settings → Grade Thresholds: Set the minimum score required for each grade.
+
+Tap "Reset" at the top of Settings to restore all defaults.`
   },
   {
     title: '💾 Auto-Save',
     content: `The Bias Tool auto-saves your analysis to the database 1.5 seconds after you stop making changes.
 
-You'll see a small "Saving..." spinner followed by a green "Saved" tick in the header when it completes.
+A small "Saving..." spinner and a green "Saved" tick appear in the header to confirm.
 
-You can also hit the Save button at any time to manually force a save to History.`
+You can also tap the Save button at any time to manually force a save to History.`
+  },
+  {
+    title: '⚠️ Warnings',
+    content: `Yellow warnings appear when the engine detects conflicting signals:
+• Deep and DD pointing in opposite directions
+• Now momentum strongly opposing the main trend
+• Very low confidence score
+
+Warnings don't mean "don't trade" — they flag elevated risk. Always apply your own judgment and proper risk management.`
   },
 ];
 
