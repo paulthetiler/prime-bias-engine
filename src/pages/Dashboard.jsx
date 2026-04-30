@@ -12,8 +12,11 @@ import WhyThisTrade from '@/components/bias/WhyThisTrade';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 
 const gradeColors = {
-  A: 'text-emerald-400', B: 'text-blue-400', C: 'text-yellow-400',
-  D: 'text-orange-400',  F: 'text-red-400',
+  A: 'text-emerald-600 dark:text-emerald-400',
+  B: 'text-blue-600 dark:text-blue-400',
+  C: 'text-yellow-700 dark:text-yellow-400',
+  D: 'text-orange-600 dark:text-orange-400',
+  F: 'text-red-600 dark:text-red-400',
 };
 
 const actionColors = {
@@ -23,8 +26,8 @@ const actionColors = {
 };
 
 function TrendPill({ label, dir, strength }) {
-  const color = dir === 'BUY' || dir === 'BULL' ? 'text-emerald-400'
-    : dir === 'SELL' || dir === 'BEAR' ? 'text-red-400' : 'text-muted-foreground';
+  const color = dir === 'BUY' || dir === 'BULL' ? 'text-emerald-600 dark:text-emerald-400'
+    : dir === 'SELL' || dir === 'BEAR' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
   return (
     <div className="rounded-lg bg-secondary border border-border p-2 text-center flex-1 min-w-0">
       <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
@@ -44,8 +47,8 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
   } = results;
 
   const alignment = calcAlignment(results);
-  const dirColor = mainDirection === 'BUY' ? 'text-emerald-400'
-    : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+  const dirColor = mainDirection === 'BUY' ? 'text-emerald-600 dark:text-emerald-400'
+    : mainDirection === 'SELL' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
   const dirBorder = mainDirection === 'BUY' ? 'border-emerald-500/40'
     : mainDirection === 'SELL' ? 'border-red-500/40' : 'border-border';
 
@@ -296,10 +299,10 @@ export default function Dashboard() {
       <div className="flex gap-2 text-xs text-muted-foreground">
         <span>{analyses.length} assets</span>
         {activeFilterCount > 0 && <span className="text-primary">(filtered)</span>}
-        <span className="ml-auto text-emerald-400 font-semibold">
+        <span className="ml-auto text-emerald-600 dark:text-emerald-400 font-semibold">
           {analyses.filter(a => a.results?.tradeAction === 'TRADE').length} TRADE
         </span>
-        <span className="text-yellow-400 font-semibold">
+        <span className="text-yellow-700 dark:text-yellow-400 font-semibold">
           {analyses.filter(a => a.results?.tradeAction === 'WAIT').length} WAIT
         </span>
       </div>

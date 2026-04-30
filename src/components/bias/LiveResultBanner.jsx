@@ -2,8 +2,8 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 function Block({ label, dir, strength }) {
-  const color = dir === 'BUY' || dir === 'BULL' ? 'text-emerald-400'
-    : dir === 'SELL' || dir === 'BEAR' ? 'text-red-400' : 'text-muted-foreground';
+  const color = dir === 'BUY' || dir === 'BULL' ? 'text-emerald-600 dark:text-emerald-400'
+    : dir === 'SELL' || dir === 'BEAR' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
   return (
     <div className="text-center min-w-0">
       <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
@@ -14,7 +14,11 @@ function Block({ label, dir, strength }) {
 }
 
 const gradeColors = {
-  A: 'text-emerald-400', B: 'text-blue-400', C: 'text-yellow-400', D: 'text-orange-400', F: 'text-red-400',
+  A: 'text-emerald-600 dark:text-emerald-400',
+  B: 'text-blue-600 dark:text-blue-400',
+  C: 'text-yellow-700 dark:text-yellow-400',
+  D: 'text-orange-600 dark:text-orange-400',
+  F: 'text-red-600 dark:text-red-400',
 };
 
 const actionBg = {
@@ -24,7 +28,7 @@ const actionBg = {
 export default function LiveResultBanner({ results }) {
   if (!results) return null;
   const { mainDirection, grade, status, tradeAction, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength } = results;
-  const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+  const dirColor = mainDirection === 'BUY' ? 'text-emerald-600 dark:text-emerald-400' : mainDirection === 'SELL' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
 
   return (
     <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm px-3 py-2.5">

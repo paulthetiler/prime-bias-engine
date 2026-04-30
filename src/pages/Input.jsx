@@ -329,7 +329,7 @@ export default function Input() {
 
       {/* Instructions */}
       <div className="text-xs text-muted-foreground px-1">
-        Tap each indicator to cycle: <span className="text-muted-foreground">0</span> → <span className="text-emerald-400">+1</span> → <span className="text-red-400">−1</span> → <span className="text-muted-foreground">0</span>
+        Tap each indicator to cycle: <span className="text-muted-foreground">0</span> → <span className="text-emerald-700 dark:text-emerald-400">+1</span> → <span className="text-red-700 dark:text-red-400">−1</span> → <span className="text-muted-foreground">0</span>
       </div>
 
       {/* Live Result Banner */}

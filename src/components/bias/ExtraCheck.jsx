@@ -47,13 +47,13 @@ export default function ExtraCheck({ h1, m15, onChange }) {
       {result === 'green' && (
         <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
-          <span className="text-xs font-semibold text-emerald-300">Green Light</span>
+          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Green Light</span>
         </div>
       )}
       {result === 'red' && (
         <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2">
           <div className="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0" />
-          <span className="text-xs font-semibold text-red-300">Red Light</span>
+          <span className="text-xs font-semibold text-red-700 dark:text-red-300">Red Light</span>
         </div>
       )}
     </div>

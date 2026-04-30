@@ -14,8 +14,8 @@ function TapCycleButton({ value, onChange, label }) {
       onClick={cycle}
       className={cn(
         'w-full h-12 rounded-lg font-mono text-sm font-semibold transition-all duration-150 active:scale-95 border-2',
-        value === 1 && 'bg-emerald-500/20 border-emerald-500 text-emerald-400',
-        value === -1 && 'bg-red-500/20 border-red-500 text-red-400',
+        value === 1 && 'bg-emerald-500/20 border-emerald-500 text-emerald-700 dark:text-emerald-400',
+        value === -1 && 'bg-red-500/20 border-red-500 text-red-700 dark:text-red-400',
         value === 0 && 'bg-secondary border-border text-muted-foreground'
       )}
     >
