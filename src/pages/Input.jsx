@@ -96,18 +96,19 @@ export default function Input() {
   // Load analysis from active set and sync active assets
   useEffect(() => {
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+    // Strip stale cached results — always recalculate fresh from inputs
+    Object.keys(active).forEach(key => { delete active[key].results; });
     setActiveAssets(active);
     if (instrument && active[instrument]) {
       const data = active[instrument];
       const loadedInputs = data.inputs || getDefaultInputs();
-      userEditedRef.current = false; // loading, not a user edit
+      userEditedRef.current = false;
       setInputs(loadedInputs);
-      // Always recalculate fresh results (never use stale cached results)
-      const freshResults = calculateBias(loadedInputs);
+      const freshResults = calculateBias(loadedInputs, data.extraCheck || null);
       setResults(freshResults);
       setExtraCheck(data.extraCheck || { h1: null, m15: null });
     } else if (instrument) {
-      userEditedRef.current = false; // loading, not a user edit
+      userEditedRef.current = false;
       setInputs(getDefaultInputs());
       setExtraCheck({ h1: null, m15: null });
     }

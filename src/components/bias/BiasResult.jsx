@@ -2,10 +2,16 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle, MinusCircle } from 'lucide-react';
 
-export default function BiasResult({ results }) {
+export default function BiasResult({ results, rawTimeframes }) {
   if (!results) return null;
 
-  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, plusMinusScore, winningScore, warnings, targetNote } = results;
+  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, plusMinusScore, winningScore, warnings, targetNote, timeframes } = results;
+  
+  // Debug panel — shows raw TF results and engine NOW output
+  const tf = timeframes || rawTimeframes || {};
+  const h1r  = tf.h1?.result  ?? '?';
+  const m15r = tf.m15?.result ?? '?';
+  const m5r  = tf.m5?.result  ?? '?';
 
   const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
   const dirBg = mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border';
@@ -51,6 +57,18 @@ export default function BiasResult({ results }) {
 
   return (
     <div className="space-y-3">
+
+      {/* ── DEBUG PANEL ── */}
+      <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/5 p-3 text-[10px] font-mono space-y-1">
+        <div className="text-yellow-400 font-bold uppercase tracking-wider mb-1">🔍 NOW Debug</div>
+        <div>H1 result: <span className="text-foreground font-bold">{h1r === 1 ? '+1 (BUY)' : h1r === -1 ? '-1 (SELL)' : '0 (Neutral)'}</span></div>
+        <div>M15 result: <span className="text-foreground font-bold">{m15r === 1 ? '+1 (BUY)' : m15r === -1 ? '-1 (SELL)' : '0 (Neutral)'}</span></div>
+        <div>M5 result: <span className="text-foreground font-bold">{m5r === 1 ? '+1 (BUY)' : m5r === -1 ? '-1 (SELL)' : '0 (Neutral)'}</span></div>
+        <div className="border-t border-yellow-500/20 pt-1 mt-1">
+          <span>Engine NOW: </span>
+          <span className="text-foreground font-bold">{nowBias} / {nowStrength}</span>
+        </div>
+      </div>
 
       {/* ── FINAL TREND ── Deep + DD driven direction */}
       <div className="rounded-xl border border-border bg-secondary/40 p-3">
