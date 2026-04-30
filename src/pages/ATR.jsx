@@ -7,22 +7,22 @@ import { RotateCcw, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ATR() {
-  const [topAssets, setTopAssets] = useState([
-    { asset: '', atr: null },
-    { asset: '', atr: null },
-    { asset: '', atr: null },
-    { asset: '', atr: null },
-    { asset: '', atr: null },
-  ]);
-  const [extraAssets, setExtraAssets] = useState([]);
-
-  // Load from localStorage
-  useEffect(() => {
+  const [topAssets, setTopAssets] = useState(() => {
     const saved = localStorage.getItem('primebias_top_assets');
-    if (saved) setTopAssets(JSON.parse(saved));
-    const savedExtra = localStorage.getItem('primebias_extra_assets');
-    if (savedExtra) setExtraAssets(JSON.parse(savedExtra));
-  }, []);
+    if (saved) return JSON.parse(saved);
+    return [
+      { asset: '', atr: null },
+      { asset: '', atr: null },
+      { asset: '', atr: null },
+      { asset: '', atr: null },
+      { asset: '', atr: null },
+    ];
+  });
+
+  const [extraAssets, setExtraAssets] = useState(() => {
+    const saved = localStorage.getItem('primebias_extra_assets');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Save top assets to localStorage on change
   useEffect(() => {
@@ -159,7 +159,7 @@ export default function ATR() {
         <div className="font-semibold">How ATR is used:</div>
         <ul className="list-disc list-inside space-y-0.5">
           <li>Target = (ATR ÷ 9) × grade weight</li>
-          <li>Grade weights: A (1.25), B (1.0), C (1.5), D (3.0)</li>
+          <li>Grade weights: A (1.25), B (1.0), C (0.75), D (0.5)</li>
           <li>Custom values override base ATR for selected assets</li>
         </ul>
       </div>
