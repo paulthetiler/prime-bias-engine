@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Trash2, SlidersHorizontal, CheckCircle2 } from 'lucide-react';
+import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { calculateBias } from '@/lib/biasEngine';
@@ -39,6 +39,7 @@ function TrendPill({ label, dir, strength }) {
 
 function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
   const { instrument, results, targetInfo } = analysis;
+  const [pressed, setPressed] = useState(false);
   if (!results) return null;
 
   const {
@@ -54,22 +55,33 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
 
   return (
     <div
-      className={cn('rounded-xl border bg-card p-4 space-y-3 cursor-pointer hover:border-primary/40 transition-colors', dirBorder)}
+      className={cn(
+        'rounded-xl border bg-card p-4 space-y-3 cursor-pointer transition-all select-none',
+        'hover:border-primary/40 active:scale-[0.98] active:bg-accent/50',
+        pressed ? 'scale-[0.98] bg-accent/50' : '',
+        dirBorder
+      )}
       onClick={() => onOpen(analysis)}
+      onTouchStart={() => setPressed(true)}
+      onTouchEnd={() => { setPressed(false); }}
     >
-      {/* Row 1: Name + Direction + Action */}
+      {/* Row 1: Name + Direction + Action + Chevron */}
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="font-bold text-sm">{instrument}</div>
           <div className={cn('text-2xl font-bold leading-tight', dirColor)}>{mainDirection}</div>
         </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <div className={cn('px-3 py-1 rounded-lg text-xs font-bold', actionColors[tradeAction])}>
-            {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end gap-1.5">
+            <div className={cn('px-3 py-1 rounded-lg text-xs font-bold', actionColors[tradeAction])}>
+              {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
+            </div>
+            <div className={cn('text-xs font-semibold', gradeColors[grade])}>
+              Grade {grade} <span className="text-muted-foreground font-normal">· {status}</span>
+            </div>
           </div>
-          <div className={cn('text-xs font-semibold', gradeColors[grade])}>
-            Grade {grade} <span className="text-muted-foreground font-normal">· {status}</span>
-          </div>
+          {/* Chevron — always visible, signals tappability */}
+          <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 -mr-1" />
         </div>
       </div>
 
@@ -82,7 +94,7 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
         </div>
       )}
 
-      {/* Row 3: Metrics */}
+      {/* Row 3: Metrics + Tap hint (mobile only) */}
       <div className="flex items-center gap-3 text-xs">
         {settings.showScore && (
           <span className="text-muted-foreground">
@@ -95,10 +107,14 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
           </span>
         )}
         {settings.showAlignment && (
-          <span className={cn('font-semibold ml-auto', alignmentColor(alignment.label))}>
+          <span className={cn('font-semibold', alignmentColor(alignment.label))}>
             {alignment.label}
           </span>
         )}
+        {/* "Tap for details" — mobile only, fills remaining space */}
+        <span className="ml-auto text-[10px] text-muted-foreground/50 md:hidden">
+          Tap for details →
+        </span>
       </div>
 
       {/* Why this trade */}
