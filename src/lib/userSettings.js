@@ -20,6 +20,9 @@ const DEFAULTS = {
   filterHideExtended: false,
   filterAlignedOnly: false,
 
+  // Trade completion
+  tradeCompletionMode: 'quick', // 'quick' | 'detailed'
+
   // Advanced logic
   useM5Override: false,
   downgradeOnNowWeakness: false,

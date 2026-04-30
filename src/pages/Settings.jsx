@@ -68,7 +68,7 @@ export default function Settings() {
   const [showGuide, setShowGuide] = useState(false);
   const [s, setS] = useState(getSettings());
   const [openSections, setOpenSections] = useState({
-    display: true, input: false, filters: false, advanced: false, weights: false, thresholds: false
+    display: true, input: false, completion: false, filters: false, advanced: false, weights: false, thresholds: false
   });
 
   const toggle = (key) => setOpenSections(o => ({ ...o, [key]: !o[key] }));
@@ -148,6 +148,36 @@ export default function Settings() {
               >
                 <div className={cn('w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center', s.inputStyle === opt.id ? 'border-primary' : 'border-muted-foreground')}>
                   {s.inputStyle === opt.id && <div className="w-2 h-2 rounded-full bg-primary" />}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">{opt.label}</div>
+                  <div className="text-xs text-muted-foreground">{opt.sub}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Trade Completion Mode */}
+      <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
+        <SectionHeader title="Trade Completion" sub="How you log completed trades" open={openSections.completion} onToggle={() => toggle('completion')} />
+        {openSections.completion && (
+          <div className="py-3 space-y-2">
+            {[
+              { id: 'quick', label: 'Quick Mode (default)', sub: 'One tap to log — WIN / LOSS / BE / NOT TAKEN. Details optional.' },
+              { id: 'detailed', label: 'Detailed Mode', sub: 'Full form before saving — entry, exit, P&L, notes.' },
+            ].map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => update('tradeCompletionMode', opt.id)}
+                className={cn(
+                  'w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-colors',
+                  s.tradeCompletionMode === opt.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                )}
+              >
+                <div className={cn('w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center', s.tradeCompletionMode === opt.id ? 'border-primary' : 'border-muted-foreground')}>
+                  {s.tradeCompletionMode === opt.id && <div className="w-2 h-2 rounded-full bg-primary" />}
                 </div>
                 <div>
                   <div className="text-sm font-semibold">{opt.label}</div>
