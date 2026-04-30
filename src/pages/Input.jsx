@@ -322,23 +322,6 @@ export default function Input() {
         )}
       </div>
 
-      {/* Live ATR & Target Display */}
-      {instrument && (
-        <div className="grid grid-cols-2 gap-3 bg-accent/30 rounded-lg p-3 border border-border">
-          <div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">ATR Used</div>
-            <div className="text-lg font-mono font-bold text-foreground">{baseAtr ? baseAtr.toFixed(6) : '—'}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Target</div>
-            <div className="text-lg font-mono font-bold text-foreground">
-              {targetInfo?.target ? targetInfo.target.toFixed(6) : '—'}
-              {targetInfo?.targetType && <span className="text-xs text-muted-foreground ml-1">({targetInfo.targetType})</span>}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* No instrument selected helper */}
       {!instrument && (
         <div className="text-xs text-orange-800 dark:text-amber-400 px-1 py-1.5 rounded-lg bg-orange-100 dark:bg-amber-500/10 border border-orange-300 dark:border-amber-500/20 text-center">
@@ -407,6 +390,23 @@ export default function Input() {
       </button>
 
       {showResult && <BiasResult results={results} />}
+
+      {/* ATR & Target — bottom */}
+      {instrument && (
+        <div className="grid grid-cols-2 gap-3 bg-accent/30 rounded-lg p-3 border border-border">
+          <div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">ATR Used</div>
+            <div className="text-lg font-mono font-bold text-foreground">{baseAtr ? baseAtr.toFixed(6) : '—'}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Target</div>
+            <div className="text-lg font-mono font-bold text-foreground">
+              {targetInfo?.target ? targetInfo.target.toFixed(6) : '—'}
+              {targetInfo?.targetType && <span className="text-xs text-muted-foreground ml-1">({targetInfo.targetType})</span>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
