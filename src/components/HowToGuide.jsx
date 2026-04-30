@@ -76,7 +76,9 @@ Each card shows:
 
 Tap any card to open the Full Decision View — a detailed modal with all metrics and the full "Why this trade?" breakdown.
 
-Inside the modal, tap "Edit" to jump directly to that instrument in the Bias Tool.`
+Inside the modal, tap "Edit" to jump directly to that instrument in the Bias Tool.
+
+When a trade is done, tap "Complete Trade" at the bottom of the card to log the outcome and move it to Trade History.`
   },
   {
     title: '🔎 Alignment Indicator',
@@ -143,8 +145,8 @@ How to set it:
 The target shown on the Bias Tool and Dashboard will update automatically.`
   },
   {
-    title: '📜 History',
-    content: `Every save (manual or auto) creates a record in History.
+    title: '📜 Bias History',
+    content: `Every save (manual or auto) creates a record in the Bias History.
 
 From the History tab you can:
 • Review past analyses
@@ -153,6 +155,26 @@ From the History tab you can:
 • Delete old records
 
 Use History to track the accuracy of your bias reads over time.`
+  },
+  {
+    title: '📒 Trade History',
+    content: `The Trades tab is your completed trade journal — separate from the active Summary.
+
+When you tap "Complete Trade" on a Summary card, you are prompted to log:
+• Result — Win / Loss / Break Even / Not Taken
+• Entry & Exit prices (optional)
+• P&L (optional)
+• Exit reason (optional)
+• Notes and Screenshot URL (optional)
+
+The full engine snapshot at the time of completion is saved automatically (direction, grade, score, alignment, block breakdown, inputs).
+
+From Trade History you can:
+• Browse and filter completed trades by Result, Grade, Direction, or Asset
+• View analytics — win rate, total trades, best grade, best and worst performing asset
+• Open any trade to see the full detail view
+• Restore a trade back to the active Summary (e.g. if completed by mistake)
+• Archive a trade to remove it from the list`
   },
   {
     title: '⚙️ Settings',
