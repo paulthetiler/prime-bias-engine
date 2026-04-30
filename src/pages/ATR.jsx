@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ASSETS } from '@/lib/biasEngine';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { RotateCcw, Plus } from 'lucide-react';
+import { RotateCcw, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ATR() {
@@ -23,6 +22,9 @@ export default function ATR() {
     const saved = localStorage.getItem('primebias_extra_assets');
     return saved ? JSON.parse(saved) : [];
   });
+
+  const [searches, setSearches] = useState({});
+  const [openDropdowns, setOpenDropdowns] = useState({});
 
   // Save top assets to localStorage on change
   useEffect(() => {
@@ -67,36 +69,70 @@ export default function ATR() {
       <div className="space-y-3 bg-secondary/50 rounded-lg p-3 border border-border">
         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Top 5 Assets</div>
         <div className="space-y-2">
-          {topAssets.map((item, idx) => (
-            <div key={idx} className="flex gap-2 items-end">
-              <Select value={item.asset || ''} onValueChange={(val) => {
-                const newTop = [...topAssets];
-                newTop[idx].asset = val;
-                setTopAssets(newTop);
-              }}>
-                <SelectTrigger className="flex-1 h-9 text-sm">
-                  <SelectValue placeholder={`Position ${idx + 1}`} />
-                </SelectTrigger>
-                <SelectContent className="max-h-48">
-                  {ASSETS.map(a => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                step="0.00001"
-                placeholder="ATR"
-                value={item.atr || ''}
-                onChange={(e) => {
-                  const newTop = [...topAssets];
-                  newTop[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
-                  setTopAssets(newTop);
-                }}
-                className="w-28 h-9 text-sm"
-              />
-            </div>
-          ))}
+          {topAssets.map((item, idx) => {
+            const search = searches[`top-${idx}`] || '';
+            const filtered = ASSETS.filter(a => a.toLowerCase().includes(search.toLowerCase()));
+            return (
+              <div key={idx} className="flex gap-2 items-end">
+                <div className="flex-1 relative">
+                  <Input
+                    type="text"
+                    placeholder={`Position ${idx + 1}`}
+                    value={item.asset || ''}
+                    onChange={(e) => {
+                      setSearches(s => ({ ...s, [`top-${idx}`]: e.target.value }));
+                    }}
+                    onFocus={() => setOpenDropdowns(o => ({ ...o, [`top-${idx}`]: true }))}
+                    className="h-9 text-sm"
+                  />
+                  {item.asset && (
+                    <button
+                      onClick={() => {
+                        const newTop = [...topAssets];
+                        newTop[idx].asset = '';
+                        setTopAssets(newTop);
+                        setSearches(s => ({ ...s, [`top-${idx}`]: '' }));
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  {openDropdowns[`top-${idx}`] && filtered.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                      {filtered.map(a => (
+                        <button
+                          key={a}
+                          onClick={() => {
+                            const newTop = [...topAssets];
+                            newTop[idx].asset = a;
+                            setTopAssets(newTop);
+                            setSearches(s => ({ ...s, [`top-${idx}`]: '' }));
+                            setOpenDropdowns(o => ({ ...o, [`top-${idx}`]: false }));
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-accent text-sm"
+                        >
+                          {a}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Input
+                  type="number"
+                  step="0.00001"
+                  placeholder="ATR"
+                  value={item.atr || ''}
+                  onChange={(e) => {
+                    const newTop = [...topAssets];
+                    newTop[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
+                    setTopAssets(newTop);
+                  }}
+                  className="w-28 h-9 text-sm"
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -105,44 +141,78 @@ export default function ATR() {
         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Additional Assets</div>
         {extraAssets.length > 0 && (
           <div className="space-y-2">
-            {extraAssets.map((item, idx) => (
-              <div key={idx} className="flex gap-2 items-end">
-                <Select value={item.asset || ''} onValueChange={(val) => {
-                  const updated = [...extraAssets];
-                  updated[idx].asset = val;
-                  setExtraAssets(updated);
-                }}>
-                  <SelectTrigger className="flex-1 h-9 text-sm">
-                    <SelectValue placeholder="Asset" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-48">
-                    {ASSETS.map(a => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  step="0.00001"
-                  placeholder="ATR"
-                  value={item.atr || ''}
-                  onChange={(e) => {
-                    const updated = [...extraAssets];
-                    updated[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
-                    setExtraAssets(updated);
-                  }}
-                  className="w-28 h-9 text-sm"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-destructive hover:text-destructive shrink-0"
-                  onClick={() => setExtraAssets(prev => prev.filter((_, i) => i !== idx))}
-                >
-                  ×
-                </Button>
-              </div>
-            ))}
+            {extraAssets.map((item, idx) => {
+              const search = searches[`extra-${idx}`] || '';
+              const filtered = ASSETS.filter(a => a.toLowerCase().includes(search.toLowerCase()));
+              return (
+                <div key={idx} className="flex gap-2 items-end">
+                  <div className="flex-1 relative">
+                    <Input
+                      type="text"
+                      placeholder="Asset"
+                      value={item.asset || ''}
+                      onChange={(e) => {
+                        setSearches(s => ({ ...s, [`extra-${idx}`]: e.target.value }));
+                      }}
+                      onFocus={() => setOpenDropdowns(o => ({ ...o, [`extra-${idx}`]: true }))}
+                      className="h-9 text-sm"
+                    />
+                    {item.asset && (
+                      <button
+                        onClick={() => {
+                          const updated = [...extraAssets];
+                          updated[idx].asset = '';
+                          setExtraAssets(updated);
+                          setSearches(s => ({ ...s, [`extra-${idx}`]: '' }));
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    {openDropdowns[`extra-${idx}`] && filtered.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                        {filtered.map(a => (
+                          <button
+                            key={a}
+                            onClick={() => {
+                              const updated = [...extraAssets];
+                              updated[idx].asset = a;
+                              setExtraAssets(updated);
+                              setSearches(s => ({ ...s, [`extra-${idx}`]: '' }));
+                              setOpenDropdowns(o => ({ ...o, [`extra-${idx}`]: false }));
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-accent text-sm"
+                          >
+                            {a}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Input
+                    type="number"
+                    step="0.00001"
+                    placeholder="ATR"
+                    value={item.atr || ''}
+                    onChange={(e) => {
+                      const updated = [...extraAssets];
+                      updated[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
+                      setExtraAssets(updated);
+                    }}
+                    className="w-28 h-9 text-sm"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-destructive hover:text-destructive shrink-0"
+                    onClick={() => setExtraAssets(prev => prev.filter((_, i) => i !== idx))}
+                  >
+                    ×
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         )}
         <Button
