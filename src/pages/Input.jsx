@@ -35,6 +35,7 @@ export default function Input() {
   const [extraCheck, setExtraCheck] = useState({ h1: null, m15: null });
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle, saving, saved
   const autoSaveTimeoutRef = useRef(null);
+  const userEditedRef = useRef(false); // tracks if inputs changed due to user action vs loading
 
   const handleExtraCheckChange = (key, value) => {
     setExtraCheck(prev => {
@@ -93,12 +94,14 @@ export default function Input() {
     if (instrument && active[instrument]) {
       const data = active[instrument];
       const loadedInputs = data.inputs || getDefaultInputs();
+      userEditedRef.current = false; // loading, not a user edit
       setInputs(loadedInputs);
       // Always recalculate fresh results (never use stale cached results)
       const freshResults = calculateBias(loadedInputs);
       setResults(freshResults);
       setExtraCheck(data.extraCheck || { h1: null, m15: null });
     } else if (instrument) {
+      userEditedRef.current = false; // loading, not a user edit
       setInputs(getDefaultInputs());
       setExtraCheck({ h1: null, m15: null });
     }
@@ -137,27 +140,30 @@ export default function Input() {
     localStorage.setItem('primebias_instrument', instrument);
     window.dispatchEvent(new Event('biasUpdated'));
     
-    // Auto-save to database
-    setAutoSaveStatus('saving');
-    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      await base44.entities.BiasAnalysis.create({
-        instrument,
-        timestamp: new Date().toISOString(),
-        inputs,
-        results: res,
-        overall_bias: res?.mainDirection || 'NEUTRAL',
-        grade: res?.grade || 'F',
-        confidence_score: res?.confidenceScore || 0,
-        trade_action: res?.tradeAction || 'NO_TRADE',
-        warnings: res?.warnings || [],
-      });
-      setAutoSaveStatus('saved');
-      setTimeout(() => setAutoSaveStatus('idle'), 2000);
-    }, 1500);
+    // Auto-save to database only on user edits, not on load
+    if (userEditedRef.current) {
+      setAutoSaveStatus('saving');
+      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+      autoSaveTimeoutRef.current = setTimeout(async () => {
+        await base44.entities.BiasAnalysis.create({
+          instrument,
+          timestamp: new Date().toISOString(),
+          inputs,
+          results: res,
+          overall_bias: res?.mainDirection || 'NEUTRAL',
+          grade: res?.grade || 'F',
+          confidence_score: res?.confidenceScore || 0,
+          trade_action: res?.tradeAction || 'NO_TRADE',
+          warnings: res?.warnings || [],
+        });
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      }, 1500);
+    }
   }, [inputs, instrument, topAssets]);
 
   const handleTFChange = (tfKey, indicators) => {
+    userEditedRef.current = true;
     setInputs(prev => ({ ...prev, [tfKey]: indicators }));
   };
 
