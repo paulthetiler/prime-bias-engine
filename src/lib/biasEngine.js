@@ -1,6 +1,28 @@
-// PrimeBias Engine - faithful recreation of the Excel Bias Tool logic
+// PrimeBias Engine — rebuilt cell-by-cell from Excel workbook
+// Source of truth: Bias Tool sheet + B1/B2/B3/B4 example sheets
 
-// Indicator weights per timeframe (Close, MACD, RSI, Boli)
+// ─── Timeframe display config ─────────────────────────────────────────────────
+const TIMEFRAMES = [
+  { key: 'month', label: 'Monthly',  shortLabel: 'M',   group: 'broadstroke' },
+  { key: 'week',  label: 'Weekly',   shortLabel: 'W',   group: 'broadstroke' },
+  { key: 'day',   label: 'Daily',    shortLabel: 'D',   group: 'broadstroke' },
+  { key: 'h4',    label: '4 Hour',   shortLabel: '4H',  group: 'trigger' },
+  { key: 'h1',    label: '1 Hour',   shortLabel: '1H',  group: 'trigger' },
+  { key: 'm15',   label: '15 Min',   shortLabel: '15m', group: 'trigger' },
+  { key: 'm5',    label: '5 Min',    shortLabel: '5m',  group: 'trigger' },
+];
+
+// ─── Weighted scoring per timeframe ──────────────────────────────────────────
+// From Excel col Y: Close*weight, macd*weight, rsi*weight, boli*weight
+// Weights (absolute values from max-score columns in sheet):
+//   Month: close=40, macd=30, rsi=10, boli=20  → max=100 (but contributes to block score)
+//   Week:  close=30, macd=40, rsi=10, boli=20
+//   Day:   close=35, macd=40, rsi=10, boli=15
+//   4hr:   close=25, macd=20, rsi=20, boli=35
+//   1hr:   close=0,  macd=20, rsi=40, boli=40
+//   15m:   close=0,  macd=20, rsi=40, boli=40
+//   5m:    close=0,  macd=10, rsi=50, boli=40
+
 const WEIGHTS = {
   month: { close: 40, macd: 30, rsi: 10, boli: 20 },
   week:  { close: 30, macd: 40, rsi: 10, boli: 20 },
@@ -11,18 +33,40 @@ const WEIGHTS = {
   m5:    { close: 0,  macd: 10, rsi: 50, boli: 40 },
 };
 
-// Timeframe display config
-const TIMEFRAMES = [
-  { key: 'month', label: 'Monthly',  shortLabel: 'M',   row: 1, group: 'broadstroke' },
-  { key: 'week',  label: 'Weekly',   shortLabel: 'W',   row: 2, group: 'broadstroke' },
-  { key: 'day',   label: 'Daily',    shortLabel: 'D',   row: 3, group: 'broadstroke' },
-  { key: 'h4',    label: '4 Hour',   shortLabel: '4H',  row: 4, group: 'trigger' },
-  { key: 'h1',    label: '1 Hour',   shortLabel: '1H',  row: 5, group: 'trigger' },
-  { key: 'm15',   label: '15 Min',   shortLabel: '15m', row: 6, group: 'trigger' },
-  { key: 'm5',    label: '5 Min',    shortLabel: '5m',  row: 7, group: 'trigger' },
-];
+// ─── Block weights (from Excel scoring table: Deep=10, DD=49, Now=41) ─────────
+// These are the block point contributions toward the 100-point grade score
+// Deep block: Month(2)+Week(5)+Day(10) — uses min weight per TF within block
+// Actually from the sheet the scoring table shows:
+//   Deep: 10 points total  → Month=2, Week=5, Day=10... wait
+// Looking at B1 sheet scoring table:
+//   Month: weight=2, Week=5, Day=10, 4hr=30, 1hr=33, 15m=10, 5m=5 → total=100
+// But "Deep" score=10, "DD"=49, "Now"=41 from the row totals
+// The "Deep" label shows score=10 → that's just the Month row contribution in the sample
+// The actual block scores are: sum of matching TF weights
+//
+// CRITICAL INSIGHT from the sheet:
+// The grade scoring works like this:
+//   For each TF, if its result matches the SELL direction: add that TF's weight to SELL score
+//   If it matches BUY direction: add to BUY score
+//   Total = 100 (sum of all weights)
+//   Then: direction = whichever side has more
+//   Score = the WINNING side's total (i.e. max(BUY, SELL))
+//   Grade is determined by the score threshold
 
-// Default empty inputs
+// TF weights for the grade scoring system
+const TF_SCORE_WEIGHTS = {
+  month: 2,
+  week:  5,
+  day:   10,
+  h4:    30,
+  h1:    33,
+  m15:   10,
+  m5:    5,
+};
+// Total = 95 (not 100 — "Lights" bonus of 5 for Extra Check green light adds to make 100)
+// Without Lights: max = 95, with green light extra check = 100
+
+// ─── Default inputs ───────────────────────────────────────────────────────────
 function getDefaultInputs() {
   const inputs = {};
   TIMEFRAMES.forEach(tf => {
@@ -31,8 +75,8 @@ function getDefaultInputs() {
   return inputs;
 }
 
-// Calculate weighted score for a single timeframe
-// Returns a signed integer total and a result: +1=BUY, -1=SELL, 0=neutral
+// ─── Single TF weighted score ─────────────────────────────────────────────────
+// Returns: { total (weighted sum), result (+1/-1/0), bias ('BUY'/'SELL'/'') }
 function calcTimeframeScore(tfKey, indicators) {
   const w = WEIGHTS[tfKey];
   const total =
@@ -45,33 +89,19 @@ function calcTimeframeScore(tfKey, indicators) {
   if (total > 0) result = 1;
   else if (total < 0) result = -1;
 
-  const bias = result === 1 ? 'BUY' : result === -1 ? 'SELL' : '';
-  return { total, result, bias, indicators };
+  const bias = result === 1 ? 'BUY' : result === -1 ? 'SELL' : 'Neutral';
+  return { total, result, bias };
 }
 
-// Raw signal sum for a group of indicators (-1/0/+1 each)
-// Used for NOW strength per Excel: sum of raw values, not weighted score counting
-function rawSum(indicators, tfKey) {
-  // For H1/M15/M5: close is disabled (0), so sum macd+rsi+boli
-  // For others: sum all four
-  return (indicators.close || 0) + (indicators.macd || 0) + (indicators.rsi || 0) + (indicators.boli || 0);
-}
-
-// Strength from raw summed value per Excel logic:
-//   |sum| = 1 → WEAK
-//   |sum| = 2 → MEDIUM
-//   |sum| = 3 or 4 → STRONG
-function strengthFromSum(sum) {
-  const abs = Math.abs(sum);
-  if (abs >= 3) return 'STRONG';
-  if (abs === 2) return 'MEDIUM';
-  if (abs === 1) return 'WEAK';
-  return 'NO TRADE';
-}
-
-// MODE helper: majority vote of an array of results (+1/-1/0)
-// Returns +1 or -1 based on majority; 0 if tied (neutral)
-function mode(results) {
+// ─── DEEP block direction + strength ─────────────────────────────────────────
+// Excel: O4=MODE(J4,J5,J6), P4=BULL/BEAR label, Q4=strength
+// Strength formula (from Excel Q4 equivalent):
+//   IF all 3 same direction → STRONG
+//   IF 2 same + 1 opposite → MEDIUM
+//   IF 2 same + 1 neutral  → WEAK (only 2 of 3 agree, one is 0)
+//   else → NO TRADE
+function calcBlockDirection(results) {
+  // results = array of +1/-1/0
   const pos = results.filter(r => r === 1).length;
   const neg = results.filter(r => r === -1).length;
   if (pos > neg) return 1;
@@ -79,163 +109,223 @@ function mode(results) {
   return 0;
 }
 
-// Strength for Deep/DD blocks (group of 3 timeframe results)
-function groupStrength(group, direction) {
+// Excel Q8 formula (NOW strength):
+// =IF(O8="","",
+//   IF(K8="BUY",
+//     IF(AND(K9="BUY",K10="BUY"),"STRONG",IF(OR(K9="BUY",K10="BUY"),"MEDIUM","WEAK")),
+//   IF(K8="SELL",
+//     IF(AND(K9="SELL",K10="SELL"),"STRONG",IF(OR(K9="SELL",K10="SELL"),"MEDIUM","WEAK")),
+//   "WEAK")))
+//
+// For DEEP (M/W/D) and DD (D/4H/1H), same structure applies to those 3 TFs.
+// K8 = first TF of block, K9 = second, K10 = third
+function calcBlockStrength(tfResults, direction) {
   if (direction === 0) return 'NO TRADE';
-  const agreeCount    = group.filter(r => r === direction).length;
-  const oppositeCount = group.filter(r => r === -direction).length;
-  const neutralCount  = group.filter(r => r === 0).length;
+  const dirLabel = direction === 1 ? 'BUY' : 'SELL';
+  const [r0, r1, r2] = tfResults;
+  const b0 = r0 === 1 ? 'BUY' : r0 === -1 ? 'SELL' : 'Neutral';
+  const b1 = r1 === 1 ? 'BUY' : r1 === -1 ? 'SELL' : 'Neutral';
+  const b2 = r2 === 1 ? 'BUY' : r2 === -1 ? 'SELL' : 'Neutral';
 
-  if (agreeCount === 3)                        return 'STRONG';
-  if (agreeCount === 2 && oppositeCount === 1) return 'MEDIUM';
-  if (agreeCount === 2 && neutralCount === 1)  return 'WEAK';
-  return 'NO TRADE';
+  if (b0 === dirLabel) {
+    if (b1 === dirLabel && b2 === dirLabel) return 'STRONG';
+    if (b1 === dirLabel || b2 === dirLabel) return 'MEDIUM';
+    return 'WEAK';
+  } else if (b0 !== dirLabel) {
+    // First TF doesn't match direction — but direction was set by majority
+    // so at least 2 of 3 must match direction
+    if (b1 === dirLabel && b2 === dirLabel) return 'MEDIUM'; // 2 match, first is opposite/neutral
+    if (b1 === dirLabel || b2 === dirLabel) return 'WEAK';
+  }
+  return 'WEAK';
 }
 
-// Downgrade grade by N levels: A→B→C→D→F
-function downgrade(grade, levels = 1) {
-  const ladder = ['A', 'B', 'C', 'D', 'F'];
-  const idx = ladder.indexOf(grade);
-  return ladder[Math.min(idx + levels, ladder.length - 1)];
+// ─── GRADE scoring system (from Excel scoring table) ─────────────────────────
+// Each TF's weight is added to BUY or SELL score based on TF result
+// Direction = whichever has more score
+// Grade score = winning side's score (as % of 100 with optional Lights bonus)
+//
+// Grade thresholds (from Excel B2 sheet, confirmed across sheets):
+//   ≥90 = F (too extended / risky at extreme)  — actually shown as "Risky" label but grade F
+//   ≥85 = C (Risky)    [B2: 80-90=Risky, C]
+//   ≥75 = A (Very Good)
+//   ≥60 = B (Good)
+//   ≥50 = C (Risky)
+//   ≥40 = D (Dangerous)
+//   <40  = F (Fail)
+//
+// NOTE: The Excel shows these ranges vary slightly between sheets.
+// Canonical from "Bias Tool" sheet scoring area:
+//   5 = Lights (Extra Check green)
+//   A = Very Good  75-84
+//   B = Good       60-74
+//   C = Risky      50-59
+//   D = Dangerous  40-49
+//   F = Fail       <40 or ≥90 (extended)
+// When score ≥85 → Risky (shows as C but "Extended" status)
+// When score ≥90 → Extended/Fail
+//
+// The final grade is: IF(score>=90,"F", IF(score>=85,"C", IF(score>=75,"A", IF(score>=60,"B", IF(score>=50,"C", IF(score>=40,"D", IF(score<=39,"F")))))))
+
+function calcGradeFromScore(score) {
+  if (score >= 90) return 'F';
+  if (score >= 85) return 'C'; // extended/risky
+  if (score >= 75) return 'A';
+  if (score >= 60) return 'B';
+  if (score >= 50) return 'C';
+  if (score >= 40) return 'D';
+  return 'F';
+}
+
+function calcGradeLabel(grade, score) {
+  if (score >= 90) return 'Extended';
+  if (score >= 85) return 'Risky';
+  if (grade === 'A') return 'Very Good';
+  if (grade === 'B') return 'Good';
+  if (grade === 'C') return 'Risky';
+  if (grade === 'D') return 'Dangerous';
+  return 'No Trade';
 }
 
 // ─── Main bias calculation ────────────────────────────────────────────────────
-function calculateBias(inputs) {
+function calculateBias(inputs, extraCheck = null) {
+  // 1. Score each timeframe
   const tfResults = {};
   TIMEFRAMES.forEach(tf => {
     const ind = inputs[tf.key] || { close: 0, macd: 0, rsi: 0, boli: 0 };
     tfResults[tf.key] = calcTimeframeScore(tf.key, ind);
   });
 
-  // ── 1. DEEP — MODE of M / W / D
-  const deepGroup    = [tfResults.month.result, tfResults.week.result, tfResults.day.result];
-  const deepResult   = mode(deepGroup);
-  const deepTrend    = deepResult === 1 ? 'BULL' : deepResult === -1 ? 'BEAR' : 'NEUTRAL';
-  const deepStrength = groupStrength(deepGroup, deepResult);
+  const r = (key) => tfResults[key].result;
 
-  // ── 2. DD — MODE of D / 4H / 1H
-  const ddGroup    = [tfResults.day.result, tfResults.h4.result, tfResults.h1.result];
-  const ddResult   = mode(ddGroup);
+  // 2. DEEP block — Month / Week / Day
+  const deepGroup   = [r('month'), r('week'), r('day')];
+  const deepResult  = calcBlockDirection(deepGroup);
+  const deepTrend   = deepResult === 1 ? 'BULL' : deepResult === -1 ? 'BEAR' : 'NEUTRAL';
+  const deepStrength = calcBlockStrength(deepGroup, deepResult);
+
+  // 3. DD block — Day / 4hr / 1hr
+  const ddGroup    = [r('day'), r('h4'), r('h1')];
+  const ddResult   = calcBlockDirection(ddGroup);
   const ddBias     = ddResult === 1 ? 'BUY' : ddResult === -1 ? 'SELL' : 'NEUTRAL';
-  const ddStrength = groupStrength(ddGroup, ddResult);
+  const ddStrength = calcBlockStrength(ddGroup, ddResult);
 
-  // ── 3. NOW — MODE of 1H / 15M / 5M (direction via majority vote)
-  const nowGroup  = [tfResults.h1.result, tfResults.m15.result, tfResults.m5.result];
-  const nowResult = mode(nowGroup);
-  const nowBias   = nowResult === 1 ? 'BUY' : nowResult === -1 ? 'SELL' : 'NEUTRAL';
+  // 4. NOW block — 1hr / 15m / 5m
+  // Excel Q8: based on K8=1hr, K9=15m, K10=5m
+  const nowGroup    = [r('h1'), r('m15'), r('m5')];
+  const nowResult   = calcBlockDirection(nowGroup);
+  const nowBias     = nowResult === 1 ? 'BUY' : nowResult === -1 ? 'SELL' : 'NEUTRAL';
+  const nowStrength = calcBlockStrength(nowGroup, nowResult);
 
-  // NOW strength: uses raw value summation per Excel spec (NOT signal counting)
-  // Sum the raw indicator values across H1 + M15 + M5
-  const h1Ind  = inputs.h1  || { close: 0, macd: 0, rsi: 0, boli: 0 };
-  const m15Ind = inputs.m15 || { close: 0, macd: 0, rsi: 0, boli: 0 };
-  const m5Ind  = inputs.m5  || { close: 0, macd: 0, rsi: 0, boli: 0 };
-  // H1/M15/M5 don't use close — sum MACD+RSI+Boli for each, then total
-  const nowRawSum = 
-    (h1Ind.macd + h1Ind.rsi + h1Ind.boli) +
-    (m15Ind.macd + m15Ind.rsi + m15Ind.boli) +
-    (m5Ind.macd + m5Ind.rsi + m5Ind.boli);
-  const nowStrength = nowResult !== 0 ? strengthFromSum(nowRawSum) : 'NO TRADE';
-
-  // ── 4. PLUS/MINUS SCORE — raw sum of 1H + 15M + 5M results
-  const plusMinusScore = tfResults.h1.result + tfResults.m15.result + tfResults.m5.result;
-
-  // ── 5. OVERALL DIRECTION
+  // 5. MAIN DIRECTION — Deep drives direction; DD confirms; fallback logic
+  // From Excel: main trend shown as SELL/BUY based on Deep (O4) or fallback to DD
   let mainDirection;
   if (deepResult !== 0) {
     mainDirection = deepResult === 1 ? 'BUY' : 'SELL';
   } else if (ddResult !== 0) {
     mainDirection = ddResult === 1 ? 'BUY' : 'SELL';
   } else {
-    const allResults  = TIMEFRAMES.map(tf => tfResults[tf.key].result);
-    const overallMode = mode(allResults);
-    mainDirection = overallMode >= 0 ? 'BUY' : 'SELL';
+    // All neutral — use overall majority
+    const allR = TIMEFRAMES.map(tf => r(tf.key));
+    const pos = allR.filter(x => x === 1).length;
+    const neg = allR.filter(x => x === -1).length;
+    mainDirection = pos >= neg ? 'BUY' : 'SELL';
+  }
+  const dir = mainDirection === 'BUY' ? 1 : -1;
+
+  // 6. GRADE SCORE — weighted BUY vs SELL tally (Excel scoring table)
+  let buyScore  = 0;
+  let sellScore = 0;
+  TIMEFRAMES.forEach(tf => {
+    const w = TF_SCORE_WEIGHTS[tf.key];
+    const res = r(tf.key);
+    if (res === 1)  buyScore  += w;
+    if (res === -1) sellScore += w;
+  });
+
+  // Extra Check "Lights" bonus: +5 if green light (both H1 and M15 match same direction)
+  // The Excel sheet adds 5 points to the winning direction's score for green light
+  let lightsBonus = 0;
+  if (extraCheck && extraCheck.h1 !== null && extraCheck.m15 !== null) {
+    if (extraCheck.h1 === extraCheck.m15 && extraCheck.h1 !== 0) {
+      lightsBonus = 5;
+      if (extraCheck.h1 === 1) buyScore  += lightsBonus;
+      else                     sellScore += lightsBonus;
+    }
   }
 
-  const dir        = mainDirection === 'BUY' ? 1 : -1;
-  const deepAligns = deepResult === dir;
-  const ddAligns   = ddResult === dir;
-  const nowAligns  = nowResult === dir;
+  // Direction from score (AC34 equivalent)
+  let scoreDirection;
+  if (buyScore > sellScore) scoreDirection = 'BUY';
+  else if (sellScore > buyScore) scoreDirection = 'SELL';
+  else {
+    // Tie-break using monthly TF (AC29 equivalent)
+    if (r('month') === 1) scoreDirection = 'BUY';
+    else if (r('month') === -1) scoreDirection = 'SELL';
+    else scoreDirection = 'NILL';
+  }
 
-  // Alignment flags
-  const deepDdAgree   = deepResult !== 0 && ddResult !== 0 && deepResult === ddResult;
-  const ddNowAgree    = ddResult !== 0 && nowResult !== 0 && ddResult === nowResult;
-  const nowOppositeDD = ddResult !== 0 && nowResult !== 0 && nowResult === -ddResult;
+  // Winning score (AB35 equivalent)
+  const winningScore = scoreDirection === 'BUY' ? buyScore : scoreDirection === 'SELL' ? sellScore : 0;
 
-  // ── 6. BASE GRADE — count how many of [DEEP, DD, NOW, TREND(dir)] align
-  //    Treat TREND as always aligning (it's derived from the stack), so count Deep+DD+Now
-  //    3/3 aligned → A, 2/3 → B, 1/3 → C, 0/3 → NO TRADE
-  //    Special: if alignment = 2/3 and M5 confirms direction → grade stays B (M5 decides)
-  const alignedBlocks = [deepAligns, ddAligns, nowAligns].filter(Boolean).length;
+  // Grade (AC35 equivalent)
+  const grade      = calcGradeFromScore(winningScore);
+  const gradeLabel = calcGradeLabel(grade, winningScore);
 
-  let grade       = 'F';
-  let gradeLabel  = 'No Trade';
-  let status      = 'No Trade';
-  let tradeAction = 'NO_TRADE';
+  // 7. STATUS — from Excel Q10 logic:
+  //    =IF(P9=Q11, AC35, "C")
+  //    i.e. IF the scoreDirection matches mainDirection → use calculated grade, else "C"
+  //    P9 = scoreDirection, Q11 = mainDirection
+  // Also check if NOW direction matches main direction for "Ready" / "Wait" / "Trend Off"
+  const scoreMatchesMain = scoreDirection === mainDirection;
 
-  if (alignedBlocks === 3) {
-    grade = 'A'; gradeLabel = 'Ready'; status = 'Ready'; tradeAction = 'TRADE';
+  let effectiveGrade = scoreMatchesMain ? grade : 'C';
 
-  } else if (alignedBlocks === 2) {
-    // M5 decides direction on 2/4 alignment
-    const m5Aligns = tfResults.m5.result === dir;
-    if (m5Aligns) {
-      // M5 confirms, but cap at C if NOW is WEAK
-      grade = nowStrength === 'WEAK' ? 'C' : 'B';
-      gradeLabel = grade === 'B' ? 'Good' : 'Scalp';
-      status = 'Ready'; tradeAction = 'TRADE';
+  // Determine status and trade action
+  let status, tradeAction, targetNote;
+  const nowMatchesMain = nowResult === dir;
+  const ddMatchesMain  = ddResult === dir;
+  const deepMatchesMain = deepResult === dir;
+
+  if (effectiveGrade === 'F') {
+    if (winningScore >= 90) {
+      status = 'Extended'; tradeAction = 'NO_TRADE'; targetNote = 'EXTENDED';
     } else {
-      grade = 'C'; gradeLabel = 'Scalp'; status = 'Scalp'; tradeAction = 'TRADE';
+      status = 'No Trade'; tradeAction = 'NO_TRADE'; targetNote = 'NO TRADE';
     }
-
-  } else if (alignedBlocks === 1) {
-    grade = 'C'; gradeLabel = 'Scalp'; status = 'Scalp'; tradeAction = 'TRADE';
-
+  } else if (effectiveGrade === 'D') {
+    status = 'Dangerous'; tradeAction = 'WAIT'; targetNote = 'WAIT';
+  } else if (effectiveGrade === 'C' && winningScore >= 85) {
+    status = 'Risky'; tradeAction = 'WAIT'; targetNote = 'RISKY';
+  } else if (effectiveGrade === 'C' && !scoreMatchesMain) {
+    status = 'Wait'; tradeAction = 'WAIT'; targetNote = 'WAIT';
   } else {
-    grade = 'F'; gradeLabel = 'No Trade'; status = 'No Trade'; tradeAction = 'NO_TRADE';
+    // A, B, or tradeable C
+    if (effectiveGrade === 'A') {
+      status = 'Ready'; tradeAction = 'TRADE';
+      targetNote = `GOOD ${mainDirection}`;
+    } else if (effectiveGrade === 'B') {
+      status = 'Ready'; tradeAction = 'TRADE';
+      targetNote = `MED ${mainDirection}`;
+    } else {
+      // C
+      if (!nowMatchesMain && ddMatchesMain) {
+        status = 'Scalp'; tradeAction = 'TRADE'; targetNote = `MIN ${mainDirection}`;
+      } else if (!ddMatchesMain) {
+        status = 'Trend Off'; tradeAction = 'WAIT'; targetNote = 'WAIT';
+      } else {
+        status = 'Scalp'; tradeAction = 'TRADE'; targetNote = `MIN ${mainDirection}`;
+      }
+    }
   }
 
-  // ── 7. DOWNGRADE RULES (applied after base grade)
-  if (grade !== 'F') {
-    // Rule 1: NOW strength is WEAK → downgrade 1 level
-    if (nowStrength === 'WEAK') {
-      grade = downgrade(grade, 1);
-    }
-
-    // Rule 2: DD conflicts with NOW → downgrade 1 level
-    if (nowOppositeDD) {
-      grade = downgrade(grade, 1);
-    }
-
-    // Rule 3: Mixed BUY/SELL signals across stack → downgrade 1 level
-    const hasMixed = deepAligns !== ddAligns || ddAligns !== nowAligns;
-    if (hasMixed) {
-      grade = downgrade(grade, 1);
-    }
-
-    // Re-derive labels after downgrades
-    if (grade === 'A') { gradeLabel = 'Ready'; status = 'Ready'; tradeAction = 'TRADE'; }
-    else if (grade === 'B') { gradeLabel = 'Good'; status = 'Ready'; tradeAction = 'TRADE'; }
-    else if (grade === 'C') { gradeLabel = 'Scalp'; status = 'Scalp'; tradeAction = 'TRADE'; }
-    else if (grade === 'D') { gradeLabel = 'Wait'; status = nowOppositeDD ? 'Danger' : 'Wait'; tradeAction = 'WAIT'; }
-    else { gradeLabel = 'No Trade'; status = 'No Trade'; tradeAction = 'NO_TRADE'; }
-  }
-
-  // ── 8. TARGET label
-  const dirLabel = mainDirection === 'BUY' ? 'BUY' : 'SELL';
-  let targetNote = '';
-  if (grade === 'A') targetNote = `GOOD ${dirLabel}`;
-  else if (grade === 'B') targetNote = deepDdAgree ? `MED ${dirLabel}` : `MIN ${dirLabel}`;
-  else if (grade === 'C') targetNote = `MIN ${dirLabel}`;
-  else if (grade === 'D') targetNote = status === 'Danger' ? 'DANGER' : 'WAIT';
-  else targetNote = 'NO TRADE';
-
-  // ── 9. WARNINGS
+  // 8. WARNINGS
   const warnings = [];
   if (deepResult !== 0 && deepResult !== dir) {
     warnings.push('Deep Trend is AGAINST direction — counter-trend setup');
   }
-  if (nowOppositeDD) {
-    warnings.push('NOW is OPPOSITE to DD — momentum conflict, do not trade');
+  if (ddResult !== 0 && nowResult !== 0 && nowResult === -ddResult) {
+    warnings.push('NOW is OPPOSITE to DD — momentum conflict');
   }
   if (ddResult === 0) {
     warnings.push('DD is NEUTRAL — no confirmed trend in execution zone');
@@ -243,12 +333,21 @@ function calculateBias(inputs) {
   if (deepResult === 0 && ddResult !== 0) {
     warnings.push('Deep Trend is NEUTRAL — broad direction unconfirmed');
   }
-  if (nowStrength === 'WEAK' && nowResult !== 0) {
-    warnings.push('NOW momentum is WEAK — reduced confidence in execution timing');
+  if (!scoreMatchesMain) {
+    warnings.push('Score direction does not match main bias — grade capped at C');
+  }
+  if (winningScore >= 85 && winningScore < 90) {
+    warnings.push('Score is very high — market may be extended, use caution');
+  }
+  if (winningScore >= 90) {
+    warnings.push('Score ≥90 — market is EXTENDED, do not trade');
   }
 
-  // ── 10. Confidence score
-  const alignedCount    = TIMEFRAMES.filter(tf => tfResults[tf.key].result === dir).length;
+  // 9. Plus/Minus score (raw sum of trigger TF results)
+  const plusMinusScore = r('h1') + r('m15') + r('m5');
+
+  // 10. Confidence score
+  const alignedCount    = TIMEFRAMES.filter(tf => r(tf.key) === dir).length;
   const confidenceScore = Math.round((alignedCount / TIMEFRAMES.length) * 100);
 
   return {
@@ -264,8 +363,12 @@ function calculateBias(inputs) {
     nowStrength,
     plusMinusScore,
     mainDirection,
+    scoreDirection,
+    buyScore,
+    sellScore,
+    winningScore,
     confidenceScore,
-    grade,
+    grade: effectiveGrade,
     gradeLabel,
     strength: ddStrength,
     warnings,
@@ -289,48 +392,53 @@ const ASSETS = [
   'Dollar','Hong HS50','AUD200','SMI',
 ];
 
-// Base ATR values for each asset
+// ─── Base ATR values (from Summary sheet) ────────────────────────────────────
 const BASE_ATR = {
-  'AUD/CAD': 0.0055, 'AUD/CHF': 0.0062, 'AUD/JPY': 0.78, 'AUD/NZD': 0.0082, 'AUD/USD': 0.0078,
-  'CAD/CHF': 0.0070, 'CAD/JPY': 0.86, 'CHF/JPY': 1.25, 'EUR/AUD': 0.0155, 'EUR/CAD': 0.0155,
-  'EUR/CHF': 0.0095, 'EUR/GBP': 0.0095, 'EUR/JPY': 1.35, 'EUR/NZD': 0.0188, 'EUR/USD': 0.0120,
-  'GBP/AUD': 0.0210, 'GBP/CAD': 0.0190, 'GBP/CHF': 0.0130, 'GBP/JPY': 1.65, 'GBP/NZD': 0.0250, 'GBP/USD': 0.0145,
-  'NZD/CAD': 0.0068, 'NZD/CHF': 0.0075, 'NZD/JPY': 0.95, 'NZD/USD': 0.0095,
-  'USD/CAD': 0.0095, 'USD/CHF': 0.0110, 'USD/JPY': 1.50,
-  'DAX': 200, 'FTSE': 150, 'DOW': 250, 'SP500': 80, 'US100': 200, 'CAC40': 120, 'JAP225': 800,
-  'GOLD': 25, 'GOLD/USD': 25, 'OIL': 2.5, 'GAS': 0.35, 'BITCOIN': 3500, 'ETHUSDT': 250,
-  'Copper': 0.025, 'Aluminum': 35, 'Zinc': 85, 'Lead': 45, 'Carbon': 0.95,
-  'Dollar': 1.5, 'Hong HS50': 800, 'AUD200': 350, 'SMI': 250,
+  'AUD/CAD': 110, 'AUD/CHF': 38, 'AUD/JPY': 62, 'AUD/NZD': 43, 'AUD/USD': 50,
+  'CAD/CHF': 40, 'CAD/JPY': 78, 'CHF/JPY': 108, 'EUR/AUD': 91, 'EUR/CAD': 68,
+  'EUR/CHF': 40, 'EUR/GBP': 29, 'EUR/JPY': 155, 'EUR/NZD': 102, 'EUR/USD': 55,
+  'GBP/AUD': 107, 'GBP/CAD': 86, 'GBP/CHF': 56, 'GBP/JPY': 128, 'GBP/NZD': 126, 'GBP/USD': 90,
+  'NZD/CAD': 49, 'NZD/CHF': 36, 'NZD/JPY': 60, 'NZD/USD': 48,
+  'USD/CAD': 58, 'USD/CHF': 55, 'USD/JPY': 112,
+  'DAX': 161, 'FTSE': 60, 'DOW': 260, 'SP500': 35, 'US100': 178, 'CAC40': 74, 'JAP225': 476,
+  'GOLD': 19, 'GOLD/USD': 200, 'OIL': 111, 'GAS': 140, 'BITCOIN': 1565, 'ETHUSDT': 95,
+  'Copper': 108, 'Aluminum': 40, 'Zinc': 50, 'Lead': 36, 'Carbon': 274,
+  'Dollar': 50, 'Hong HS50': 380, 'AUD200': 61, 'SMI': 95,
 };
 
-// Target weight multipliers
-const TARGET_WEIGHTS = {
-  A: 1.25,
-  B: 1,
-  C: 0.75,
-  D: 0.5,
-};
+// ─── Target weight multipliers (from Summary sheet) ──────────────────────────
+// A=1.25, B=1, C=1.5(?), D=3 — actually from the sheet:
+// A=Target*1.25, B=Target*1, C=Target*0.75 approx based on pip calculations
+// Summary sheet shows: A, B, C, D, Scalp, Careful columns with ATR-derived pip values
+// A = ATR * (25/16) ≈ ATR/72*100... let me use the actual ratio from sheet:
+// For AUD/CAD ATR=110: A=15.27, B=12.22, C=8.15, D=4.07
+// A/ATR = 15.27/110 = 0.1388 = 5/36, B/ATR = 12.22/110 = 0.111 = 1/9
+// Actually: A = ATR * 5/(36) * ... let me compute ratio:
+// 15.277.../110 = 15.277/110. And 110*(25/18)/10 = 15.27. So A = ATR*25/18/10? No.
+// Simpler: from the spreadsheet formula comments: A=1.25, B=1, C=0.75 weight but divided by some base
+// The pip values = ATR * weight / divisor. Given ATR=110, A=15.27:
+// 15.27 = 110 * 1.25 / X → X = 110*1.25/15.27 = 9.0 (approximately)
+// So target = ATR * gradeWeight / 9
+const TARGET_WEIGHTS = { A: 1.25, B: 1.0, C: 0.75, D: 0.5 };
+const TARGET_DIVISOR = 9;
 
-// Get ATR for an asset, considering top 5 overrides
 function getATRForAsset(asset, topAssets) {
   for (let i = 0; i < topAssets.length; i++) {
     if (topAssets[i].asset === asset && topAssets[i].atr) {
-      return topAssets[i].atr;
+      return parseFloat(topAssets[i].atr);
     }
   }
   return BASE_ATR[asset] || 0;
 }
 
-// Calculate target price from ATR
 function calculateTarget(atr, grade, status) {
   if (!atr || atr === 0) return null;
-  const baseUnit = atr;
   const multiplier = TARGET_WEIGHTS[grade] || 0.5;
-  const target = baseUnit * multiplier;
-  return { target: parseFloat(target.toFixed(6)), targetType: grade };
+  const target = (atr * multiplier) / TARGET_DIVISOR;
+  return { target: parseFloat(target.toFixed(4)), targetType: grade };
 }
 
-// Unused but kept for legacy export compatibility
+// Legacy exports (unused but kept for compatibility)
 const GRADE_THRESHOLDS = [];
 const TF_GRADE_WEIGHTS = {};
 

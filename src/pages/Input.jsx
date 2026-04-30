@@ -122,7 +122,7 @@ export default function Input() {
   // Recalculate on every input change
   useEffect(() => {
     if (!instrument) return;
-    const res = calculateBias(inputs);
+    const res = calculateBias(inputs, extraCheck);
     setResults(res);
     
     // Calculate ATR and target

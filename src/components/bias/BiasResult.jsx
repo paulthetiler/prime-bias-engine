@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle, MinusCir
 export default function BiasResult({ results }) {
   if (!results) return null;
 
-  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, plusMinusScore, warnings, targetNote } = results;
+  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, plusMinusScore, winningScore, warnings, targetNote } = results;
 
   const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
   const dirBg = mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border';
@@ -92,7 +92,7 @@ export default function BiasResult({ results }) {
         </div>
         <div className={cn('rounded-lg border p-3 text-center', gradeColors[grade])}>
           <div className="text-2xl font-bold">{grade} <span className="text-sm font-semibold opacity-80">{gradeLabel}</span></div>
-          <div className="text-[10px] uppercase tracking-wider opacity-60">Grade</div>
+          <div className="text-[10px] uppercase tracking-wider opacity-60">Grade · {winningScore ?? 0}pts</div>
         </div>
       </div>
 
