@@ -72,7 +72,10 @@ export default function WhyThisTrade({ results, defaultOpen = false, onOpenFullV
   const resultLine = `${grade} grade / ${status}`;
 
   return (
-    <div className="rounded-lg border border-border bg-card/50 cursor-pointer hover:border-primary/30 transition-colors" onClick={onOpenFullView}>
+    <div className="rounded-lg border border-border bg-card/50 cursor-pointer hover:border-primary/30 transition-colors" onClick={(e) => {
+      e.stopPropagation();
+      onOpenFullView?.();
+    }}>
       <button
         onClick={(e) => {
           e.stopPropagation();
