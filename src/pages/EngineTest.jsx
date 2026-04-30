@@ -3,7 +3,6 @@ import { calculateBias } from '@/lib/biasEngine';
 import { cn } from '@/lib/utils';
 
 // ── 5 Excel test cases ──────────────────────────────────────────────────────
-// Indicators: close, macd, rsi, boli  (+1=BUY, -1=SELL, 0=Neutral)
 const TEST_CASES = [
   {
     name: 'Bias Tool (GBP/USD)',
@@ -16,10 +15,7 @@ const TEST_CASES = [
       m15:   { close:  0, macd:  1, rsi: 1, boli: 0 },
       m5:    { close:  0, macd:  1, rsi: 1, boli: 0 },
     },
-    expected: {
-      deep: 'BEAR / MEDIUM', dd: 'SELL / WEAK', now: 'BUY / WEAK',
-      direction: 'SELL', score: 42, grade: 'D',
-    },
+    expected: { deep: 'BEAR / MEDIUM', dd: 'SELL / WEAK', now: 'BUY / WEAK', direction: 'SELL', score: 42, grade: 'D' },
   },
   {
     name: 'B1 (All BUY)',
@@ -30,12 +26,9 @@ const TEST_CASES = [
       h4:    { close:  1, macd:  1, rsi: 1, boli:  1 },
       h1:    { close:  0, macd:  1, rsi: 1, boli:  0 },
       m15:   { close:  0, macd:  1, rsi: 1, boli:  1 },
-      m5:    { close:  0, macd:  1, rsi:-1, boli:  1 }, // macd+boli dominate → BUY
+      m5:    { close:  0, macd:  1, rsi:-1, boli:  1 },
     },
-    expected: {
-      deep: 'BULL / STRONG', dd: 'BUY / STRONG', now: 'BUY / STRONG',
-      direction: 'BUY', score: 95, grade: 'F (Ext)',
-    },
+    expected: { deep: 'BULL / STRONG', dd: 'BUY / STRONG', now: 'BUY / STRONG', direction: 'BUY', score: 95, grade: 'F (Ext)' },
   },
   {
     name: 'B2 (SELL biased)',
@@ -46,12 +39,9 @@ const TEST_CASES = [
       h4:    { close:  1, macd:  1, rsi: -1, boli:  1 },
       h1:    { close:  0, macd: -1, rsi: -1, boli:  0 },
       m15:   { close:  0, macd: -1, rsi:  1, boli: -1 },
-      m5:    { close:  0, macd: -1, rsi:  1, boli:  0 }, // -10+30=+20 → BUY
+      m5:    { close:  0, macd: -1, rsi:  1, boli:  0 },
     },
-    expected: {
-      deep: 'BEAR / STRONG', dd: 'SELL / MEDIUM', now: 'SELL / MEDIUM',
-      direction: 'SELL', score: 60, grade: 'B',
-    },
+    expected: { deep: 'BEAR / STRONG', dd: 'SELL / MEDIUM', now: 'SELL / MEDIUM', direction: 'SELL', score: 60, grade: 'B' },
   },
   {
     name: 'B3 (Mixed)',
@@ -62,12 +52,9 @@ const TEST_CASES = [
       h4:    { close:  1, macd: -1, rsi: 1, boli:  1 },
       h1:    { close:  0, macd: -1, rsi: 1, boli: -1 },
       m15:   { close:  0, macd:  1, rsi: 1, boli:  0 },
-      m5:    { close:  0, macd:  1, rsi:-1, boli:  0 }, // 10-30=−20 → SELL
+      m5:    { close:  0, macd:  1, rsi:-1, boli:  0 },
     },
-    expected: {
-      deep: 'BEAR / MEDIUM', dd: 'SELL / MEDIUM', now: 'SELL / MEDIUM',
-      direction: 'SELL', score: 53, grade: 'C',
-    },
+    expected: { deep: 'BEAR / MEDIUM', dd: 'SELL / MEDIUM', now: 'SELL / MEDIUM', direction: 'SELL', score: 53, grade: 'C' },
   },
   {
     name: 'B4 (Strong BUY)',
@@ -78,34 +65,14 @@ const TEST_CASES = [
       h4:    { close:  1, macd:  1, rsi:-1, boli:  1 },
       h1:    { close:  0, macd:  1, rsi:-1, boli:  1 },
       m15:   { close:  0, macd:  1, rsi: 1, boli:  1 },
-      m5:    { close:  0, macd: -1, rsi: 1, boli:  0 }, // -10+30=+20 → BUY
+      m5:    { close:  0, macd: -1, rsi: 1, boli:  0 },
     },
-    expected: {
-      deep: 'BULL / STRONG', dd: 'BUY / STRONG', now: 'BUY / STRONG',
-      direction: 'BUY', score: 95, grade: 'F (Ext)',
-    },
+    expected: { deep: 'BULL / STRONG', dd: 'BUY / STRONG', now: 'BUY / STRONG', direction: 'BUY', score: 95, grade: 'F (Ext)' },
   },
 ];
 
 function match(actual, expected) {
   return actual?.toString().toLowerCase().includes(expected?.toString().toLowerCase());
-}
-
-function Cell({ value, expected, isBlock }) {
-  const ok = expected === undefined || match(value, expected);
-  return (
-    <td className={cn(
-      'px-3 py-2 text-xs font-mono border-b border-border whitespace-nowrap',
-      ok ? 'text-emerald-500' : 'text-red-400 font-bold bg-red-500/10'
-    )}>
-      {value}
-      {!ok && expected !== undefined && (
-        <div className="text-[10px] text-muted-foreground font-normal">
-          expect: {expected}
-        </div>
-      )}
-    </td>
-  );
 }
 
 export default function EngineTest() {
@@ -129,13 +96,14 @@ export default function EngineTest() {
 
   return (
     <div className="p-4 space-y-3">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pt-2">
         <h1 className="text-lg font-bold">Engine Test — 5 Excel Cases</h1>
         <span className={cn('text-xs font-bold px-2 py-1 rounded', allPass ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400')}>
           {allPass ? '✓ ALL PASS' : '✗ FAILURES DETECTED'}
         </span>
       </div>
       <p className="text-xs text-muted-foreground">Green = matches Excel. Red = mismatch (expected value shown below).</p>
+      <p className="text-[10px] text-muted-foreground">Route: /admin/engine-test</p>
 
       {results.map(({ tc, r }) => {
         const [expDeepDir, expDeepStr] = tc.expected.deep.split(' / ');
@@ -148,8 +116,8 @@ export default function EngineTest() {
           { label: 'DD',   got: `${r.ddBias} / ${r.ddStrength}`,   ok: match(r.ddBias, expDdDir) && match(r.ddStrength, expDdStr),   exp: tc.expected.dd },
           { label: 'NOW',  got: `${r.nowBias} / ${r.nowStrength}`,  ok: match(r.nowBias, expNowDir) && match(r.nowStrength, expNowStr),  exp: tc.expected.now },
           { label: 'DIR',  got: r.mainDirection, ok: match(r.mainDirection, tc.expected.direction), exp: tc.expected.direction },
-          { label: 'SCORE',got: String(r.winningScore), ok: r.winningScore === tc.expected.score, exp: String(tc.expected.score) },
-          { label: 'GRADE',got: gradeVal, ok: match(gradeVal, tc.expected.grade), exp: tc.expected.grade },
+          { label: 'SCORE', got: String(r.winningScore), ok: r.winningScore === tc.expected.score, exp: String(tc.expected.score) },
+          { label: 'GRADE', got: gradeVal, ok: match(gradeVal, tc.expected.grade), exp: tc.expected.grade },
         ];
         const casePass = checks.every(c => c.ok);
 
@@ -169,16 +137,13 @@ export default function EngineTest() {
                 </div>
               ))}
             </div>
-            {/* Per-TF pill row */}
             <div className="flex gap-1 flex-wrap pt-1">
               {['month','week','day','h4','h1','m15','m5'].map(key => {
                 const tf = r.timeframes[key];
                 return (
-                  <div key={key} className={cn(
-                    'text-[9px] font-mono rounded px-1.5 py-0.5',
+                  <div key={key} className={cn('text-[9px] font-mono rounded px-1.5 py-0.5',
                     tf.result === 1  ? 'bg-emerald-500/20 text-emerald-400' :
-                    tf.result === -1 ? 'bg-red-500/20 text-red-400' :
-                                       'bg-secondary text-muted-foreground'
+                    tf.result === -1 ? 'bg-red-500/20 text-red-400' : 'bg-secondary text-muted-foreground'
                   )}>
                     {key.toUpperCase()}: {tf.bias[0]}
                   </div>

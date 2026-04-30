@@ -8,12 +8,13 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import AppLayout from '@/components/layout/AppLayout';
-import Dashboard from '@/pages/Dashboard';
+import Dashboard from '@/pages/Dashboard.jsx';
 import Input from '@/pages/Input';
 import Engine from '@/pages/Engine';
 import History from '@/pages/History';
 import ATR from '@/pages/ATR';
-import Settings from '@/pages/Settings';
+import Settings from '@/pages/Settings.jsx';
+import EngineTest from '@/pages/EngineTest.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -47,6 +48,7 @@ const AuthenticatedApp = () => {
           <Route path="/settings" element={<Settings />} />
 
         </Route>
+        <Route path="/admin/engine-test" element={<EngineTest />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </AnimatePresence>

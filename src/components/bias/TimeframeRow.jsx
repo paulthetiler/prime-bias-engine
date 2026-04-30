@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import IndicatorButton from './IndicatorButton';
 
-export default function TimeframeRow({ tf, indicators, onChange, result }) {
+export default function TimeframeRow({ tf, indicators, onChange, result, inputStyle = 'tap-cycle' }) {
   const handleChange = (indicator, value) => {
     onChange(tf.key, { ...indicators, [indicator]: value });
   };
@@ -23,18 +23,18 @@ export default function TimeframeRow({ tf, indicators, onChange, result }) {
         {tf.key === 'h1' || tf.key === 'm15' || tf.key === 'm5' ? (
           <>
             <div className="opacity-30">
-              <IndicatorButton value={0} onChange={() => {}} label="Close" />
+              <IndicatorButton value={0} onChange={() => {}} label="Close" inputStyle={inputStyle} />
             </div>
-            <IndicatorButton value={indicators.macd} onChange={(v) => handleChange('macd', v)} label="MACD" />
-            <IndicatorButton value={indicators.rsi} onChange={(v) => handleChange('rsi', v)} label="RSI" />
-            <IndicatorButton value={indicators.boli} onChange={(v) => handleChange('boli', v)} label="Boli" />
+            <IndicatorButton value={indicators.macd} onChange={(v) => handleChange('macd', v)} label="MACD" inputStyle={inputStyle} />
+            <IndicatorButton value={indicators.rsi} onChange={(v) => handleChange('rsi', v)} label="RSI" inputStyle={inputStyle} />
+            <IndicatorButton value={indicators.boli} onChange={(v) => handleChange('boli', v)} label="Boli" inputStyle={inputStyle} />
           </>
         ) : (
           <>
-            <IndicatorButton value={indicators.close} onChange={(v) => handleChange('close', v)} label="Close" />
-            <IndicatorButton value={indicators.macd} onChange={(v) => handleChange('macd', v)} label="MACD" />
-            <IndicatorButton value={indicators.rsi} onChange={(v) => handleChange('rsi', v)} label="RSI" />
-            <IndicatorButton value={indicators.boli} onChange={(v) => handleChange('boli', v)} label="Boli" />
+            <IndicatorButton value={indicators.close} onChange={(v) => handleChange('close', v)} label="Close" inputStyle={inputStyle} />
+            <IndicatorButton value={indicators.macd} onChange={(v) => handleChange('macd', v)} label="MACD" inputStyle={inputStyle} />
+            <IndicatorButton value={indicators.rsi} onChange={(v) => handleChange('rsi', v)} label="RSI" inputStyle={inputStyle} />
+            <IndicatorButton value={indicators.boli} onChange={(v) => handleChange('boli', v)} label="Boli" inputStyle={inputStyle} />
           </>
         )}
       </div>

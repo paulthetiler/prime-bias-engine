@@ -1,8 +1,8 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-// Tri-state button: 0 → 1 → -1 → 0 (matches Excel: UP=1 DOWN=-1 NEUTRAL=0)
-export default function IndicatorButton({ value, onChange, label }) {
+// Tap-cycle: 0 → 1 → -1 → 0
+function TapCycleButton({ value, onChange, label }) {
   const cycle = () => {
     if (value === 0) onChange(1);
     else if (value === 1) onChange(-1);
@@ -25,4 +25,49 @@ export default function IndicatorButton({ value, onChange, label }) {
       </div>
     </button>
   );
+}
+
+// Button style: 3 explicit buttons
+function ButtonStyleInput({ value, onChange, label }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground text-center">{label}</div>
+      <div className="flex gap-1">
+        <button
+          onClick={() => onChange(1)}
+          className={cn(
+            'flex-1 h-8 rounded text-[10px] font-bold border transition-colors',
+            value === 1
+              ? 'bg-emerald-500 text-white border-emerald-500'
+              : 'bg-secondary border-border text-muted-foreground hover:border-emerald-500/50'
+          )}
+        >B</button>
+        <button
+          onClick={() => onChange(0)}
+          className={cn(
+            'flex-1 h-8 rounded text-[10px] font-bold border transition-colors',
+            value === 0
+              ? 'bg-secondary border-foreground text-foreground'
+              : 'bg-secondary border-border text-muted-foreground'
+          )}
+        >N</button>
+        <button
+          onClick={() => onChange(-1)}
+          className={cn(
+            'flex-1 h-8 rounded text-[10px] font-bold border transition-colors',
+            value === -1
+              ? 'bg-red-500 text-white border-red-500'
+              : 'bg-secondary border-border text-muted-foreground hover:border-red-500/50'
+          )}
+        >S</button>
+      </div>
+    </div>
+  );
+}
+
+export default function IndicatorButton({ value, onChange, label, inputStyle = 'tap-cycle' }) {
+  if (inputStyle === 'buttons') {
+    return <ButtonStyleInput value={value} onChange={onChange} label={label} />;
+  }
+  return <TapCycleButton value={value} onChange={onChange} label={label} />;
 }

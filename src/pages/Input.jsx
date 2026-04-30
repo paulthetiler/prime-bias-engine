@@ -13,6 +13,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Save, ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import LiveResultBanner from '@/components/bias/LiveResultBanner';
+import { getSettings } from '@/lib/userSettings';
 
 export default function Input() {
   const navigate = useNavigate();
@@ -33,6 +35,13 @@ export default function Input() {
   ]);
   const [open, setOpen] = useState(false);
   const [extraCheck, setExtraCheck] = useState({ h1: null, m15: null });
+  const [settings, setSettings] = useState(getSettings());
+
+  useEffect(() => {
+    const onSettings = () => setSettings(getSettings());
+    window.addEventListener('settingsUpdated', onSettings);
+    return () => window.removeEventListener('settingsUpdated', onSettings);
+  }, []);
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle, saving, saved
   const autoSaveTimeoutRef = useRef(null);
   const userEditedRef = useRef(false); // tracks if inputs changed due to user action vs loading
@@ -342,6 +351,11 @@ export default function Input() {
         Tap each indicator to cycle: <span className="text-muted-foreground">0</span> → <span className="text-emerald-400">+1</span> → <span className="text-red-400">−1</span> → <span className="text-muted-foreground">0</span>
       </div>
 
+      {/* Live Result Banner */}
+      {instrument && results && (
+        <LiveResultBanner results={results} />
+      )}
+
       {/* Broadstroke Section */}
       <div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2 px-1">Broadstroke — Deep Trend</div>
@@ -353,6 +367,7 @@ export default function Input() {
               indicators={inputs[tf.key]}
               onChange={handleTFChange}
               result={results?.timeframes[tf.key]}
+              inputStyle={settings.inputStyle}
             />
           ))}
         </div>
@@ -369,6 +384,7 @@ export default function Input() {
               indicators={inputs[tf.key]}
               onChange={handleTFChange}
               result={results?.timeframes[tf.key]}
+              inputStyle={settings.inputStyle}
             />
           ))}
         </div>
