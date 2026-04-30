@@ -26,13 +26,11 @@ export default function Input() {
   const [baseAtr, setBaseAtr] = useState(null);
   const [targetInfo, setTargetInfo] = useState(null);
   const [timeToNextHour, setTimeToNextHour] = useState('');
-  const [topAssets, setTopAssets] = useState([
-    { asset: '', atr: null },
-    { asset: '', atr: null },
-    { asset: '', atr: null },
-    { asset: '', atr: null },
-    { asset: '', atr: null },
-  ]);
+  const [topAssets, setTopAssets] = useState(() => {
+    const top = JSON.parse(localStorage.getItem('primebias_top_assets') || '[]');
+    const extra = JSON.parse(localStorage.getItem('primebias_extra_assets') || '[]');
+    return [...top, ...extra];
+  });
   const [open, setOpen] = useState(false);
   const [extraCheck, setExtraCheck] = useState({ h1: null, m15: null });
   const [settings, setSettings] = useState(getSettings());
@@ -76,47 +74,44 @@ export default function Input() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load top assets from ATR page (top 5 + extras combined)
-  const loadAllAssets = () => {
-    const top = JSON.parse(localStorage.getItem('primebias_top_assets') || '[]');
-    const extra = JSON.parse(localStorage.getItem('primebias_extra_assets') || '[]');
-    setTopAssets([...top, ...extra]);
-  };
-
+  // Reload top assets when ATR page updates them
   useEffect(() => {
-    loadAllAssets();
-  }, []);
-
-  // Listen for ATR changes
-  useEffect(() => {
+    const loadAllAssets = () => {
+      const top = JSON.parse(localStorage.getItem('primebias_top_assets') || '[]');
+      const extra = JSON.parse(localStorage.getItem('primebias_extra_assets') || '[]');
+      setTopAssets([...top, ...extra]);
+    };
     window.addEventListener('atrUpdated', loadAllAssets);
     return () => window.removeEventListener('atrUpdated', loadAllAssets);
   }, []);
 
-  // Load analysis from active set and sync active assets
+  // Load analysis when instrument changes (not on every topAssets change)
   useEffect(() => {
-    // Mark as non-user-edit BEFORE setting state so the inputs effect won't trigger a save
+    if (!instrument) return;
+
     userEditedRef.current = false;
-    // Also cancel any pending auto-save from a previous instrument
     if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
     setAutoSaveStatus('idle');
 
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
-    // Strip stale cached results — always recalculate fresh from inputs
-    Object.keys(active).forEach(key => { delete active[key].results; });
     setActiveAssets(active);
-    if (instrument && active[instrument]) {
+
+    if (active[instrument]) {
       const data = active[instrument];
       const loadedInputs = data.inputs || getDefaultInputs();
       setInputs(loadedInputs);
-      const freshResults = calculateBias(loadedInputs, data.extraCheck || null);
-      setResults(freshResults);
       setExtraCheck(data.extraCheck || { h1: null, m15: null });
-    } else if (instrument) {
+    } else {
       setInputs(getDefaultInputs());
       setExtraCheck({ h1: null, m15: null });
     }
-  }, [instrument, topAssets]);
+  }, [instrument]);
+
+  // Sync active assets list separately (doesn't reset inputs)
+  useEffect(() => {
+    const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+    setActiveAssets(active);
+  }, [topAssets]);
 
   // Track active assets for quick switch
   const [activeAssets, setActiveAssets] = useState({});
