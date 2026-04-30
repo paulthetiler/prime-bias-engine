@@ -119,9 +119,7 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
 
       {/* Why this trade */}
       {settings.showWhyThisTrade && !compact && (
-        <div onClick={e => e.stopPropagation()}>
-          <WhyThisTrade results={results} />
-        </div>
+        <WhyThisTrade results={results} onOpenFullView={() => onOpen(analysis)} />
       )}
 
       {/* Complete Trade */}

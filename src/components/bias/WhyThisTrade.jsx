@@ -16,7 +16,7 @@ function dirWord(d) {
   return 'neutral';
 }
 
-export default function WhyThisTrade({ results, defaultOpen = false }) {
+export default function WhyThisTrade({ results, defaultOpen = false, onOpenFullView = null }) {
   const [open, setOpen] = useState(defaultOpen);
   if (!results) return null;
 
@@ -72,9 +72,12 @@ export default function WhyThisTrade({ results, defaultOpen = false }) {
   const resultLine = `${grade} grade / ${status}`;
 
   return (
-    <div className="rounded-lg border border-border bg-card/50">
+    <div className="rounded-lg border border-border bg-card/50 cursor-pointer hover:border-primary/30 transition-colors" onClick={onOpenFullView}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(o => !o);
+        }}
         className="w-full flex items-center justify-between px-3 py-2.5 text-left"
       >
         <div className="flex items-center gap-2">
