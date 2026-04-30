@@ -45,6 +45,7 @@ const AuthenticatedApp = () => {
           <Route path="/history" element={<History />} />
           <Route path="/atr" element={<ATR />} />
           <Route path="/settings" element={<Settings />} />
+
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>

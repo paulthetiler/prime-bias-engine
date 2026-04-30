@@ -21,8 +21,8 @@ export default function Dashboard() {
       const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
       // Recalculate fresh results for all assets to avoid stale cache
       Object.keys(active).forEach(key => {
-        if (active[key].inputs) {
-          active[key].results = calculateBias(active[key].inputs);
+        if (active[key]?.inputs) {
+          active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null);
         }
       });
       setActiveAssets(active);

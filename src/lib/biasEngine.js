@@ -221,8 +221,8 @@ function calculateBias(inputs, extraCheck = null) {
 
   // Extra Check lights (+5 if green: h1 and m15 both same non-zero direction)
   let lightsActive = false;
-  if (extraCheck?.h1 !== null && extraCheck?.m15 !== null &&
-      extraCheck?.h1 !== 0 && extraCheck?.h1 === extraCheck?.m15) {
+  if (extraCheck && extraCheck.h1 != null && extraCheck.m15 != null &&
+      extraCheck.h1 !== 0 && extraCheck.h1 === extraCheck.m15) {
     lightsActive = true;
     if (extraCheck.h1 === 1) buyScore  += LIGHTS_WEIGHT;
     else                      sellScore += LIGHTS_WEIGHT;
