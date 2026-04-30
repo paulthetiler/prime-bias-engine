@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input as InputField } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Save, ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import LiveResultBanner from '@/components/bias/LiveResultBanner';
@@ -22,7 +22,7 @@ export default function Input() {
   const [inputs, setInputs] = useState(getDefaultInputs());
   const [results, setResults] = useState(null);
   const [showResult, setShowResult] = useState(true);
-  const [saving, setSaving] = useState(false);
+
   const [baseAtr, setBaseAtr] = useState(null);
   const [targetInfo, setTargetInfo] = useState(null);
   const [timeToNextHour, setTimeToNextHour] = useState('');
@@ -174,31 +174,6 @@ export default function Input() {
     setInputs(prev => ({ ...prev, [tfKey]: indicators }));
   };
 
-  const handleReset = () => {
-    setInputs(getDefaultInputs());
-  };
-
-  const handleSave = async () => {
-    if (!instrument) {
-      toast.error('Please select an instrument first');
-      return;
-    }
-    setSaving(true);
-    await base44.entities.BiasAnalysis.create({
-      instrument,
-      timestamp: new Date().toISOString(),
-      inputs,
-      results,
-      overall_bias: results?.mainDirection || 'NEUTRAL',
-      grade: results?.grade || 'F',
-      confidence_score: results?.confidenceScore || 0,
-      trade_action: results?.tradeAction || 'NO_TRADE',
-      warnings: results?.warnings || [],
-    });
-    toast.success('Analysis saved to history');
-    setSaving(false);
-  };
-
   return (
     <div className="p-3 space-y-2.5">
       {/* Header — compact single row */}
@@ -207,6 +182,21 @@ export default function Input() {
         <div className="flex items-center gap-2">
           <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-xs font-semibold">
             {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+          </div>
+          {/* Auto-save status indicator */}
+          <div className="h-8 px-2 rounded text-xs font-medium flex items-center gap-1 min-w-[64px]">
+            {autoSaveStatus === 'saving' && (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                <span className="text-muted-foreground">Saving…</span>
+              </>
+            )}
+            {autoSaveStatus === 'saved' && (
+              <>
+                <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-emerald-600 dark:text-emerald-300 font-semibold">Saved ✓</span>
+              </>
+            )}
           </div>
           <Button 
             variant="ghost" 
@@ -219,28 +209,10 @@ export default function Input() {
               toast.success('Cleared');
             }}
             className="h-8 w-8 text-destructive hover:text-destructive"
-            title="Clear history"
+            title="Clear all data"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1 h-8 px-3">
-            <Save className="w-4 h-4" />
-            Save
-          </Button>
-          <div className="h-8 px-2 rounded text-xs font-medium flex items-center gap-1" title={autoSaveStatus === 'saving' ? 'Auto-saving...' : autoSaveStatus === 'saved' ? 'Auto-saved' : ''}>
-            {autoSaveStatus === 'saving' && (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span className="text-muted-foreground">Saving...</span>
-              </>
-            )}
-            {autoSaveStatus === 'saved' && (
-              <>
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                <span className="text-emerald-600 dark:text-emerald-300">Saved</span>
-              </>
-            )}
-          </div>
         </div>
       </div>
 
