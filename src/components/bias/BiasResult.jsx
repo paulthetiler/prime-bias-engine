@@ -57,18 +57,6 @@ export default function BiasResult({ results, rawTimeframes }) {
   return (
     <div className="space-y-3">
 
-      {/* ── DEBUG PANEL ── */}
-      <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/5 p-3 text-[10px] font-mono space-y-1">
-        <div className="text-yellow-400 font-bold uppercase tracking-wider mb-1">🔍 NOW Debug</div>
-        <div>H1 result: <span className="text-foreground font-bold">{h1r === 1 ? '+1 (BUY)' : h1r === -1 ? '-1 (SELL)' : '0 (Neutral)'}</span></div>
-        <div>M15 result: <span className="text-foreground font-bold">{m15r === 1 ? '+1 (BUY)' : m15r === -1 ? '-1 (SELL)' : '0 (Neutral)'}</span></div>
-        <div>M5 result: <span className="text-foreground font-bold">{m5r === 1 ? '+1 (BUY)' : m5r === -1 ? '-1 (SELL)' : '0 (Neutral)'}</span></div>
-        <div className="border-t border-yellow-500/20 pt-1 mt-1">
-          <span>Engine NOW: </span>
-          <span className="text-foreground font-bold">{nowBias} / {nowStrength}</span>
-        </div>
-      </div>
-
       {/* ── FINAL TREND ── Deep + DD driven direction */}
       <div className="rounded-xl border border-border bg-secondary/40 p-3">
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Trend</div>
