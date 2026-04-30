@@ -95,6 +95,12 @@ export default function Input() {
 
   // Load analysis from active set and sync active assets
   useEffect(() => {
+    // Mark as non-user-edit BEFORE setting state so the inputs effect won't trigger a save
+    userEditedRef.current = false;
+    // Also cancel any pending auto-save from a previous instrument
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
+    setAutoSaveStatus('idle');
+
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
     // Strip stale cached results — always recalculate fresh from inputs
     Object.keys(active).forEach(key => { delete active[key].results; });
@@ -102,13 +108,11 @@ export default function Input() {
     if (instrument && active[instrument]) {
       const data = active[instrument];
       const loadedInputs = data.inputs || getDefaultInputs();
-      userEditedRef.current = false;
       setInputs(loadedInputs);
       const freshResults = calculateBias(loadedInputs, data.extraCheck || null);
       setResults(freshResults);
       setExtraCheck(data.extraCheck || { h1: null, m15: null });
     } else if (instrument) {
-      userEditedRef.current = false;
       setInputs(getDefaultInputs());
       setExtraCheck({ h1: null, m15: null });
     }
@@ -152,19 +156,23 @@ export default function Input() {
       setAutoSaveStatus('saving');
       if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
       autoSaveTimeoutRef.current = setTimeout(async () => {
-        await base44.entities.BiasAnalysis.create({
-          instrument,
-          timestamp: new Date().toISOString(),
-          inputs,
-          results: res,
-          overall_bias: res?.mainDirection || 'NEUTRAL',
-          grade: res?.grade || 'F',
-          confidence_score: res?.confidenceScore || 0,
-          trade_action: res?.tradeAction || 'NO_TRADE',
-          warnings: res?.warnings || [],
-        });
-        setAutoSaveStatus('saved');
-        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+        try {
+          await base44.entities.BiasAnalysis.create({
+            instrument,
+            timestamp: new Date().toISOString(),
+            inputs,
+            results: res,
+            overall_bias: res?.mainDirection || 'NEUTRAL',
+            grade: res?.grade || 'F',
+            confidence_score: res?.confidenceScore || 0,
+            trade_action: res?.tradeAction || 'NO_TRADE',
+            warnings: res?.warnings || [],
+          });
+          setAutoSaveStatus('saved');
+          setTimeout(() => setAutoSaveStatus('idle'), 2000);
+        } catch (e) {
+          setAutoSaveStatus('idle');
+        }
       }, 1500);
     }
   }, [inputs, instrument, topAssets]);
