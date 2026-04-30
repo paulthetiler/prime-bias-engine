@@ -117,19 +117,18 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
         </span>
       </div>
 
-      {/* Why this trade */}
-      {settings.showWhyThisTrade && !compact && (
-        <WhyThisTrade results={results} onOpenFullView={() => onOpen(analysis)} />
-      )}
-
-      {/* Complete Trade */}
-      <div onClick={e => e.stopPropagation()}>
+      {/* View full decision hint + Complete Trade */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>View full decision →</span>
         <button
-          onClick={() => onComplete(analysis)}
-          className="w-full flex items-center justify-center gap-2 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 py-2 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onComplete(analysis);
+          }}
+          className="flex items-center gap-2 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 px-3 py-2 font-semibold text-muted-foreground hover:text-primary transition-colors"
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
-          Complete Trade
+          Complete
         </button>
       </div>
     </div>
