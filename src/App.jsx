@@ -12,6 +12,7 @@ import Dashboard from '@/pages/Dashboard.jsx';
 import Input from '@/pages/Input';
 import Engine from '@/pages/Engine';
 import History from '@/pages/History';
+import TradeHistory from '@/pages/TradeHistory';
 import ATR from '@/pages/ATR';
 import Settings from '@/pages/Settings.jsx';
 import EngineTest from '@/pages/EngineTest.jsx';
@@ -44,6 +45,7 @@ const AuthenticatedApp = () => {
           <Route path="/input" element={<Input />} />
           <Route path="/engine" element={<Engine />} />
           <Route path="/history" element={<History />} />
+          <Route path="/trade-history" element={<TradeHistory />} />
           <Route path="/atr" element={<ATR />} />
           <Route path="/settings" element={<Settings />} />
 

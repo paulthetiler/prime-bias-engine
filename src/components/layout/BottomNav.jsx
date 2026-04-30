@@ -1,12 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Crosshair, BarChart3, Clock, Settings } from 'lucide-react';
+import { BarChart3, Timer, BookMarked, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/engine', icon: BarChart3, label: 'Engine' },
-  { path: '/atr', icon: Clock, label: 'ATR' },
-  { path: '/history', icon: Clock, label: 'History' },
+  { path: '/atr', icon: Timer, label: 'ATR' },
+  { path: '/trade-history', icon: BookMarked, label: 'Trades' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

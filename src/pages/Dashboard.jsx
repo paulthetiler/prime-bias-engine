@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Trash2, SlidersHorizontal } from 'lucide-react';
+import { Trash2, SlidersHorizontal, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { calculateBias } from '@/lib/biasEngine';
@@ -9,6 +9,7 @@ import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
 import { getSettings } from '@/lib/userSettings';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import WhyThisTrade from '@/components/bias/WhyThisTrade';
+import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 
 const gradeColors = {
   A: 'text-emerald-400', B: 'text-blue-400', C: 'text-yellow-400',
@@ -33,7 +34,7 @@ function TrendPill({ label, dir, strength }) {
   );
 }
 
-function AssetCard({ analysis, onOpen, settings, compact }) {
+function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
   const { instrument, results, targetInfo } = analysis;
   if (!results) return null;
 
@@ -103,6 +104,17 @@ function AssetCard({ analysis, onOpen, settings, compact }) {
           <WhyThisTrade results={results} />
         </div>
       )}
+
+      {/* Complete Trade */}
+      <div onClick={e => e.stopPropagation()}>
+        <button
+          onClick={() => onComplete(analysis)}
+          className="w-full flex items-center justify-center gap-2 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 py-2 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          Complete Trade
+        </button>
+      </div>
     </div>
   );
 }
@@ -150,6 +162,7 @@ export default function Dashboard() {
   const [activeAssets, setActiveAssets] = useState({});
   const [timeToNextHour, setTimeToNextHour] = useState('');
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
+  const [completeAnalysis, setCompleteAnalysis] = useState(null);
   const [settings, setSettings] = useState(getSettings());
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(() => {
@@ -303,6 +316,7 @@ export default function Dashboard() {
               key={a.instrument}
               analysis={a}
               onOpen={setSelectedAnalysis}
+              onComplete={setCompleteAnalysis}
               settings={settings}
               compact={settings.compactMode}
             />
@@ -316,6 +330,14 @@ export default function Dashboard() {
           settings={settings}
           onClose={() => setSelectedAnalysis(null)}
           onEdit={() => handleEditInstrument(selectedAnalysis.instrument)}
+        />
+      )}
+
+      {completeAnalysis && (
+        <CompleteTradeModal
+          analysis={completeAnalysis}
+          onClose={() => setCompleteAnalysis(null)}
+          onCompleted={() => setCompleteAnalysis(null)}
         />
       )}
     </div>

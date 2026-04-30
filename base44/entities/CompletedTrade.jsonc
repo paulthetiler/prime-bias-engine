@@ -1,0 +1,122 @@
+{
+  "name": "CompletedTrade",
+  "type": "object",
+  "properties": {
+    "instrument": {
+      "type": "string",
+      "description": "Trading pair or asset"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "archived"
+      ],
+      "default": "completed",
+      "description": "Trade record status"
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "win",
+        "loss",
+        "breakeven",
+        "not_taken"
+      ],
+      "description": "Trade outcome"
+    },
+    "direction": {
+      "type": "string",
+      "description": "BUY / SELL / NEUTRAL"
+    },
+    "grade": {
+      "type": "string",
+      "description": "A / B / C / D / F"
+    },
+    "trade_status": {
+      "type": "string",
+      "description": "Engine status label"
+    },
+    "trade_action": {
+      "type": "string",
+      "description": "TRADE / WAIT / NO_TRADE"
+    },
+    "score": {
+      "type": "number",
+      "description": "Winning score"
+    },
+    "target": {
+      "type": "number",
+      "description": "Calculated price target"
+    },
+    "alignment": {
+      "type": "string",
+      "description": "HIGH / MEDIUM / LOW"
+    },
+    "deep_trend": {
+      "type": "string"
+    },
+    "deep_strength": {
+      "type": "string"
+    },
+    "dd_bias": {
+      "type": "string"
+    },
+    "dd_strength": {
+      "type": "string"
+    },
+    "now_bias": {
+      "type": "string"
+    },
+    "now_strength": {
+      "type": "string"
+    },
+    "extra_check_h1": {
+      "type": "number",
+      "description": "Extra check H1 value"
+    },
+    "extra_check_m15": {
+      "type": "number",
+      "description": "Extra check M15 value"
+    },
+    "inputs_snapshot": {
+      "type": "object",
+      "description": "Full inputs at time of completion"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When analysis was created"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When trade was completed"
+    },
+    "entry_price": {
+      "type": "number"
+    },
+    "exit_price": {
+      "type": "number"
+    },
+    "pnl": {
+      "type": "number",
+      "description": "Profit or loss"
+    },
+    "exit_reason": {
+      "type": "string",
+      "description": "Reason for exit"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "screenshot_url": {
+      "type": "string",
+      "description": "Screenshot link or upload URL"
+    }
+  },
+  "required": [
+    "instrument",
+    "result"
+  ]
+}
