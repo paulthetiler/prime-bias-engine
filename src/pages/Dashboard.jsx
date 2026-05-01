@@ -187,6 +187,7 @@ export default function Dashboard() {
   const [timeToNextHour, setTimeToNextHour] = useState('');
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [completeAnalysis, setCompleteAnalysis] = useState(null);
+  const [completedTrade, setCompletedTrade] = useState(null);
   const [settings, setSettings] = useState(getSettings());
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(() => {
@@ -249,6 +250,19 @@ export default function Dashboard() {
     setSelectedAnalysis(null);
     sessionStorage.setItem('selectedInstrument', instrument);
     navigate('/input');
+  };
+
+  const handleTradeCompleted = (record) => {
+    // Store the completed trade and navigate immediately
+    console.log("PB_DEBUG_DASHBOARD_COMPLETION_HANDLER", {
+      recordId: record.id,
+      instrument: record.instrument,
+      timestamp: new Date().toISOString(),
+    });
+    setCompletedTrade(record);
+    setCompleteAnalysis(null);
+    // Navigate to trade history before re-render
+    navigate('/trade-history', { state: { focusedTradeId: record.id } });
   };
 
   let analyses = Object.values(activeAssets);
@@ -392,7 +406,7 @@ export default function Dashboard() {
         <CompleteTradeModal
           analysis={completeAnalysis}
           onClose={() => setCompleteAnalysis(null)}
-          onCompleted={() => setCompleteAnalysis(null)}
+          onCompleted={handleTradeCompleted}
         />
       )}
 
