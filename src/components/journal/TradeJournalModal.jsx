@@ -17,23 +17,17 @@ const RESULT_LABELS = {
 };
 
 function buildTradeNote(analysis, result) {
-  const { instrument, results, targetInfo } = analysis;
-  if (!results) return '';
-  const { mainDirection, grade, status, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, winningScore } = results;
+  const { instrument, results, targetInfo } = analysis || {};
   const now = new Date();
-  const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  const target = targetInfo?.target ? targetInfo.target.toFixed(4) : '—';
-  const resultLine = result ? `Result: ${RESULT_LABELS[result] || result}` : '';
-
-  return [
-    `📍 ${instrument} — ${dateStr}`,
-    resultLine,
-    `Direction: ${mainDirection} | Grade: ${grade} (${status}) | Score: ${winningScore}`,
-    `Target: ${target}`,
-    `Deep: ${deepTrend} (${deepStrength}) | DD: ${ddBias} (${ddStrength}) | Now: ${nowBias} (${nowStrength})`,
-    ``,
-    `Notes: `,
-  ].filter(Boolean).join('\n');
+  const dateStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const resultLabel = result ? RESULT_LABELS[result] : '';
+  if (!results) {
+    return `${instrument} — ${dateStr} — ${resultLabel}\nNotes: `;
+  }
+  const { mainDirection, grade, status, winningScore } = results;
+  return `${instrument} — ${dateStr} — ${resultLabel}
+Grade: ${grade} (${status}) | ${mainDirection} | Score: ${winningScore}
+Notes: `;
 }
 
 export default function TradeJournalModal({ analysis, result, onClose }) {
@@ -56,7 +50,7 @@ export default function TradeJournalModal({ analysis, result, onClose }) {
   const handleSave = async () => {
     setSaving(true);
     const appendedNotes = existingEntry?.notes
-      ? `${existingEntry.notes}\n\n---\n\n${note}`
+      ? `${existingEntry.notes}\n\n— — —\n\n${note}`
       : note;
 
     if (existingEntry) {
