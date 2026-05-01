@@ -22,9 +22,14 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
       
-      // Check if user is authenticated
+      // Check if user is authenticated with timeout
       if (appParams.token) {
-        await checkUserAuth();
+        // Add 8-second timeout to auth check to prevent infinite spinner
+        const authPromise = checkUserAuth();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Auth check timeout')), 8000)
+        );
+        await Promise.race([authPromise, timeoutPromise]);
       } else {
         setIsLoadingAuth(false);
         setIsAuthenticated(false);
@@ -34,36 +39,42 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('App state check failed:', error);
       setAuthError({
-        type: 'unknown',
+        type: error.message === 'Auth check timeout' ? 'auth_timeout' : 'unknown',
         message: error.message || 'An unexpected error occurred'
       });
       setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
+      setIsAuthenticated(false);
+      setAuthChecked(true);
     }
   };
 
   const checkUserAuth = async () => {
+    setIsLoadingAuth(true);
     try {
-      // Now check if the user is authenticated
-      setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
-      setIsLoadingAuth(false);
       setAuthChecked(true);
     } catch (error) {
       console.error('User auth check failed:', error);
-      setIsLoadingAuth(false);
       setIsAuthenticated(false);
       setAuthChecked(true);
       
       // If user auth fails, it might be an expired token
-      if (error.status === 401 || error.status === 403) {
+      if (error?.status === 401 || error?.status === 403) {
         setAuthError({
           type: 'auth_required',
           message: 'Authentication required'
         });
+      } else {
+        setAuthError({
+          type: 'auth_check_failed',
+          message: error?.message || 'Failed to check authentication'
+        });
       }
+    } finally {
+      setIsLoadingAuth(false);
     }
   };
 

@@ -41,6 +41,22 @@ const AuthenticatedApp = () => {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
       return null;
+    } else if (authError.type === 'auth_timeout' || authError.type === 'auth_check_failed') {
+      return (
+        <div className="fixed inset-0 flex items-center justify-center bg-background p-4">
+          <div className="max-w-sm text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-lg font-bold mb-2">Connection Problem</h2>
+            <p className="text-sm text-muted-foreground mb-6">{authError.message}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
     }
   }
 
