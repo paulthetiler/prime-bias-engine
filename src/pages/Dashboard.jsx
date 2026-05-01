@@ -74,11 +74,11 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
     >
       {/* Asset name + Direction row */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <div>
-          <span className="font-bold text-sm tracking-tight text-foreground">{instrument}</span>
-          <div className={cn('text-2xl font-black leading-tight tracking-tight', dirColor)}>{mainDirection}</div>
+        <span className="font-bold text-sm tracking-tight text-foreground">{instrument}</span>
+        <div className="flex items-center gap-2">
+          <span className={cn('text-xl font-black tracking-tight', dirColor)}>{mainDirection}</span>
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
         </div>
-        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
       </div>
 
       {/* Split layout */}
