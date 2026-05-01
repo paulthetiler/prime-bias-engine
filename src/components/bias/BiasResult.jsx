@@ -54,26 +54,52 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
     return 'text-muted-foreground';
   }
 
+  const statusBadge = status === 'Ready' || status === 'Scalp'
+    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+    : status === 'Wait' || status === 'Weak'
+    ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
+    : 'bg-secondary text-muted-foreground border-border';
+
   return (
     <div className="space-y-3">
 
-      {/* ── MAIN RESULT CARD ── Grade, Status, Direction, Target */}
-      <div className="rounded-xl border border-border bg-secondary/40 p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Grade</span>
-          <span className={cn('text-lg font-bold', gradeColors[grade]?.split(' ')[0])}>{grade} — {gradeLabel}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Status</span>
-          <span className="text-sm font-semibold text-foreground">{status}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Direction</span>
-          <span className={cn('text-lg font-bold', dirColor)}>{mainDirection}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Target</span>
-          <span className="text-sm font-mono font-bold">{targetNote || '—'}</span>
+      {/* ── MAIN RESULT CARD ── Split layout */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex min-h-[120px]">
+
+          {/* Left — Grade */}
+          <div className="flex flex-col items-center justify-center px-5 py-4 bg-secondary/60 border-r border-border min-w-[90px]">
+            <span className="text-5xl font-black tracking-tight text-foreground leading-none">{grade}</span>
+            <span className="text-xs font-medium text-muted-foreground mt-1.5 text-center leading-tight">{gradeLabel}</span>
+          </div>
+
+          {/* Right — Decision info */}
+          <div className="flex flex-col justify-center px-4 py-3 gap-1.5 flex-1">
+            {/* Status badge */}
+            <span className={cn('self-start text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
+              {status}
+            </span>
+
+            {/* Direction */}
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground w-14 shrink-0">Direction</span>
+              <span className={cn('text-base font-bold', dirColor)}>{mainDirection}</span>
+            </div>
+
+            {/* Action */}
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground w-14 shrink-0">Action</span>
+              <span className={cn('text-sm font-bold px-2 py-0.5 rounded-md', actionColors[tradeAction])}>
+                {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
+              </span>
+            </div>
+
+            {/* Target */}
+            <div className="flex items-baseline gap-2">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground w-14 shrink-0">Target</span>
+              <span className="text-sm font-mono font-semibold text-foreground">{targetNote || '—'}</span>
+            </div>
+          </div>
         </div>
       </div>
 
