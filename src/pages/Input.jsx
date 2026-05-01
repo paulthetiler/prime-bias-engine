@@ -350,9 +350,15 @@ export default function Input() {
       )}
 
       {/* Instructions */}
-      <div className="text-xs text-muted-foreground px-1">
-        Tap each indicator to cycle: <span className="text-muted-foreground">0</span> → <span className="text-emerald-700 dark:text-emerald-400">+1</span> → <span className="text-red-700 dark:text-red-400">−1</span> → <span className="text-muted-foreground">0</span>
-      </div>
+      {instrument && (
+        <div className="text-xs text-muted-foreground px-1 space-y-0.5">
+          {settings.inputStyle === 'tap-cycle'
+            ? <span>Tap to cycle: <span className="text-muted-foreground font-mono">0</span> → <span className="text-emerald-700 dark:text-emerald-400 font-mono">+1</span> → <span className="text-red-700 dark:text-red-400 font-mono">−1</span> → <span className="text-muted-foreground font-mono">0</span></span>
+            : <span>Tap <span className="text-emerald-700 dark:text-emerald-400 font-semibold">BUY</span> / <span className="text-muted-foreground font-semibold">NEUTRAL</span> / <span className="text-red-700 dark:text-red-400 font-semibold">SELL</span> for each indicator</span>
+          }
+          <div className="text-[10px] text-muted-foreground/70">When done → go to Summary → Complete trade → optionally journal it</div>
+        </div>
+      )}
 
       {/* Broadstroke Section */}
       {instrument && (
