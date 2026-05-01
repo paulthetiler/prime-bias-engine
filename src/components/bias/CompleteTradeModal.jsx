@@ -111,7 +111,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={phase === 'pick' ? onClose : undefined}>
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
         className="w-full max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl overflow-y-auto"
         style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))', maxHeight: 'calc(100vh - 120px)' }}
@@ -151,7 +151,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
                 {RESULTS.map(r => (
                   <button
                     key={r.value}
-                    onClick={() => handlePick(r.value)}
+                    onClick={(e) => { e.stopPropagation(); handlePick(r.value); }}
                     className={cn(
                       'rounded-xl border-2 py-4 text-sm font-bold transition-all active:scale-95',
                       'border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary/5'
