@@ -74,15 +74,34 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
 
     localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
 
+    console.log("PB_DEBUG_BEFORE_NAVIGATE", {
+      currentPath: window.location.pathname,
+      target: "/trade-history",
+      recordId: record?.id,
+    });
+
     navigate("/trade-history", {
       replace: true,
       state: { focusedTradeId: record?.id }
     });
 
     setTimeout(() => {
+      console.log("PB_DEBUG_AFTER_NAVIGATE_TIMEOUT", {
+        currentPath: window.location.pathname,
+        expected: "/trade-history",
+        recordId: record?.id,
+      });
+
+      if (window.location.pathname !== "/trade-history") {
+        console.warn("PB_DEBUG_NAVIGATE_FAILED_FORCING_LOCATION");
+        window.location.assign("/trade-history");
+      }
+    }, 100);
+
+    setTimeout(() => {
       removeCompletedActiveAnalysis(analysis);
       onCompleted?.(record);
-    }, 50);
+    }, 500);
   };
 
   return (
@@ -207,15 +226,34 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
 
     localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
 
+    console.log("PB_DEBUG_BEFORE_NAVIGATE", {
+      currentPath: window.location.pathname,
+      target: "/trade-history",
+      recordId: record?.id,
+    });
+
     navigate("/trade-history", {
       replace: true,
       state: { focusedTradeId: record?.id }
     });
 
     setTimeout(() => {
+      console.log("PB_DEBUG_AFTER_NAVIGATE_TIMEOUT", {
+        currentPath: window.location.pathname,
+        expected: "/trade-history",
+        recordId: record?.id,
+      });
+
+      if (window.location.pathname !== "/trade-history") {
+        console.warn("PB_DEBUG_NAVIGATE_FAILED_FORCING_LOCATION");
+        window.location.assign("/trade-history");
+      }
+    }, 100);
+
+    setTimeout(() => {
       removeCompletedActiveAnalysis(analysis);
       onCompleted?.(record);
-    }, 50);
+    }, 500);
   };
 
   return (
