@@ -50,9 +50,11 @@ export async function completeTrade(analysis, result, details = {}) {
   // Generate analysisId if not present
   const id = analysisId || generateAnalysisId(instrument);
 
-  console.log('[Trade Completion Start]', {
+  console.log("PB_DEBUG_COMPLETE_TRADE_START", {
     instrument,
     analysisId: id,
+    result,
+    timestamp: new Date().toISOString(),
   });
 
   // 1. Save to DB FIRST — so if this fails, nothing is removed from the UI
@@ -87,7 +89,7 @@ export async function completeTrade(analysis, result, details = {}) {
     screenshot_url:   details.screenshotUrl || null,
   });
 
-  console.log('[Trade Completion - DB Save Result]', {
+  console.log("PB_DEBUG_COMPLETE_TRADE_DB_SAVED", {
     recordId: record.id,
     instrument: record.instrument,
     result: record.result,
@@ -117,7 +119,7 @@ export async function completeTrade(analysis, result, details = {}) {
 
    const locks = getLocks();
 
-   console.log('[Trade Completion - Final State]', {
+   console.log("PB_DEBUG_COMPLETE_TRADE_FINAL", {
      instrument,
      analysisId: id,
      primebias_activeBefore: activeBefore,

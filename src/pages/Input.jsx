@@ -195,11 +195,12 @@ export default function Input() {
     setActiveAssets({ ...active });
     window.dispatchEvent(new Event('biasUpdated'));
     
-    // DEBUG: Log Bias Tool save
-    console.log('[Bias Tool Save]', {
+    // DEBUG: Browser-visible log
+    console.log("PB_DEBUG_INPUT_SAVE", {
       instrument,
       analysisId,
       primebias_active: active,
+      timestamp: new Date().toISOString(),
     });
 
     // ── DB auto-save: only on actual user edits, debounced 1.5 s ──

@@ -10,6 +10,7 @@ import { getSettings } from '@/lib/userSettings';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import WhyThisTrade from '@/components/bias/WhyThisTrade';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
+import DebugPanel from '@/components/DebugPanel';
 
 
 const gradeColors = {
@@ -251,19 +252,16 @@ export default function Dashboard() {
 
   let analyses = Object.values(activeAssets);
 
-  // DEBUG: Log all active analyses with visibility reasoning
-  const completedIds = JSON.parse(localStorage.getItem('primebias_completedAnalysisIds') || '[]');
-  console.log('[Dashboard Load]', {
-    allActiveAssets: Object.keys(activeAssets).map(inst => ({
-      instrument: inst,
-      analysisId: activeAssets[inst]?.analysisId,
-    })),
-    completedAnalysisIds: completedIds,
-    visibilityReasons: analyses.map(a => ({
+  // DEBUG: Browser-visible load log
+  const locks = JSON.parse(localStorage.getItem('primebias_completed_locks') || '{}');
+  console.log("PB_DEBUG_DASHBOARD_LOAD", {
+    primebias_active: JSON.parse(localStorage.getItem('primebias_active') || '{}'),
+    completedAnalysisLocks: locks,
+    visibleAssets: analyses.map(a => ({
       instrument: a.instrument,
       analysisId: a.analysisId,
-      shown: true,
     })),
+    timestamp: new Date().toISOString(),
   });
 
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
@@ -396,6 +394,8 @@ export default function Dashboard() {
           onCompleted={() => setCompleteAnalysis(null)}
         />
       )}
-    </div>
-  );
-}
+
+      <DebugPanel />
+      </div>
+      );
+      }

@@ -33,6 +33,13 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     processingRef.current = true;
     setSaving(true);
 
+    console.log("PB_DEBUG_OUTCOME_CLICKED", {
+      outcome: resultValue,
+      instrument,
+      analysisId: getAnalysisId(analysis),
+      timestamp: new Date().toISOString(),
+    });
+
     let record;
     try {
       record = await completeTrade(analysis, resultValue);
@@ -162,6 +169,13 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     if (processingRef.current) return;
     processingRef.current = true;
     setSaving(true);
+
+    console.log("PB_DEBUG_OUTCOME_CLICKED", {
+      outcome: result,
+      instrument,
+      analysisId: getAnalysisId(analysis),
+      timestamp: new Date().toISOString(),
+    });
 
     let record;
     try {
