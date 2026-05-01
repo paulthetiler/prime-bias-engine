@@ -72,9 +72,9 @@ export function unlockAnalysis(analysisId) {
  * analysis MUST have a unique analysisId. If not, one is generated.
  * 1. Save to DB first (so if it fails, nothing is removed from the UI)
  * 2. Lock the analysisId (prevents this specific analysis from re-rendering)
- * 3. Remove from primebias_active
- * 4. Dispatch biasUpdated
- * 5. Return the saved record
+ * 3. Return the saved record
+ *
+ * NOTE: Active removal is handled separately by removeCompletedActiveAnalysis()
  */
 export async function completeTrade(analysis, result, details = {}) {
   const { instrument, results, targetInfo, inputs, extraCheck, timestamp, analysisId } = analysis || {};
@@ -92,8 +92,8 @@ export async function completeTrade(analysis, result, details = {}) {
   });
 
   // 1. Save to DB FIRST — so if this fails, nothing is removed from the UI
-   const alignment = calcAlignment(results || {});
-   const record = await base44.entities.CompletedTrade.create({
+  const alignment = calcAlignment(results || {});
+  const record = await base44.entities.CompletedTrade.create({
     instrument,
     status: 'completed',
     result,
@@ -129,39 +129,39 @@ export async function completeTrade(analysis, result, details = {}) {
     result: record.result,
   });
 
-   // 2. Lock this specific analysisId
-   lockAnalysis(id);
+  // 2. Lock this specific analysisId
+  lockAnalysis(id);
 
-   // 3. Remove this specific analysis from active set (by ID)
-   const activeBefore = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
-   const active = structuredClone(activeBefore);
-   if (active[instrument]) {
-     const analyses = Array.isArray(active[instrument]) 
-       ? active[instrument].filter(a => a.analysisId !== id)
-       : active[instrument].analysisId === id ? [] : [active[instrument]];
+  return record;
+}
 
-     if (analyses.length === 0) {
-       delete active[instrument];
-     } else if (analyses.length === 1) {
-       active[instrument] = analyses[0];
-     } else {
-       active[instrument] = analyses;
-     }
-   }
-   const activeAfter = active;
-   localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeAfter));
+/**
+ * removeCompletedActiveAnalysis(analysis)
+ * Removes a completed analysis from primebias_active storage.
+ * Should be called AFTER navigation is complete.
+ */
+export function removeCompletedActiveAnalysis(analysis) {
+  const { instrument, analysisId } = analysis || {};
+  if (!instrument || !analysisId) return;
 
-   const locks = getLocks();
+  const activeBefore = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
+  const active = structuredClone(activeBefore);
 
-   console.log("PB_DEBUG_COMPLETE_TRADE_FINAL", {
-     instrument,
-     analysisId: id,
-     primebias_activeBefore: activeBefore,
-     primebias_activeAfter: activeAfter,
-     completedAnalysisLocks: locks,
-   });
+  if (active[instrument]) {
+    const analyses = Array.isArray(active[instrument])
+      ? active[instrument].filter(a => a.analysisId !== analysisId)
+      : active[instrument].analysisId === analysisId ? [] : [active[instrument]];
 
-   return record;
+    if (analyses.length === 0) {
+      delete active[instrument];
+    } else if (analyses.length === 1) {
+      active[instrument] = analyses[0];
+    } else {
+      active[instrument] = analyses;
+    }
+  }
+
+  localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
 }
 
 /**

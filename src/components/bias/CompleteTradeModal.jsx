@@ -5,7 +5,7 @@ import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getSettings } from '@/lib/userSettings';
-import { completeTrade, undoCompletion } from '@/lib/tradeCompletion';
+import { completeTrade, undoCompletion, removeCompletedActiveAnalysis } from '@/lib/tradeCompletion';
 
 function getAnalysisId(analysis) {
   return analysis?.analysisId;
@@ -79,7 +79,10 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       state: { focusedTradeId: record?.id }
     });
 
-    onCompleted?.(record);
+    setTimeout(() => {
+      removeCompletedActiveAnalysis(analysis);
+      onCompleted?.(record);
+    }, 50);
   };
 
   return (
@@ -209,7 +212,10 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
       state: { focusedTradeId: record?.id }
     });
 
-    onCompleted?.(record);
+    setTimeout(() => {
+      removeCompletedActiveAnalysis(analysis);
+      onCompleted?.(record);
+    }, 50);
   };
 
   return (
