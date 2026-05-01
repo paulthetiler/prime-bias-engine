@@ -12,7 +12,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import LiveResultBanner from '@/components/bias/LiveResultBanner';
 import { getSettings } from '@/lib/userSettings';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -354,9 +353,6 @@ export default function Input() {
       <div className="text-xs text-muted-foreground px-1">
         Tap each indicator to cycle: <span className="text-muted-foreground">0</span> → <span className="text-emerald-700 dark:text-emerald-400">+1</span> → <span className="text-red-700 dark:text-red-400">−1</span> → <span className="text-muted-foreground">0</span>
       </div>
-
-      {/* Live Result Banner */}
-      {instrument && results && <LiveResultBanner results={results} />}
 
       {/* Broadstroke Section */}
       {instrument && (
