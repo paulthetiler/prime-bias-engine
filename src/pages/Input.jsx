@@ -185,19 +185,22 @@ export default function Input() {
         try {
           const direction = res?.mainDirection;
           const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
+          const grade = ['A','B','C','D','F'].includes(res?.grade) ? res.grade : 'F';
+          const tradeAction = ['TRADE','WAIT','NO_TRADE'].includes(res?.tradeAction) ? res.tradeAction : 'NO_TRADE';
           await base44.entities.BiasAnalysis.create({
             instrument,
             timestamp: new Date().toISOString(),
             overall_bias: overallBias,
-            grade: res?.grade || 'F',
+            grade,
             confidence_score: res?.winningScore || 0,
-            trade_action: res?.tradeAction || 'NO_TRADE',
+            trade_action: tradeAction,
             warnings: res?.warnings || [],
-            notes: `${res?.mainDirection} | ${res?.grade} | Score: ${res?.winningScore} | ${res?.status}`,
+            notes: `${direction} | ${grade} | Score: ${res?.winningScore ?? 0} | ${res?.status ?? ''}`,
           });
           setAutoSaveStatus('saved');
           setTimeout(() => setAutoSaveStatus('idle'), 2000);
-        } catch {
+        } catch (err) {
+          console.error('AutoSave error:', err?.message || err);
           setAutoSaveStatus('error');
           setTimeout(() => setAutoSaveStatus('idle'), 3000);
         }
