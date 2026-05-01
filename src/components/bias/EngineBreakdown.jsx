@@ -5,7 +5,7 @@ import { TIMEFRAMES, TF_GRADE_WEIGHTS } from '@/lib/biasEngine';
 export default function EngineBreakdown({ results }) {
   if (!results) return null;
 
-  const { timeframes, posScore, negScore, mainDirection, confidenceScore } = results;
+  const { timeframes = {}, posScore = 0, negScore = 0, mainDirection, confidenceScore = 0 } = results;
 
   return (
     <div className="space-y-4">
@@ -27,8 +27,8 @@ export default function EngineBreakdown({ results }) {
         <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">Grading Weights</h3>
         <div className="space-y-1.5">
           {TIMEFRAMES.map(tf => {
-            const weight = TF_GRADE_WEIGHTS[tf.key];
-            const result = timeframes[tf.key]?.result || 0;
+            const weight = TF_GRADE_WEIGHTS[tf.key] ?? 0;
+            const result = timeframes[tf.key]?.result ?? 0;
             const contrib = result === 1 ? weight : result === -1 ? weight : 0;
             const side = result === 1 ? 'POS' : result === -1 ? 'NEG' : '—';
             return (
@@ -72,7 +72,7 @@ function Section({ title, subtitle, children }) {
 
 function TFRow({ tf, data }) {
   if (!data) return null;
-  const { indicators = {}, total, result, bias } = data;
+  const { indicators = {}, total = 0, result = 0, bias } = data;
   const biasColor = bias === 'BUY' ? 'text-emerald-400' : bias === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
 
   return (
@@ -80,10 +80,10 @@ function TFRow({ tf, data }) {
       <div className="flex items-center gap-3 min-w-0">
         <span className="text-xs font-semibold w-8">{tf.shortLabel}</span>
         <div className="flex gap-2 text-[10px] font-mono">
-          <Pill value={indicators.close} label="C" />
-          <Pill value={indicators.macd} label="M" />
-          <Pill value={indicators.rsi} label="R" />
-          <Pill value={indicators.boli} label="B" />
+          <Pill value={indicators.close ?? 0} label="C" />
+          <Pill value={indicators.macd ?? 0} label="M" />
+          <Pill value={indicators.rsi ?? 0} label="R" />
+          <Pill value={indicators.boli ?? 0} label="B" />
         </div>
       </div>
       <div className="flex items-center gap-3">
