@@ -20,7 +20,6 @@ const RESULTS = [
 
 // ── Quick mode ────────────────────────────────────────────────────────────────
 function QuickCompleteModal({ analysis, onClose, onCompleted }) {
-  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const processingRef = useRef(false);
 
@@ -32,24 +31,6 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     processingRef.current = true;
     setSaving(true);
 
-    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "1 outcome clicked");
-
-    const active = JSON.parse(localStorage.getItem("primebias_active") || "{}");
-    const current = active[instrument];
-    const currentAnalysisId = Array.isArray(current) ? current[0]?.analysisId : current?.analysisId;
-
-    if (currentAnalysisId && currentAnalysisId !== analysis.analysisId) {
-      alert(`DEBUG MISMATCH: modal has ${analysis.analysisId} but active has ${currentAnalysisId}`);
-      setSaving(false);
-      processingRef.current = false;
-      return;
-    }
-
-    console.log("PB_DEBUG_COMPLETE_TRADE_ID_CHECK", {
-      modalAnalysisId: analysis.analysisId,
-      activeStorageId: currentAnalysisId,
-    });
-
     let record;
     try {
       record = await completeTrade(analysis, resultValue);
@@ -60,43 +41,15 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       return;
     }
 
-    setSaving(false);
-    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "2 trade saved");
+    // Remove from active storage
+    removeCompletedActiveAnalysis(analysis);
 
-    const analysisId = getAnalysisId(analysis);
     const label = RESULTS.find(r => r.value === resultValue)?.label || resultValue;
-    toast(`${instrument} — ${label}`, {
-      description: 'Saved to Trade History',
-      action: {
-        label: 'Undo',
-        onClick: async () => {
-          await undoCompletion(analysisId, record?.id);
-          toast.success(`${instrument} restored to Summary`);
-        },
-      },
-      duration: 6000,
-    });
+    toast.success(`${instrument} saved as ${label}`);
 
-    localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
-    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "3 navigating to trade-history");
-
-    navigate("/trade-history", {
-      replace: true,
-      state: { focusedTradeId: record?.id }
-    });
-
-    setTimeout(() => {
-      if (window.location.pathname !== "/trade-history") {
-        window.location.assign("/trade-history");
-      }
-    }, 100);
-
-    setTimeout(() => {
-      localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "4 removing active analysis");
-      removeCompletedActiveAnalysis(analysis);
-      localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "5 active analysis removed");
-      onCompleted?.(record);
-    }, 500);
+    setSaving(false);
+    onClose();
+    onCompleted?.(record);
   };
 
   return (
@@ -164,7 +117,6 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
 
 // ── Detailed mode ─────────────────────────────────────────────────────────────
 function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
-  const navigate = useNavigate();
   const [result, setResult] = useState('');
   const [entry, setEntry] = useState('');
   const [exit, setExit] = useState('');
@@ -182,24 +134,6 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     processingRef.current = true;
     setSaving(true);
 
-    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "1 outcome clicked");
-
-    const active = JSON.parse(localStorage.getItem("primebias_active") || "{}");
-    const current = active[instrument];
-    const currentAnalysisId = Array.isArray(current) ? current[0]?.analysisId : current?.analysisId;
-
-    if (currentAnalysisId && currentAnalysisId !== analysis.analysisId) {
-      alert(`DEBUG MISMATCH: modal has ${analysis.analysisId} but active has ${currentAnalysisId}`);
-      setSaving(false);
-      processingRef.current = false;
-      return;
-    }
-
-    console.log("PB_DEBUG_COMPLETE_TRADE_ID_CHECK", {
-      modalAnalysisId: analysis.analysisId,
-      activeStorageId: currentAnalysisId,
-    });
-
     let record;
     try {
       record = await completeTrade(analysis, result, { entry, exit, pnl, notes });
@@ -210,41 +144,15 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
       return;
     }
 
-    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "2 trade saved");
+    // Remove from active storage
+    removeCompletedActiveAnalysis(analysis);
 
-    const analysisId = getAnalysisId(analysis);
-    toast.success(`${instrument} saved to Trade History`, {
-      action: {
-        label: 'Undo',
-        onClick: async () => {
-          await undoCompletion(analysisId, record?.id);
-          toast.success(`${instrument} restored to Summary`);
-        },
-      },
-      duration: 6000,
-    });
+    const resultLabel = RESULTS.find(r => r.value === result)?.label || result;
+    toast.success(`${instrument} saved as ${resultLabel}`);
+
     setSaving(false);
-
-    localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
-    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "3 navigating to trade-history");
-
-    navigate("/trade-history", {
-      replace: true,
-      state: { focusedTradeId: record?.id }
-    });
-
-    setTimeout(() => {
-      if (window.location.pathname !== "/trade-history") {
-        window.location.assign("/trade-history");
-      }
-    }, 100);
-
-    setTimeout(() => {
-      localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "4 removing active analysis");
-      removeCompletedActiveAnalysis(analysis);
-      localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "5 active analysis removed");
-      onCompleted?.(record);
-    }, 500);
+    onClose();
+    onCompleted?.(record);
   };
 
   return (

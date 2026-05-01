@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight, Crosshair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { calculateBias } from '@/lib/biasEngine';
@@ -11,7 +11,7 @@ import { getLocks } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import WhyThisTrade from '@/components/bias/WhyThisTrade';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
-import DebugPanel from '@/components/DebugPanel';
+
 
 
 const gradeColors = {
@@ -169,26 +169,13 @@ function FilterBar({ filters, onChange }) {
   );
 }
 
-function Crosshair(props) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="12" r="10" />
-      <line x1="22" y1="12" x2="18" y2="12" />
-      <line x1="6" y1="12" x2="2" y2="12" />
-      <line x1="12" y1="6" x2="12" y2="2" />
-      <line x1="12" y1="22" x2="12" y2="18" />
-    </svg>
-  );
-}
-
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeAssets, setActiveAssets] = useState({});
   const [timeToNextHour, setTimeToNextHour] = useState('');
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [completeAnalysis, setCompleteAnalysis] = useState(null);
-  const [completedTrade, setCompletedTrade] = useState(null);
-  const [isCompletingTrade, setIsCompletingTrade] = useState(false);
+  const [lastCompletedTrade, setLastCompletedTrade] = useState(null);
   const [settings, setSettings] = useState(getSettings());
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(() => {
@@ -271,29 +258,19 @@ export default function Dashboard() {
   };
 
   const handleTradeCompleted = (record) => {
-    console.log("PB_DEBUG_DASHBOARD_COMPLETION_HANDLER", {
-      recordId: record?.id,
-      instrument: record?.instrument,
-      timestamp: new Date().toISOString(),
-    });
-
     setCompleteAnalysis(null);
-    setIsCompletingTrade(false);
+    setLastCompletedTrade(record);
+    // Reload active assets to reflect the removed analysis
+    const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
+    Object.keys(active).forEach(key => {
+      if (active[key]?.inputs) {
+        active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null);
+      }
+    });
+    setActiveAssets(active);
   };
 
   let analyses = Object.values(activeAssets);
-
-  // DEBUG: Browser-visible load log
-  const locks = getLocks(); // Auto-cleans invalid entries
-  console.log("PB_DEBUG_DASHBOARD_LOAD", {
-    primebias_active: JSON.parse(localStorage.getItem('primebias_active') || '{}'),
-    completedAnalysisLocks: locks,
-    visibleAssets: analyses.map(a => ({
-      instrument: a.instrument,
-      analysisId: a.analysisId,
-    })),
-    timestamp: new Date().toISOString(),
-  });
 
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
   if (filters.filterHideWait) analyses = analyses.filter(a => a.results?.tradeAction !== 'WAIT');
@@ -307,14 +284,44 @@ export default function Dashboard() {
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
-  if (isCompletingTrade) {
+  // Show trade completion success card if last trade was just completed
+  if (Object.values(activeAssets).length === 0 && lastCompletedTrade) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center">
-        <div className="text-sm text-muted-foreground">Saving trade…</div>
-      </div>
+      <>
+        <div className="p-4 space-y-4 pb-24">
+          <div className="pt-8 flex flex-col items-center justify-center min-h-[60vh] text-center">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 flex items-center justify-center mb-4 border border-emerald-500/30">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h1 className="text-lg font-bold mb-1">Trade Saved</h1>
+            <p className="text-sm text-muted-foreground mb-6">
+              {lastCompletedTrade.instrument} saved as <span className="font-semibold text-foreground">{lastCompletedTrade.result.toUpperCase()}</span>
+            </p>
+            <div className="flex flex-col gap-2 w-full max-w-xs">
+              <Button variant="default" className="rounded-full" onClick={() => navigate('/trade-history')}>
+                View Trade History
+              </Button>
+              <Button variant="outline" className="rounded-full" onClick={() => navigate('/journal')}>
+                Add Journal Note
+              </Button>
+              <Button variant="outline" className="rounded-full" onClick={() => navigate('/input')}>
+                New Analysis
+              </Button>
+            </div>
+          </div>
+        </div>
+        {completeAnalysis && (
+          <CompleteTradeModal
+            analysis={completeAnalysis}
+            onClose={() => setCompleteAnalysis(null)}
+            onCompleted={handleTradeCompleted}
+          />
+        )}
+      </>
     );
   }
 
+  // Show empty state only if no active trades and no recently completed trade
   if (Object.values(activeAssets).length === 0) {
     return (
       <>
@@ -323,7 +330,7 @@ export default function Dashboard() {
             <Crosshair className="w-10 h-10 text-muted-foreground" />
           </div>
           <h1 className="text-xl font-bold mb-2">No Active Analyses</h1>
-          <p className="text-muted-foreground text-sm mb-6">All trades completed. Add new assets in the Bias Tool to continue.</p>
+          <p className="text-muted-foreground text-sm mb-6">Add new assets in the Bias Tool to continue.</p>
           <div className="flex gap-3">
             <Button variant="outline" className="rounded-full" onClick={() => navigate('/trade-history')}>Trade History</Button>
             <Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button>
@@ -433,8 +440,6 @@ export default function Dashboard() {
           onCompleted={handleTradeCompleted}
         />
       )}
-
-      <DebugPanel />
-      </div>
-      );
-      }
+    </div>
+  );
+}

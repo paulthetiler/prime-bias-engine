@@ -69,29 +69,20 @@ export function unlockAnalysis(analysisId) {
 /**
  * completeTrade(analysis, result, details?)
  *
- * analysis MUST have a unique analysisId. If not, one is generated.
- * 1. Save to DB first (so if it fails, nothing is removed from the UI)
- * 2. Lock the analysisId (prevents this specific analysis from re-rendering)
+ * 1. Save to DB first
+ * 2. Lock the analysisId
  * 3. Return the saved record
  *
- * NOTE: Active removal is handled separately by removeCompletedActiveAnalysis()
+ * NOTE: Active removal is handled by Dashboard after the modal closes
  */
 export async function completeTrade(analysis, result, details = {}) {
   const { instrument, results, targetInfo, inputs, extraCheck, timestamp, analysisId } = analysis || {};
   if (!instrument) throw new Error('No instrument on analysis');
   if (!result)     throw new Error('No result provided');
 
-  // Generate analysisId if not present
   const id = analysisId || generateAnalysisId(instrument);
 
-  console.log("PB_DEBUG_COMPLETE_TRADE_START", {
-    instrument,
-    analysisId: id,
-    result,
-    timestamp: new Date().toISOString(),
-  });
-
-  // 1. Save to DB FIRST — so if this fails, nothing is removed from the UI
+  // Save to DB
   const alignment = calcAlignment(results || {});
   const record = await base44.entities.CompletedTrade.create({
     instrument,
@@ -123,13 +114,7 @@ export async function completeTrade(analysis, result, details = {}) {
     screenshot_url:   details.screenshotUrl || null,
   });
 
-  console.log("PB_DEBUG_COMPLETE_TRADE_DB_SAVED", {
-    recordId: record.id,
-    instrument: record.instrument,
-    result: record.result,
-  });
-
-  // 2. Lock this specific analysisId
+  // Lock this analysisId
   lockAnalysis(id);
 
   return record;
