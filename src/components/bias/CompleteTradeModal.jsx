@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { X, Loader2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ const RESULTS = [
 
 // ── Quick mode ────────────────────────────────────────────────────────────────
 function QuickCompleteModal({ analysis, onClose, onCompleted }) {
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [savedRecord, setSavedRecord] = useState(null);
   const [showJournal, setShowJournal] = useState(false);
@@ -67,21 +69,23 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       duration: 6000,
     });
 
-    // Close the modal FIRST (removes completeAnalysis from Dashboard state)
-    onCompleted();
-
-    // Then show journal flow as a separate overlay
-    // We do this by storing the record and letting the parent re-render with journal
-    // Since onCompleted closes this modal, show journal via a queued state update
-    setSavedRecord(record); // still set so we can hand off if needed
+    // Close the modal and open journal flow with the saved record
+    onClose();
+    setShowJournal(true);
   };
 
   if (showJournal && savedRecord) {
     return (
       <TradeJournalFlow
         trade={savedRecord}
-        onClose={onCompleted}
-        onDone={onCompleted}
+        onClose={() => {
+          onCompleted();
+          navigate('/trade-history');
+        }}
+        onDone={() => {
+          onCompleted();
+          navigate('/trade-history');
+        }}
       />
     );
   }
@@ -151,6 +155,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
 
 // ── Detailed mode ─────────────────────────────────────────────────────────────
 function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
+  const navigate = useNavigate();
   const [result, setResult] = useState('');
   const [entry, setEntry] = useState('');
   const [exit, setExit] = useState('');
@@ -201,8 +206,8 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     });
     setSaving(false);
 
-    // Close Dashboard modal immediately, then show journal flow
-    onCompleted();
+    // Close and open journal flow
+    onClose();
     setShowJournal(true);
   };
 
@@ -210,8 +215,14 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     return (
       <TradeJournalFlow
         trade={savedTradeRef.current}
-        onClose={onCompleted}
-        onDone={onCompleted}
+        onClose={() => {
+          onCompleted();
+          navigate('/trade-history');
+        }}
+        onDone={() => {
+          onCompleted();
+          navigate('/trade-history');
+        }}
       />
     );
   }
