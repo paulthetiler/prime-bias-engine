@@ -8,31 +8,40 @@ import { toast } from 'sonner';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function buildTradeNote(analysis) {
+const RESULT_LABELS = {
+  win: '✅ WIN',
+  loss: '❌ LOSS',
+  breakeven: '➖ BREAK EVEN',
+  not_taken: '🚫 NOT TAKEN',
+};
+
+function buildTradeNote(analysis, result) {
   const { instrument, results, targetInfo } = analysis;
   if (!results) return '';
   const { mainDirection, grade, status, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, winningScore } = results;
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const target = targetInfo?.target ? targetInfo.target.toFixed(4) : '—';
+  const resultLine = result ? `Result: ${RESULT_LABELS[result] || result}` : '';
 
   return [
     `📍 ${instrument} — ${dateStr}`,
+    resultLine,
     `Direction: ${mainDirection} | Grade: ${grade} (${status}) | Score: ${winningScore}`,
     `Target: ${target}`,
     `Deep: ${deepTrend} (${deepStrength}) | DD: ${ddBias} (${ddStrength}) | Now: ${nowBias} (${nowStrength})`,
     ``,
     `Notes: `,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
-export default function TradeJournalModal({ analysis, onClose }) {
+export default function TradeJournalModal({ analysis, result, onClose }) {
   const qc = useQueryClient();
   const now = new Date();
   const currentMonth = MONTHS[now.getMonth()];
   const currentYear = now.getFullYear();
 
-  const [note, setNote] = useState(buildTradeNote(analysis));
+  const [note, setNote] = useState(buildTradeNote(analysis, result));
   const [saving, setSaving] = useState(false);
 
   const { data: entries = [], isLoading } = useQuery({
@@ -94,11 +103,12 @@ export default function TradeJournalModal({ analysis, onClose }) {
 
         <div className="p-4 space-y-4">
           {/* Trade snapshot */}
-          <div className="rounded-xl bg-secondary/50 border border-border px-3 py-2.5 flex items-center gap-4 text-xs">
+          <div className="rounded-xl bg-secondary/50 border border-border px-3 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
             <span className="font-bold text-sm text-foreground">{instrument}</span>
             <span className={cn('font-bold', dirColor)}>{results?.mainDirection}</span>
             <span className="text-muted-foreground">Grade <span className="text-foreground font-semibold">{results?.grade}</span></span>
             <span className="text-muted-foreground">Score <span className="font-mono text-foreground font-semibold">{results?.winningScore}</span></span>
+            {result && <span className="font-semibold text-foreground">{RESULT_LABELS[result]}</span>}
           </div>
 
           {/* Note editor */}

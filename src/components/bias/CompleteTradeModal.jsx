@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
-import { X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Loader2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { calcAlignment } from '@/lib/alignmentUtils';
 import { toast } from 'sonner';
 import { getSettings } from '@/lib/userSettings';
+import TradeJournalModal from '@/components/journal/TradeJournalModal';
 
 const RESULTS = [
   { value: 'win',       label: 'WIN',       emoji: '✅', color: 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
@@ -59,16 +60,10 @@ async function saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes
 
 // ── Quick mode: one-tap flow ─────────────────────────────────────────────────
 function QuickCompleteModal({ analysis, onClose, onCompleted }) {
-  const [phase, setPhase] = useState('pick'); // 'pick' | 'details'
+  const [phase, setPhase] = useState('pick'); // 'pick' | 'journal_prompt'
   const [selectedResult, setSelectedResult] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  // optional details
-  const [entry, setEntry] = useState('');
-  const [exit, setExit] = useState('');
-  const [pnl, setPnl] = useState('');
-  const [exitReason, setExitReason] = useState('');
-  const [notes, setNotes] = useState('');
+  const [showJournal, setShowJournal] = useState(false);
   const savedRecordRef = useRef(null);
 
   if (!analysis) return null;
@@ -81,7 +76,6 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     const record = await saveTrade({ analysis, result: resultValue, entry: '', exit: '', pnl: '', exitReason: '', notes: '', screenshotUrl: '' });
     savedRecordRef.current = record;
     setSaving(false);
-    setPhase('followup');
 
     const label = RESULTS.find(r => r.value === resultValue)?.label || resultValue;
     toast(`${instrument} — ${label}`, {
@@ -92,7 +86,6 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
           if (savedRecordRef.current?.id) {
             await base44.entities.CompletedTrade.delete(savedRecordRef.current.id);
           }
-          // Restore to active
           const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
           active[instrument] = analysis;
           localStorage.setItem('primebias_active', JSON.stringify(active));
@@ -103,22 +96,19 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       },
       duration: 6000,
     });
+
+    setPhase('journal_prompt');
   };
 
-  const handleAddDetails = async () => {
-    if (!savedRecordRef.current?.id) return;
-    setSaving(true);
-    await base44.entities.CompletedTrade.update(savedRecordRef.current.id, {
-      entry_price: entry ? parseFloat(entry) : null,
-      exit_price: exit ? parseFloat(exit) : null,
-      pnl: pnl ? parseFloat(pnl) : null,
-      exit_reason: exitReason || null,
-      notes: notes || null,
-    });
-    setSaving(false);
-    toast.success('Details added');
-    onCompleted();
-  };
+  if (showJournal) {
+    return (
+      <TradeJournalModal
+        analysis={analysis}
+        result={selectedResult}
+        onClose={onCompleted}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={phase === 'pick' ? onClose : undefined}>
@@ -151,84 +141,54 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
 
         <div className="px-4 pb-5 space-y-3">
           {phase === 'pick' && (
-            <>
-              {saving ? (
-                <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Saving…
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {RESULTS.map(r => (
-                    <button
-                      key={r.value}
-                      onClick={() => handlePick(r.value)}
-                      className={cn(
-                        'rounded-xl border-2 py-4 text-sm font-bold transition-all active:scale-95',
-                        'border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary/5'
-                      )}
-                    >
-                      <div className="text-2xl mb-1">{r.emoji}</div>
-                      <div>{r.label}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
+            saving ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Saving…
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {RESULTS.map(r => (
+                  <button
+                    key={r.value}
+                    onClick={() => handlePick(r.value)}
+                    className={cn(
+                      'rounded-xl border-2 py-4 text-sm font-bold transition-all active:scale-95',
+                      'border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary/5'
+                    )}
+                  >
+                    <div className="text-2xl mb-1">{r.emoji}</div>
+                    <div>{r.label}</div>
+                  </button>
+                ))}
+              </div>
+            )
           )}
 
-          {phase === 'followup' && (
+          {phase === 'journal_prompt' && (
             <div className="space-y-3">
               {/* Confirmation */}
-              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-300 font-semibold text-center">
-                {RESULTS.find(r => r.value === selectedResult)?.emoji} {RESULTS.find(r => r.value === selectedResult)?.label} — saved!
+              <div className={cn(
+                'rounded-xl px-3 py-3 text-sm font-semibold text-center border',
+                selectedResult === 'win' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' :
+                selectedResult === 'loss' ? 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300' :
+                selectedResult === 'breakeven' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:text-yellow-300' :
+                'bg-secondary border-border text-muted-foreground'
+              )}>
+                {RESULTS.find(r => r.value === selectedResult)?.emoji} {RESULTS.find(r => r.value === selectedResult)?.label} — saved to history
               </div>
 
-              {/* Optional details toggle */}
-              <button
-                onClick={() => setShowDetails(d => !d)}
-                className="w-full flex items-center justify-between rounded-lg border border-border px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <span>Add details (optional)</span>
-                {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-
-              {showDetails && (
-                <div className="space-y-2.5 border border-border rounded-xl p-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[11px] text-muted-foreground block mb-1">Entry Price</label>
-                      <input type="number" step="any" value={entry} onChange={e => setEntry(e.target.value)} placeholder="1.2500"
-                        className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-muted-foreground block mb-1">Exit Price</label>
-                      <input type="number" step="any" value={exit} onChange={e => setExit(e.target.value)} placeholder="1.2600"
-                        className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">P&L</label>
-                    <input type="number" step="any" value={pnl} onChange={e => setPnl(e.target.value)} placeholder="+50 or -25"
-                      className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Notes</label>
-                    <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="What happened?" rows={2}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                {showDetails && (
-                  <Button className="flex-1" onClick={handleAddDetails} disabled={saving}>
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Details'}
+              {/* Journal prompt */}
+              <div className="rounded-xl border border-border bg-secondary/40 px-4 py-4 text-center space-y-3">
+                <div className="text-sm font-semibold text-foreground">Add this trade to your journal?</div>
+                <div className="text-xs text-muted-foreground">Pre-filled with instrument, grade, setup, and result</div>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={onCompleted}>Skip</Button>
+                  <Button className="flex-1 gap-2" onClick={() => setShowJournal(true)}>
+                    <BookOpen className="w-4 h-4" />
+                    Yes, journal it
                   </Button>
-                )}
-                <Button variant={showDetails ? 'outline' : 'default'} className="flex-1" onClick={onCompleted}>
-                  {showDetails ? 'Skip' : 'Done'}
-                </Button>
+                </div>
               </div>
             </div>
           )}
@@ -247,6 +207,9 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
   const [exitReason, setExitReason] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showJournal, setShowJournal] = useState(false);
+  const [savedResult, setSavedResult] = useState(null);
+  const [phase, setPhase] = useState('form'); // 'form' | 'journal_prompt'
 
   if (!analysis) return null;
   const { instrument, results } = analysis;
@@ -257,8 +220,13 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     await saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes, screenshotUrl: '' });
     toast.success(`${instrument} saved to Trade History`);
     setSaving(false);
-    onCompleted();
+    setSavedResult(result);
+    setPhase('journal_prompt');
   };
+
+  if (showJournal) {
+    return <TradeJournalModal analysis={analysis} result={savedResult} onClose={onCompleted} />;
+  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
@@ -322,12 +290,28 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button className="flex-1" onClick={handleSave} disabled={saving || !result}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save to History'}
-            </Button>
-          </div>
+          {phase === 'form' && (
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+              <Button className="flex-1" onClick={handleSave} disabled={saving || !result}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save to History'}
+              </Button>
+            </div>
+          )}
+
+          {phase === 'journal_prompt' && (
+            <div className="rounded-xl border border-border bg-secondary/40 px-4 py-4 text-center space-y-3">
+              <div className="text-sm font-semibold text-foreground">Add this trade to your journal?</div>
+              <div className="text-xs text-muted-foreground">Pre-filled with instrument, grade, setup, and result</div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={onCompleted}>Skip</Button>
+                <Button className="flex-1 gap-2" onClick={() => setShowJournal(true)}>
+                  <BookOpen className="w-4 h-4" />
+                  Yes, journal it
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
