@@ -49,12 +49,18 @@ async function saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes
     screenshot_url: screenshotUrl || null,
   });
 
-  // Remove from active set — dispatch AFTER removal so dashboard doesn't re-show the card
+  // Remove from active set atomically
   const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
   delete active[instrument];
   localStorage.setItem('primebias_active', JSON.stringify(active));
-  // Defer dispatch so modal state updates first, preventing re-open race
-  setTimeout(() => window.dispatchEvent(new Event('biasUpdated')), 100);
+
+  // If Input page has this instrument selected, clear it so Input doesn't re-write it back
+  if (localStorage.getItem('primebias_instrument') === instrument) {
+    localStorage.removeItem('primebias_instrument');
+  }
+
+  // Dispatch synchronously — localStorage is already correct before this fires
+  window.dispatchEvent(new Event('biasUpdated'));
 
   return record;
 }

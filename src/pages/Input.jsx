@@ -86,6 +86,25 @@ export default function Input() {
     return () => window.removeEventListener('atrUpdated', reload);
   }, []);
 
+  // ── External removal listener (e.g. trade completed from Dashboard) ────────
+  useEffect(() => {
+    const onBiasUpdated = () => {
+      // If the current instrument was removed from primebias_active externally, clear it
+      const savedInstrument = localStorage.getItem('primebias_instrument');
+      if (!savedInstrument && instrument) {
+        // primebias_instrument was cleared externally (by saveTrade) — clear local state
+        isLoadingRef.current = true;
+        setInstrument('');
+        setInputs(getDefaultInputs());
+        setExtraCheck({ h1: null, m15: null });
+        Promise.resolve().then(() => { isLoadingRef.current = false; });
+      }
+    };
+    window.addEventListener('biasUpdated', onBiasUpdated);
+    return () => window.removeEventListener('biasUpdated', onBiasUpdated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instrument]);
+
   // ── Timer countdown ────────────────────────────────────────────────────────
   useEffect(() => {
     const tick = () => {
@@ -160,9 +179,17 @@ export default function Input() {
     setTargetInfo(targetData);
 
     // ── Persist to localStorage immediately ──
-    // Always write, regardless of whether this is a load or a user edit.
-    // This ensures the active store is always up-to-date.
+    // Skip if the instrument was externally removed (e.g. completed from Dashboard).
+    // This prevents Input from silently re-adding a completed trade back to the active set.
     const active = getActiveStore();
+    const existsInActive = instrument in active;
+    const isSelectedInStorage = localStorage.getItem('primebias_instrument') === instrument;
+
+    if (!existsInActive && !isSelectedInStorage && !isLoadingRef.current) {
+      // Instrument was completed/removed externally — don't re-add it
+      return;
+    }
+
     active[instrument] = {
       instrument,
       inputs,

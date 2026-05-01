@@ -205,6 +205,12 @@ export default function Dashboard() {
         }
       });
       setActiveAssets(active);
+
+      // If a modal is open for an instrument that no longer exists in active, close it
+      setCompleteAnalysis(prev => {
+        if (prev && !(prev.instrument in active)) return null;
+        return prev;
+      });
     };
     load();
     window.addEventListener('biasUpdated', load);
@@ -213,6 +219,7 @@ export default function Dashboard() {
       window.removeEventListener('biasUpdated', load);
       window.removeEventListener('storage', load);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
