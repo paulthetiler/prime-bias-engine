@@ -1,12 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { BarChart3, Timer, BookMarked, Settings } from 'lucide-react';
+import { BarChart3, Timer, Settings } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/engine', icon: BarChart3, label: 'Engine' },
   { path: '/atr', icon: Timer, label: 'ATR' },
-  { path: '/trade-history', icon: BookMarked, label: 'Trades' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

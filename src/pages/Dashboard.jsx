@@ -330,7 +330,7 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold mb-2">No Active Analyses</h1>
           <p className="text-muted-foreground text-sm mb-6">Add new assets in the Bias Tool to continue.</p>
           <div className="flex gap-3">
-            <Button variant="outline" className="rounded-full" onClick={() => navigate('/trade-history')}>Trade History</Button>
+
             <Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button>
           </div>
         </div>
