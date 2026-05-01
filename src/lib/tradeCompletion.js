@@ -8,23 +8,57 @@ import { calcAlignment } from '@/lib/alignmentUtils';
 const ACTIVE_KEY = 'primebias_active';
 const LOCKS_KEY  = 'primebias_completed_locks'; // set of completed analysisIds
 
+// ── Validation helpers ───────────────────────────────────────────────────────
+
+function isValidAnalysisId(id) {
+  // Valid format: "INSTRUMENT-YYYY-MM-DD-HHMMSS-suffix"
+  // Must contain at least one "-"
+  return typeof id === 'string' && id.includes('-');
+}
+
+function purgeInvalidLocks(locks) {
+  const clean = {};
+  Object.entries(locks).forEach(([id, timestamp]) => {
+    if (isValidAnalysisId(id)) {
+      clean[id] = timestamp;
+    }
+  });
+  return clean;
+}
+
 // ── Lock helpers ──────────────────────────────────────────────────────────────
 
 export function getLocks() {
-  try { return JSON.parse(localStorage.getItem(LOCKS_KEY) || '{}'); } catch { return {}; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(LOCKS_KEY) || '{}');
+    const clean = purgeInvalidLocks(raw);
+    // If we had to clean, save the cleaned version
+    if (Object.keys(clean).length !== Object.keys(raw).length) {
+      localStorage.setItem(LOCKS_KEY, JSON.stringify(clean));
+    }
+    return clean;
+  } catch { 
+    return {}; 
+  }
 }
 
 export function isAnalysisLocked(analysisId) {
+  if (!isValidAnalysisId(analysisId)) return false;
   return analysisId in getLocks();
 }
 
 export function lockAnalysis(analysisId) {
+  if (!isValidAnalysisId(analysisId)) {
+    console.warn('Refusing to lock invalid analysisId:', analysisId);
+    return;
+  }
   const locks = getLocks();
   locks[analysisId] = Date.now();
   localStorage.setItem(LOCKS_KEY, JSON.stringify(locks));
 }
 
 export function unlockAnalysis(analysisId) {
+  if (!isValidAnalysisId(analysisId)) return;
   const locks = getLocks();
   delete locks[analysisId];
   localStorage.setItem(LOCKS_KEY, JSON.stringify(locks));
@@ -147,12 +181,20 @@ export async function undoCompletion(analysisId, recordId) {
 }
 
 /**
- * Generate a unique analysis ID
+ * Generate a unique analysis ID with proper format
+ * Format: INSTRUMENT-YYYY-MM-DD-HHMMSS-randomsuffix
  */
 export function generateAnalysisId(instrument) {
   const now = new Date();
-  const date = now.toISOString().split('T')[0];
-  const time = now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
+  const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const time = now.toISOString().split('T')[1].split('.')[0].replace(/:/g, ''); // HHMMSS
   const rand = Math.random().toString(36).substring(2, 8);
-  return `${instrument}-${date}-${time}-${rand}`;
+  const id = `${instrument}-${date}-${time}-${rand}`;
+  
+  // Validate our own output
+  if (!isValidAnalysisId(id)) {
+    console.error('Generated invalid analysisId:', id);
+  }
+  
+  return id;
 }

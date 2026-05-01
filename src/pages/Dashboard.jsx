@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { calculateBias } from '@/lib/biasEngine';
 import { calcAlignment } from '@/lib/alignmentUtils';
 import { getSettings } from '@/lib/userSettings';
+import { getLocks } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import WhyThisTrade from '@/components/bias/WhyThisTrade';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
@@ -253,7 +254,7 @@ export default function Dashboard() {
   let analyses = Object.values(activeAssets);
 
   // DEBUG: Browser-visible load log
-  const locks = JSON.parse(localStorage.getItem('primebias_completed_locks') || '{}');
+  const locks = getLocks(); // Auto-cleans invalid entries
   console.log("PB_DEBUG_DASHBOARD_LOAD", {
     primebias_active: JSON.parse(localStorage.getItem('primebias_active') || '{}'),
     completedAnalysisLocks: locks,
