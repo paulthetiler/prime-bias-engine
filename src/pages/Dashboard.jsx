@@ -301,9 +301,7 @@ export default function Dashboard() {
               <Button variant="default" className="rounded-full" onClick={() => navigate('/trade-history')}>
                 View Trade History
               </Button>
-              <Button variant="outline" className="rounded-full" onClick={() => navigate('/journal')}>
-                Add Journal Note
-              </Button>
+
               <Button variant="outline" className="rounded-full" onClick={() => navigate('/input')}>
                 New Analysis
               </Button>
