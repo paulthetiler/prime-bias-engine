@@ -74,7 +74,7 @@ function Analytics({ trades }) {
   );
 }
 
-function TradeDetailModal({ trade, onClose, onRestore, onArchive }) {
+function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete }) {
   if (!trade) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
@@ -140,13 +140,18 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive }) {
           )}
 
           {/* Actions */}
-          <div className="flex gap-2 pt-1">
-            <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => onRestore(trade)}>
+          <div className="flex flex-col gap-2 pt-1">
+            <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => onRestore(trade)}>
               <RotateCcw className="w-3.5 h-3.5" /> Restore to Summary
             </Button>
-            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive gap-1.5" onClick={() => onArchive(trade)}>
-              <Trash2 className="w-3.5 h-3.5" /> Archive
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" className="flex-1 text-destructive hover:text-destructive gap-1.5" onClick={() => onArchive(trade)}>
+                <Trash2 className="w-3.5 h-3.5" /> Archive
+              </Button>
+              <Button variant="ghost" size="sm" className="flex-1 text-destructive hover:text-destructive gap-1.5" onClick={() => onDelete(trade)}>
+                <X className="w-3.5 h-3.5" /> Delete
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -181,6 +186,11 @@ export default function TradeHistory() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['completedTrades'] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.CompletedTrade.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['completedTrades'] }),
+  });
+
   const handleRestore = async (trade) => {
     // Put back into active localStorage
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
@@ -202,6 +212,12 @@ export default function TradeHistory() {
     await updateMutation.mutateAsync({ id: trade.id, data: { status: 'archived' } });
     setSelected(null);
     toast.success('Trade archived');
+  };
+
+  const handleDelete = async (trade) => {
+    await deleteMutation.mutateAsync(trade.id);
+    setSelected(null);
+    toast.success('Trade deleted');
   };
 
   const assets = [...new Set(trades.map(t => t.instrument))].sort();
@@ -370,6 +386,7 @@ export default function TradeHistory() {
           onClose={() => setSelected(null)}
           onRestore={handleRestore}
           onArchive={handleArchive}
+          onDelete={handleDelete}
         />
       )}
 
