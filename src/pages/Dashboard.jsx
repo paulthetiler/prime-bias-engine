@@ -5,7 +5,7 @@ import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { calculateBias } from '@/lib/biasEngine';
-import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
+import { calcAlignment } from '@/lib/alignmentUtils';
 import { getSettings } from '@/lib/userSettings';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import WhyThisTrade from '@/components/bias/WhyThisTrade';
@@ -43,91 +43,99 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
   if (!results) return null;
 
   const {
-    mainDirection, grade, tradeAction, status,
-    deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, winningScore,
+    mainDirection, grade, gradeLabel, tradeAction, status,
+    deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength,
   } = results;
 
-  const alignment = calcAlignment(results);
   const dirColor = mainDirection === 'BUY' ? 'text-emerald-600 dark:text-emerald-400'
     : mainDirection === 'SELL' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
-  const dirBorder = mainDirection === 'BUY' ? 'border-emerald-500/40'
-    : mainDirection === 'SELL' ? 'border-red-500/40' : 'border-border';
+  const dirBorder = mainDirection === 'BUY' ? 'border-emerald-500/30'
+    : mainDirection === 'SELL' ? 'border-red-500/30' : 'border-border';
+
+  const statusBadge = status === 'Ready' || status === 'Scalp'
+    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+    : status === 'Wait' || status === 'Weak'
+    ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
+    : 'bg-secondary text-muted-foreground border-border';
+
+  const targetDisplay = targetInfo?.target ? targetInfo.target.toFixed(4) : '—';
 
   return (
     <div
       className={cn(
-        'rounded-xl border bg-card p-4 space-y-3 cursor-pointer transition-all select-none',
-        'hover:border-primary/40 active:scale-[0.98] active:bg-accent/50',
-        pressed ? 'scale-[0.98] bg-accent/50' : '',
+        'rounded-xl border bg-card cursor-pointer transition-all select-none overflow-hidden',
+        'hover:border-primary/40 active:scale-[0.98] active:opacity-90',
+        pressed ? 'scale-[0.98] opacity-90' : '',
         dirBorder
       )}
       onClick={() => onOpen(analysis)}
       onTouchStart={() => setPressed(true)}
-      onTouchEnd={() => { setPressed(false); }}
+      onTouchEnd={() => setPressed(false)}
     >
-      {/* Row 1: Name + Direction + Action + Chevron */}
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <div className="font-bold text-sm">{instrument}</div>
-          <div className={cn('text-2xl font-bold leading-tight', dirColor)}>{mainDirection}</div>
+      {/* Asset name row */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <span className="font-bold text-sm tracking-tight">{instrument}</span>
+        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+      </div>
+
+      {/* Split layout */}
+      <div className="flex min-h-[100px] border-t border-border/50">
+        {/* Left — Grade */}
+        <div className="flex flex-col items-center justify-center px-4 py-3 bg-secondary/50 border-r border-border/50 min-w-[80px]">
+          <span className="text-4xl font-black tracking-tight text-foreground leading-none">{grade}</span>
+          <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight">{gradeLabel}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col items-end gap-1.5">
-            <div className={cn('px-3 py-1 rounded-lg text-xs font-bold', actionColors[tradeAction])}>
+
+        {/* Right — Decision info */}
+        <div className="flex flex-col justify-center px-4 py-3 flex-1 gap-2">
+          {/* Status badge */}
+          <span className={cn('self-start text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
+            {status}
+          </span>
+
+          {/* Grid rows */}
+          <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '1fr minmax(90px, auto)', columnGap: '12px' }}>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Direction</span>
+            <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
+
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Action</span>
+            <span className={cn('text-xs font-bold px-1.5 py-0.5 rounded self-start w-fit', actionColors[tradeAction])}>
               {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
-            </div>
-            <div className={cn('text-xs font-semibold', gradeColors[grade])}>
-              Grade {grade} <span className="text-muted-foreground font-normal">· {status}</span>
-            </div>
+            </span>
+
+            {settings.showTarget && (
+              <>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Target</span>
+                <span className="text-xs font-mono font-semibold text-foreground">{targetDisplay}</span>
+              </>
+            )}
           </div>
-          {/* Chevron — always visible, signals tappability */}
-          <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 -mr-1" />
         </div>
       </div>
 
-      {/* Row 2: Block breakdown */}
+      {/* Block breakdown */}
       {!compact && (
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 px-3 py-2.5 border-t border-border/40 bg-secondary/20">
           <TrendPill label="Deep" dir={deepTrend} strength={deepStrength} />
           <TrendPill label="DD" dir={ddBias} strength={ddStrength} />
           <TrendPill label="Now" dir={nowBias} strength={nowStrength} />
         </div>
       )}
 
-      {/* Row 3: Metrics + Tap hint (mobile only) */}
-      <div className="flex items-center gap-3 text-xs">
-        {settings.showScore && (
-          <span className="text-muted-foreground">
-            Score <span className="text-foreground font-mono font-semibold">{winningScore}</span>
-          </span>
-        )}
-        {settings.showTarget && targetInfo?.target && (
-          <span className="text-muted-foreground">
-            Target <span className="text-foreground font-mono font-semibold">{targetInfo.target.toFixed(4)}</span>
-          </span>
-        )}
-        {settings.showAlignment && (
-          <span className={cn('font-semibold', alignmentColor(alignment.label))}>
-            {alignment.label}
-          </span>
-        )}
-        {/* "Tap for details" — mobile only, fills remaining space */}
-        <span className="ml-auto text-[10px] text-muted-foreground/50 md:hidden">
-          Tap for details →
-        </span>
-      </div>
-
-      {/* View full decision hint + Complete Trade */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>View full decision →</span>
+      {/* Bottom bar — hint + complete */}
+      <div
+        className="flex items-center justify-between px-3 py-2 border-t border-border/40 bg-secondary/10"
+        onClick={e => e.stopPropagation()}
+      >
+        <span className="text-[10px] text-muted-foreground/50">Tap for full breakdown</span>
         <button
           onClick={(e) => {
             e.stopPropagation();
             onComplete(analysis);
           }}
-          className="flex items-center gap-2 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 px-3 py-2 font-semibold text-muted-foreground hover:text-primary transition-colors"
+          className="flex items-center gap-1.5 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
         >
-          <CheckCircle2 className="w-3.5 h-3.5" />
+          <CheckCircle2 className="w-3 h-3" />
           Complete
         </button>
       </div>
