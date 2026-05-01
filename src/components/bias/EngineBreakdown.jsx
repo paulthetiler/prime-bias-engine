@@ -72,7 +72,7 @@ function Section({ title, subtitle, children }) {
 
 function TFRow({ tf, data }) {
   if (!data) return null;
-  const { indicators, total, result, bias } = data;
+  const { indicators = {}, total, result, bias } = data;
   const biasColor = bias === 'BUY' ? 'text-emerald-400' : bias === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
 
   return (
