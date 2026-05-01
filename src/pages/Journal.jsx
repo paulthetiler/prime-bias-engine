@@ -22,7 +22,7 @@ export default function Journal() {
   });
 
   const entries = allEntries
-    .filter(e => e.year === selectedYear)
+    .filter(e => Number(e.year) === Number(selectedYear))
     .sort((a, b) => {
       const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
       return MONTHS.indexOf(b.month) - MONTHS.indexOf(a.month);

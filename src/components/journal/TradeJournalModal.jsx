@@ -49,7 +49,7 @@ export default function TradeJournalModal({ analysis, result, onClose }) {
     queryFn: () => base44.entities.MonthlyJournal.list('-year', 200),
   });
 
-  const existingEntry = entries.find(e => e.month === currentMonth && e.year === currentYear);
+  const existingEntry = entries.find(e => e.month === currentMonth && Number(e.year) === currentYear);
 
   const handleSave = async () => {
     setSaving(true);
