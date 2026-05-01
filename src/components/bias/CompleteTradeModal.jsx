@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { calcAlignment } from '@/lib/alignmentUtils';
 import { toast } from 'sonner';
 import { getSettings } from '@/lib/userSettings';
-import TradeJournalModal from '@/components/journal/TradeJournalModal';
+import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 
 const RESULTS = [
   { value: 'win',       label: 'WIN',       emoji: '✅', color: 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
@@ -109,10 +109,10 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
 
   if (showJournal) {
     return (
-      <TradeJournalModal
-        analysis={analysis}
-        result={selectedResult}
+      <TradeJournalFlow
+        trade={savedRecordRef.current}
         onClose={onCompleted}
+        onDone={onCompleted}
       />
     );
   }
@@ -217,6 +217,7 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
   const [showJournal, setShowJournal] = useState(false);
   const [savedResult, setSavedResult] = useState(null);
   const [phase, setPhase] = useState('form'); // 'form' | 'journal_prompt'
+  const savedTradeRef = useRef(null);
 
   if (!analysis) return null;
   const { instrument, results } = analysis;
@@ -224,15 +225,22 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
   const handleSave = async () => {
     if (!result) { toast.error('Please select a result'); return; }
     setSaving(true);
-    await saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes, screenshotUrl: '' });
+    const record = await saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes, screenshotUrl: '' });
+    savedTradeRef.current = record;
     toast.success(`${instrument} saved to Trade History`);
     setSaving(false);
     setSavedResult(result);
     setPhase('journal_prompt');
   };
 
-  if (showJournal) {
-    return <TradeJournalModal analysis={analysis} result={savedResult} onClose={onCompleted} />;
+  if (showJournal && savedTradeRef.current) {
+    return (
+      <TradeJournalFlow
+        trade={savedTradeRef.current}
+        onClose={onCompleted}
+        onDone={onCompleted}
+      />
+    );
   }
 
   return (

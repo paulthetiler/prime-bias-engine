@@ -1,0 +1,90 @@
+{
+  "name": "TradeJournalEntry",
+  "type": "object",
+  "properties": {
+    "completed_trade_id": {
+      "type": "string",
+      "description": "ID of the linked CompletedTrade record"
+    },
+    "instrument": {
+      "type": "string"
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "win",
+        "loss",
+        "breakeven",
+        "not_taken"
+      ]
+    },
+    "direction": {
+      "type": "string"
+    },
+    "grade": {
+      "type": "string"
+    },
+    "score": {
+      "type": "number"
+    },
+    "trade_status": {
+      "type": "string"
+    },
+    "trade_action": {
+      "type": "string"
+    },
+    "target": {
+      "type": "number"
+    },
+    "alignment": {
+      "type": "string"
+    },
+    "deep_trend": {
+      "type": "string"
+    },
+    "dd_bias": {
+      "type": "string"
+    },
+    "now_bias": {
+      "type": "string"
+    },
+    "followed_plan": {
+      "type": "string",
+      "enum": [
+        "followed",
+        "partial",
+        "broke_rules",
+        "not_taken"
+      ]
+    },
+    "mistake_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "lesson_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "what_happened": {
+      "type": "string"
+    },
+    "lesson": {
+      "type": "string"
+    },
+    "screenshot_url": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "instrument",
+    "result"
+  ]
+}

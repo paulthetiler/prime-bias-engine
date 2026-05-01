@@ -3,9 +3,10 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Trash2, RotateCcw, SlidersHorizontal, X, ExternalLink } from 'lucide-react';
+import { Trash2, RotateCcw, SlidersHorizontal, X, ExternalLink, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 
 const resultColors = {
   win:       'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
@@ -159,6 +160,7 @@ const ALL_GRADES  = ['A', 'B', 'C', 'D', 'F'];
 export default function TradeHistory() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState(null);
+  const [journalingTrade, setJournalingTrade] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ result: '', grade: '', direction: '', asset: '' });
 
@@ -166,6 +168,13 @@ export default function TradeHistory() {
     queryKey: ['completedTrades'],
     queryFn: () => base44.entities.CompletedTrade.filter({ status: 'completed' }, '-completed_at', 200),
   });
+
+  const { data: journalEntries = [] } = useQuery({
+    queryKey: ['journalEntries'],
+    queryFn: () => base44.entities.TradeJournalEntry.list('-created_at', 500),
+  });
+
+  const journaledIds = new Set(journalEntries.map(e => e.completed_trade_id).filter(Boolean));
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.CompletedTrade.update(id, data),
@@ -321,10 +330,20 @@ export default function TradeHistory() {
               </div>
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{trade.instrument}</span>
                   <span className={cn('text-xs font-bold', gradeColors[trade.grade])}>{trade.grade}</span>
                   <span className={cn('text-xs font-semibold', trade.direction === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>{trade.direction}</span>
+                  {journaledIds.has(trade.id) ? (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 border border-primary/30 text-primary font-semibold">Journaled</span>
+                  ) : (
+                    <button
+                      onClick={e => { e.stopPropagation(); setJournalingTrade(trade); }}
+                      className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors flex items-center gap-1"
+                    >
+                      <BookOpen className="w-2.5 h-2.5" /> Add Journal
+                    </button>
+                  )}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   {trade.completed_at ? format(new Date(trade.completed_at), 'dd MMM yyyy HH:mm') : '—'}
@@ -351,6 +370,14 @@ export default function TradeHistory() {
           onClose={() => setSelected(null)}
           onRestore={handleRestore}
           onArchive={handleArchive}
+        />
+      )}
+
+      {journalingTrade && (
+        <TradeJournalFlow
+          trade={journalingTrade}
+          onClose={() => setJournalingTrade(null)}
+          onDone={() => setJournalingTrade(null)}
         />
       )}
     </div>

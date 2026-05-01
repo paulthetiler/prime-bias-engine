@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, BookOpen, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import MonthCard from '@/components/journal/MonthCard';
 import JournalForm from '@/components/journal/JournalForm';
 import YearSummaryBar from '@/components/journal/YearSummaryBar';
+import TradeJournalTab from '@/components/journal/TradeJournalTab';
 
 const YEARS = [2024, 2025, 2026];
 
 export default function Journal() {
   const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState('trades'); // 'trades' | 'monthly'
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -53,11 +55,40 @@ export default function Journal() {
       {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-lg font-bold tracking-tight">Journal</h1>
-        <Button size="sm" className="gap-1.5 h-8" onClick={() => { setEditingEntry(null); setShowForm(true); }}>
-          <Plus className="w-3.5 h-3.5" /> New Entry
-        </Button>
+        {activeTab === 'monthly' && (
+          <Button size="sm" className="gap-1.5 h-8" onClick={() => { setEditingEntry(null); setShowForm(true); }}>
+            <Plus className="w-3.5 h-3.5" /> New Entry
+          </Button>
+        )}
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-secondary rounded-xl">
+        <button
+          onClick={() => setActiveTab('trades')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all',
+            activeTab === 'trades' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <BookOpen className="w-3.5 h-3.5" /> Trade Journal
+        </button>
+        <button
+          onClick={() => setActiveTab('monthly')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all',
+            activeTab === 'monthly' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <CalendarDays className="w-3.5 h-3.5" /> Monthly Review
+        </button>
+      </div>
+
+      {/* Trade Journal Tab */}
+      {activeTab === 'trades' && <TradeJournalTab />}
+
+      {/* Monthly Review Tab */}
+      {activeTab === 'monthly' && <>
       {/* Year selector */}
       <div className="flex gap-2">
         {YEARS.map(y => (
@@ -108,7 +139,6 @@ export default function Journal() {
             style={{ maxHeight: 'calc(100vh - 60px)' }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Modal header */}
             <div className="sticky top-0 bg-card border-b border-border px-4 py-3 flex items-center justify-between rounded-t-2xl z-10">
               <div className="text-sm font-bold">{editingEntry ? 'Edit Entry' : 'New Monthly Entry'}</div>
               <button onClick={() => { setShowForm(false); setEditingEntry(null); }} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
@@ -126,6 +156,7 @@ export default function Journal() {
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 }
