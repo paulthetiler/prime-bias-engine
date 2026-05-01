@@ -16,8 +16,8 @@ const RESULTS = [
 ];
 
 async function saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes, screenshotUrl }) {
-  const { instrument, results, targetInfo, inputs, extraCheck, timestamp } = analysis;
-  const alignment = calcAlignment(results);
+  const { instrument, results, targetInfo, inputs, extraCheck, timestamp } = analysis || {};
+  const alignment = calcAlignment(results || {});
 
   const record = await base44.entities.CompletedTrade.create({
     instrument,
@@ -73,7 +73,14 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     setSelectedResult(resultValue);
     setSaving(true);
 
-    const record = await saveTrade({ analysis, result: resultValue, entry: '', exit: '', pnl: '', exitReason: '', notes: '', screenshotUrl: '' });
+    let record;
+    try {
+      record = await saveTrade({ analysis, result: resultValue, entry: '', exit: '', pnl: '', exitReason: '', notes: '', screenshotUrl: '' });
+    } catch (err) {
+      setSaving(false);
+      toast.error('Failed to save trade. Please try again.');
+      return;
+    }
     savedRecordRef.current = record;
     setSaving(false);
 
