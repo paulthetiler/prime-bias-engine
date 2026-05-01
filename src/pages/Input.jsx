@@ -183,12 +183,14 @@ export default function Input() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = setTimeout(async () => {
         try {
+          const direction = res?.mainDirection;
+          const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
           await base44.entities.BiasAnalysis.create({
             instrument,
             timestamp: new Date().toISOString(),
             inputs,
             results: res,
-            overall_bias: res?.mainDirection || 'NEUTRAL',
+            overall_bias: overallBias,
             grade: res?.grade || 'F',
             confidence_score: res?.confidenceScore || 0,
             trade_action: res?.tradeAction || 'NO_TRADE',
