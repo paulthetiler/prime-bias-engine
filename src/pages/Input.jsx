@@ -13,6 +13,7 @@ import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Lo
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSettings } from '@/lib/userSettings';
+import { isLocked } from '@/lib/tradeCompletion';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -86,13 +87,11 @@ export default function Input() {
     return () => window.removeEventListener('atrUpdated', reload);
   }, []);
 
-  // ── External removal listener (e.g. trade completed from Dashboard) ────────
+  // ── External removal listener (trade completed from Dashboard) ───────────
   useEffect(() => {
     const onBiasUpdated = () => {
-      // If the current instrument was removed from primebias_active externally, clear it
-      const savedInstrument = localStorage.getItem('primebias_instrument');
-      if (!savedInstrument && instrument) {
-        // primebias_instrument was cleared externally (by saveTrade) — clear local state
+      // If the selected instrument is now locked (completed), clear Input state
+      if (instrument && isLocked(instrument)) {
         isLoadingRef.current = true;
         setInstrument('');
         setInputs(getDefaultInputs());
@@ -179,17 +178,10 @@ export default function Input() {
     setTargetInfo(targetData);
 
     // ── Persist to localStorage immediately ──
-    // Skip if the instrument was externally removed (e.g. completed from Dashboard).
-    // This prevents Input from silently re-adding a completed trade back to the active set.
+    // Never re-add an instrument that has been completed (locked).
+    if (isLocked(instrument)) return;
+
     const active = getActiveStore();
-    const existsInActive = instrument in active;
-    const isSelectedInStorage = localStorage.getItem('primebias_instrument') === instrument;
-
-    if (!existsInActive && !isSelectedInStorage && !isLoadingRef.current) {
-      // Instrument was completed/removed externally — don't re-add it
-      return;
-    }
-
     active[instrument] = {
       instrument,
       inputs,

@@ -1,98 +1,45 @@
 import React, { useState, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
-import { X, ChevronDown, ChevronUp, Loader2, BookOpen } from 'lucide-react';
+import { X, Loader2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { calcAlignment } from '@/lib/alignmentUtils';
 import { toast } from 'sonner';
 import { getSettings } from '@/lib/userSettings';
+import { completeTrade, undoCompletion } from '@/lib/tradeCompletion';
 import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 
 const RESULTS = [
-  { value: 'win',       label: 'WIN',       emoji: '✅', color: 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
-  { value: 'loss',      label: 'LOSS',      emoji: '❌', color: 'border-red-500 bg-red-500/15 text-red-600 dark:text-red-400' },
-  { value: 'breakeven', label: 'BREAK EVEN',emoji: '➖', color: 'border-yellow-500 bg-yellow-500/15 text-yellow-700 dark:text-yellow-400' },
-  { value: 'not_taken', label: 'NOT TAKEN', emoji: '🚫', color: 'border-muted-foreground/50 bg-secondary text-muted-foreground' },
+  { value: 'win',       label: 'WIN',        emoji: '✅', color: 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  { value: 'loss',      label: 'LOSS',       emoji: '❌', color: 'border-red-500 bg-red-500/15 text-red-600 dark:text-red-400' },
+  { value: 'breakeven', label: 'BREAK EVEN', emoji: '➖', color: 'border-yellow-500 bg-yellow-500/15 text-yellow-700 dark:text-yellow-400' },
+  { value: 'not_taken', label: 'NOT TAKEN',  emoji: '🚫', color: 'border-muted-foreground/50 bg-secondary text-muted-foreground' },
 ];
 
-async function saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes, screenshotUrl }) {
-  const { instrument, results, targetInfo, inputs, extraCheck, timestamp } = analysis || {};
-  const alignment = calcAlignment(results || {});
-
-  const record = await base44.entities.CompletedTrade.create({
-    instrument,
-    status: 'completed',
-    result,
-    direction: results?.mainDirection,
-    grade: results?.grade,
-    trade_status: results?.status,
-    trade_action: results?.tradeAction,
-    score: results?.winningScore,
-    target: targetInfo?.target || null,
-    alignment: alignment.label,
-    deep_trend: results?.deepTrend,
-    deep_strength: results?.deepStrength,
-    dd_bias: results?.ddBias,
-    dd_strength: results?.ddStrength,
-    now_bias: results?.nowBias,
-    now_strength: results?.nowStrength,
-    extra_check_h1: extraCheck?.h1 ?? null,
-    extra_check_m15: extraCheck?.m15 ?? null,
-    inputs_snapshot: inputs || {},
-    created_at: timestamp || new Date().toISOString(),
-    completed_at: new Date().toISOString(),
-    entry_price: entry ? parseFloat(entry) : null,
-    exit_price: exit ? parseFloat(exit) : null,
-    pnl: pnl ? parseFloat(pnl) : null,
-    exit_reason: exitReason || null,
-    notes: notes || null,
-    screenshot_url: screenshotUrl || null,
-  });
-
-  // Remove from active set atomically
-  const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
-  delete active[instrument];
-  localStorage.setItem('primebias_active', JSON.stringify(active));
-
-  // If Input page has this instrument selected, clear it so Input doesn't re-write it back
-  if (localStorage.getItem('primebias_instrument') === instrument) {
-    localStorage.removeItem('primebias_instrument');
-  }
-
-  // Dispatch synchronously — localStorage is already correct before this fires
-  window.dispatchEvent(new Event('biasUpdated'));
-
-  return record;
-}
-
-// ── Quick mode: one-tap flow ─────────────────────────────────────────────────
+// ── Quick mode ────────────────────────────────────────────────────────────────
 function QuickCompleteModal({ analysis, onClose, onCompleted }) {
-  const [phase, setPhase] = useState('pick'); // 'pick' | 'journal_prompt'
-  const [selectedResult, setSelectedResult] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [savedRecord, setSavedRecord] = useState(null);
   const [showJournal, setShowJournal] = useState(false);
-  const savedRecordRef = useRef(null);
   const processingRef = useRef(false);
 
   if (!analysis) return null;
   const { instrument, results } = analysis;
 
   const handlePick = async (resultValue) => {
-    if (processingRef.current) return; // guard against double-tap
+    if (processingRef.current) return;
     processingRef.current = true;
-    setSelectedResult(resultValue);
     setSaving(true);
 
     let record;
     try {
-      record = await saveTrade({ analysis, result: resultValue, entry: '', exit: '', pnl: '', exitReason: '', notes: '', screenshotUrl: '' });
+      record = await completeTrade(analysis, resultValue);
     } catch (err) {
       setSaving(false);
       processingRef.current = false;
       toast.error('Failed to save trade. Please try again.');
       return;
     }
-    savedRecordRef.current = record;
+
+    setSavedRecord(record);
     setSaving(false);
 
     const label = RESULTS.find(r => r.value === resultValue)?.label || resultValue;
@@ -101,27 +48,26 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       action: {
         label: 'Undo',
         onClick: async () => {
-          if (savedRecordRef.current?.id) {
-            await base44.entities.CompletedTrade.delete(savedRecordRef.current.id);
-          }
-          const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
-          active[instrument] = analysis;
-          localStorage.setItem('primebias_active', JSON.stringify(active));
-          window.dispatchEvent(new Event('biasUpdated'));
+          await undoCompletion(instrument, analysis, record?.id);
           toast.success(`${instrument} restored to Summary`);
-          onCompleted();
         },
       },
       duration: 6000,
     });
 
-    setPhase('journal_prompt');
+    // Close the modal FIRST (removes completeAnalysis from Dashboard state)
+    onCompleted();
+
+    // Then show journal flow as a separate overlay
+    // We do this by storing the record and letting the parent re-render with journal
+    // Since onCompleted closes this modal, show journal via a queued state update
+    setSavedRecord(record); // still set so we can hand off if needed
   };
 
-  if (showJournal) {
+  if (showJournal && savedRecord) {
     return (
       <TradeJournalFlow
-        trade={savedRecordRef.current}
+        trade={savedRecord}
         onClose={onCompleted}
         onDone={onCompleted}
       />
@@ -129,7 +75,10 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl overflow-y-auto"
         style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))', maxHeight: 'calc(100vh - 120px)' }}
@@ -146,7 +95,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
           </button>
         </div>
 
-        {/* Snapshot pill */}
+        {/* Snapshot */}
         <div className="px-4 pb-3">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className={cn('font-bold', results?.mainDirection === 'BUY' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
@@ -158,58 +107,28 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
         </div>
 
         <div className="px-4 pb-5 space-y-3">
-          {phase === 'pick' && (
-            saving ? (
-              <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Saving…
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {RESULTS.map(r => (
-                  <button
-                    key={r.value}
-                    disabled={saving || processingRef.current}
-                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); handlePick(r.value); }}
-                    className={cn(
-                      'rounded-xl border-2 py-4 text-sm font-bold transition-all active:scale-95',
-                      'border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary/5',
-                      'disabled:opacity-50 disabled:pointer-events-none'
-                    )}
-                  >
-                    <div className="text-2xl mb-1">{r.emoji}</div>
-                    <div>{r.label}</div>
-                  </button>
-                ))}
-              </div>
-            )
-          )}
-
-          {phase === 'journal_prompt' && (
-            <div className="space-y-3">
-              {/* Confirmation */}
-              <div className={cn(
-                'rounded-xl px-3 py-3 text-sm font-semibold text-center border',
-                selectedResult === 'win' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' :
-                selectedResult === 'loss' ? 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300' :
-                selectedResult === 'breakeven' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:text-yellow-300' :
-                'bg-secondary border-border text-muted-foreground'
-              )}>
-                {RESULTS.find(r => r.value === selectedResult)?.emoji} {RESULTS.find(r => r.value === selectedResult)?.label} — saved to history
-              </div>
-
-              {/* Journal prompt */}
-              <div className="rounded-xl border border-border bg-secondary/40 px-4 py-4 text-center space-y-3">
-                <div className="text-sm font-semibold text-foreground">Add this trade to your journal?</div>
-                <div className="text-xs text-muted-foreground">Pre-filled with instrument, grade, setup, and result</div>
-                <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={onCompleted}>Skip</Button>
-                  <Button className="flex-1 gap-2" onClick={() => setShowJournal(true)}>
-                    <BookOpen className="w-4 h-4" />
-                    Yes, journal it
-                  </Button>
-                </div>
-              </div>
+          {saving ? (
+            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Saving…
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {RESULTS.map(r => (
+                <button
+                  key={r.value}
+                  disabled={saving}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); handlePick(r.value); }}
+                  className={cn(
+                    'rounded-xl border-2 py-4 text-sm font-bold transition-all active:scale-95',
+                    'border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary/5',
+                    'disabled:opacity-50 disabled:pointer-events-none'
+                  )}
+                >
+                  <div className="text-2xl mb-1">{r.emoji}</div>
+                  <div>{r.label}</div>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -218,18 +137,15 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
   );
 }
 
-// ── Detailed mode: full form ─────────────────────────────────────────────────
+// ── Detailed mode ─────────────────────────────────────────────────────────────
 function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
   const [result, setResult] = useState('');
   const [entry, setEntry] = useState('');
   const [exit, setExit] = useState('');
   const [pnl, setPnl] = useState('');
-  const [exitReason, setExitReason] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [showJournal, setShowJournal] = useState(false);
-  const [savedResult, setSavedResult] = useState(null);
-  const [phase, setPhase] = useState('form'); // 'form' | 'journal_prompt'
   const savedTradeRef = useRef(null);
   const processingRef = useRef(false);
 
@@ -241,12 +157,24 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     if (processingRef.current) return;
     processingRef.current = true;
     setSaving(true);
-    const record = await saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes, screenshotUrl: '' });
+
+    let record;
+    try {
+      record = await completeTrade(analysis, result, { entry, exit, pnl, notes });
+    } catch (err) {
+      setSaving(false);
+      processingRef.current = false;
+      toast.error('Failed to save trade. Please try again.');
+      return;
+    }
+
     savedTradeRef.current = record;
     toast.success(`${instrument} saved to Trade History`);
     setSaving(false);
-    setSavedResult(result);
-    setPhase('journal_prompt');
+
+    // Close Dashboard modal immediately, then show journal flow
+    onCompleted();
+    setShowJournal(true);
   };
 
   if (showJournal && savedTradeRef.current) {
@@ -260,16 +188,27 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl overflow-y-auto" style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))', maxHeight: 'calc(100vh - 120px)' }} onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl overflow-y-auto"
+        style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))', maxHeight: 'calc(100vh - 120px)' }}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="sticky top-0 bg-card border-b border-border px-4 py-3 flex items-center justify-between rounded-t-2xl">
           <div>
             <div className="text-base font-bold">Complete Trade</div>
             <div className="text-xs text-muted-foreground">{instrument}</div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+            <X className="w-4 h-4" />
+          </button>
         </div>
+
         <div className="p-4 space-y-4">
+          {/* Snapshot */}
           <div className="rounded-xl bg-secondary/50 border border-border p-3 grid grid-cols-3 gap-2 text-center text-xs">
             <div>
               <div className={cn('font-bold text-sm', results?.mainDirection === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>{results?.mainDirection}</div>
@@ -284,18 +223,28 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
               <div className="text-muted-foreground">Score</div>
             </div>
           </div>
+
+          {/* Result picker */}
           <div>
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">Result *</div>
             <div className="grid grid-cols-2 gap-2">
               {RESULTS.map(r => (
-                <button key={r.value} onClick={() => setResult(r.value)}
-                  className={cn('rounded-xl border-2 p-3 text-sm font-semibold text-left transition-all',
-                    result === r.value ? r.color : 'border-border bg-secondary text-muted-foreground hover:border-primary/40')}>
+                <button
+                  key={r.value}
+                  disabled={saving}
+                  onClick={() => setResult(r.value)}
+                  className={cn(
+                    'rounded-xl border-2 p-3 text-sm font-semibold text-left transition-all',
+                    result === r.value ? r.color : 'border-border bg-secondary text-muted-foreground hover:border-primary/40'
+                  )}
+                >
                   {r.emoji} {r.label}
                 </button>
               ))}
             </div>
           </div>
+
+          {/* Details */}
           <div className="space-y-2.5">
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Trade Details (optional)</div>
             <div className="grid grid-cols-2 gap-2">
@@ -321,35 +270,20 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
             </div>
           </div>
-          {phase === 'form' && (
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-              <Button className="flex-1" onClick={handleSave} disabled={saving || !result}>
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save to History'}
-              </Button>
-            </div>
-          )}
 
-          {phase === 'journal_prompt' && (
-            <div className="rounded-xl border border-border bg-secondary/40 px-4 py-4 text-center space-y-3">
-              <div className="text-sm font-semibold text-foreground">Add this trade to your journal?</div>
-              <div className="text-xs text-muted-foreground">Pre-filled with instrument, grade, setup, and result</div>
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={onCompleted}>Skip</Button>
-                <Button className="flex-1 gap-2" onClick={() => setShowJournal(true)}>
-                  <BookOpen className="w-4 h-4" />
-                  Yes, journal it
-                </Button>
-              </div>
-            </div>
-          )}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button className="flex-1" onClick={handleSave} disabled={saving || !result}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save to History'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Entry point: pick mode from settings ─────────────────────────────────────
+// ── Entry point ───────────────────────────────────────────────────────────────
 export default function CompleteTradeModal({ analysis, onClose, onCompleted }) {
   const settings = getSettings();
   if (settings.tradeCompletionMode === 'detailed') {

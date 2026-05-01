@@ -10,6 +10,7 @@ import { getSettings } from '@/lib/userSettings';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import WhyThisTrade from '@/components/bias/WhyThisTrade';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
+import { isLocked } from '@/lib/tradeCompletion';
 
 const gradeColors = {
   A: 'text-emerald-600 dark:text-emerald-400',
@@ -129,7 +130,7 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
       <div className="flex items-center justify-between px-3 py-2 border-t border-border/40 bg-secondary/10">
         <span className="text-xs font-semibold text-primary" onClick={(e) => { e.stopPropagation(); onOpen(analysis); }}>View full details →</span>
         <button
-          onClick={(e) => { e.stopPropagation(); onComplete(analysis); }}
+          onClick={(e) => { e.stopPropagation(); if (!isLocked(instrument)) onComplete(analysis); }}
           className="flex items-center gap-1 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
         >
           <CheckCircle2 className="w-3 h-3" />
@@ -206,9 +207,10 @@ export default function Dashboard() {
       });
       setActiveAssets(active);
 
-      // If a modal is open for an instrument that no longer exists in active, close it
+      // Close modal if the instrument is no longer active or is locked (completed)
       setCompleteAnalysis(prev => {
-        if (prev && !(prev.instrument in active)) return null;
+        if (!prev) return null;
+        if (!(prev.instrument in active) || isLocked(prev.instrument)) return null;
         return prev;
       });
     };
@@ -219,7 +221,6 @@ export default function Dashboard() {
       window.removeEventListener('biasUpdated', load);
       window.removeEventListener('storage', load);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
