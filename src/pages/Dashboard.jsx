@@ -262,14 +262,16 @@ export default function Dashboard() {
     });
 
     setIsCompletingTrade(true);
-    setCompletedTrade(record);
     setCompleteAnalysis(null);
-
     localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
 
     navigate("/trade-history", {
       replace: true,
       state: { focusedTradeId: record?.id }
+    });
+
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("biasUpdated"));
     });
   };
 

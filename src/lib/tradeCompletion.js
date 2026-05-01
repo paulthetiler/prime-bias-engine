@@ -134,7 +134,7 @@ export async function completeTrade(analysis, result, details = {}) {
 
    // 3. Remove this specific analysis from active set (by ID)
    const activeBefore = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
-   const active = activeBefore;
+   const active = structuredClone(activeBefore);
    if (active[instrument]) {
      const analyses = Array.isArray(active[instrument]) 
        ? active[instrument].filter(a => a.analysisId !== id)
@@ -160,9 +160,6 @@ export async function completeTrade(analysis, result, details = {}) {
      primebias_activeAfter: activeAfter,
      completedAnalysisLocks: locks,
    });
-
-   // 4. Notify all listeners
-   window.dispatchEvent(new Event('biasUpdated'));
 
    return record;
 }
