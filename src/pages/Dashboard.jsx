@@ -188,6 +188,7 @@ export default function Dashboard() {
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [completeAnalysis, setCompleteAnalysis] = useState(null);
   const [completedTrade, setCompletedTrade] = useState(null);
+  const [isCompletingTrade, setIsCompletingTrade] = useState(false);
   const [settings, setSettings] = useState(getSettings());
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(() => {
@@ -253,16 +254,23 @@ export default function Dashboard() {
   };
 
   const handleTradeCompleted = (record) => {
-    // Store the completed trade and navigate immediately
     console.log("PB_DEBUG_DASHBOARD_COMPLETION_HANDLER", {
-      recordId: record.id,
-      instrument: record.instrument,
+      recordId: record?.id,
+      instrument: record?.instrument,
+      route: "/trade-history",
       timestamp: new Date().toISOString(),
     });
+
+    setIsCompletingTrade(true);
     setCompletedTrade(record);
     setCompleteAnalysis(null);
-    // Navigate to trade history before re-render
-    navigate('/trade-history', { state: { focusedTradeId: record.id } });
+
+    localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
+
+    navigate("/trade-history", {
+      replace: true,
+      state: { focusedTradeId: record?.id }
+    });
   };
 
   let analyses = Object.values(activeAssets);
@@ -291,6 +299,14 @@ export default function Dashboard() {
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
+  if (isCompletingTrade) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center">
+        <div className="text-sm text-muted-foreground">Saving trade…</div>
+      </div>
+    );
+  }
+
   if (Object.values(activeAssets).length === 0) {
     return (
       <>
@@ -309,7 +325,7 @@ export default function Dashboard() {
           <CompleteTradeModal
             analysis={completeAnalysis}
             onClose={() => setCompleteAnalysis(null)}
-            onCompleted={() => setCompleteAnalysis(null)}
+            onCompleted={handleTradeCompleted}
           />
         )}
       </>
