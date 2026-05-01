@@ -1,12 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { X, Loader2, BookOpen } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getSettings } from '@/lib/userSettings';
 import { completeTrade, undoCompletion } from '@/lib/tradeCompletion';
-import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 
 function getAnalysisId(analysis) {
   return analysis?.analysisId;
@@ -21,10 +19,7 @@ const RESULTS = [
 
 // ── Quick mode ────────────────────────────────────────────────────────────────
 function QuickCompleteModal({ analysis, onClose, onCompleted }) {
-  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
-  const [savedRecord, setSavedRecord] = useState(null);
-  const [showJournal, setShowJournal] = useState(false);
   const processingRef = useRef(false);
 
   if (!analysis) return null;
@@ -52,7 +47,6 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       return;
     }
 
-    setSavedRecord(record);
     setSaving(false);
 
     const analysisId = getAnalysisId(analysis);
@@ -69,26 +63,15 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       duration: 6000,
     });
 
-    // Close the modal and open journal flow with the saved record
-    onClose();
-    setShowJournal(true);
-  };
+    console.log("PB_DEBUG_AFTER_OUTCOME_NAVIGATE", {
+      instrument,
+      analysisId,
+      recordId: record?.id,
+      route: "/trade-history",
+    });
 
-  if (showJournal && savedRecord) {
-    return (
-      <TradeJournalFlow
-        trade={savedRecord}
-        onClose={() => {
-          onCompleted();
-          navigate('/trade-history');
-        }}
-        onDone={() => {
-          onCompleted();
-          navigate('/trade-history');
-        }}
-      />
-    );
-  }
+    onCompleted(record);
+  };
 
   return (
     <div
@@ -155,15 +138,12 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
 
 // ── Detailed mode ─────────────────────────────────────────────────────────────
 function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
-  const navigate = useNavigate();
   const [result, setResult] = useState('');
   const [entry, setEntry] = useState('');
   const [exit, setExit] = useState('');
   const [pnl, setPnl] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [showJournal, setShowJournal] = useState(false);
-  const savedTradeRef = useRef(null);
   const processingRef = useRef(false);
 
   if (!analysis) return null;
@@ -192,7 +172,6 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
       return;
     }
 
-    savedTradeRef.current = record;
     const analysisId = getAnalysisId(analysis);
     toast.success(`${instrument} saved to Trade History`, {
       action: {
@@ -206,26 +185,15 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     });
     setSaving(false);
 
-    // Close and open journal flow
-    onClose();
-    setShowJournal(true);
-  };
+    console.log("PB_DEBUG_AFTER_OUTCOME_NAVIGATE", {
+      instrument,
+      analysisId,
+      recordId: record?.id,
+      route: "/trade-history",
+    });
 
-  if (showJournal && savedTradeRef.current) {
-    return (
-      <TradeJournalFlow
-        trade={savedTradeRef.current}
-        onClose={() => {
-          onCompleted();
-          navigate('/trade-history');
-        }}
-        onDone={() => {
-          onCompleted();
-          navigate('/trade-history');
-        }}
-      />
-    );
-  }
+    onCompleted(record);
+  };
 
   return (
     <div
