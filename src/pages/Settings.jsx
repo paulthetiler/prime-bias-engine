@@ -220,12 +220,15 @@ export default function Settings() {
 
       {/* Scoring Weights */}
       <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
-        <div className="flex items-center justify-between py-3 text-left">
-          <div>
-            <div className="text-sm font-semibold">Scoring Weights</div>
-            <div className="text-xs text-muted-foreground">Points per timeframe in grade calculation</div>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => { const next = { ...s, weights: { ...DEFAULTS.weights } }; setS(next); saveSettings(next); }} className="gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center py-3">
+          <button onClick={() => toggle('weights')} className="flex-1 flex items-center justify-between text-left">
+            <div>
+              <div className="text-sm font-semibold">Scoring Weights</div>
+              <div className="text-xs text-muted-foreground">Points per timeframe in grade calculation</div>
+            </div>
+            {openSections.weights ? <ChevronUp className="w-4 h-4 text-muted-foreground mr-2" /> : <ChevronDown className="w-4 h-4 text-muted-foreground mr-2" />}
+          </button>
+          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); const next = { ...s, weights: { ...DEFAULTS.weights } }; setS(next); saveSettings(next); }} className="gap-1.5 text-xs text-muted-foreground shrink-0">
             <RotateCcw className="w-3.5 h-3.5" /> Reset
           </Button>
         </div>
@@ -251,12 +254,15 @@ export default function Settings() {
 
       {/* Grade Thresholds */}
       <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
-        <div className="flex items-center justify-between py-3 text-left">
-          <div>
-            <div className="text-sm font-semibold">Grade Thresholds</div>
-            <div className="text-xs text-muted-foreground">Min score for each grade</div>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => { const next = { ...s, gradeThresholds: { ...DEFAULTS.gradeThresholds } }; setS(next); saveSettings(next); }} className="gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center py-3">
+          <button onClick={() => toggle('thresholds')} className="flex-1 flex items-center justify-between text-left">
+            <div>
+              <div className="text-sm font-semibold">Grade Thresholds</div>
+              <div className="text-xs text-muted-foreground">Min score for each grade</div>
+            </div>
+            {openSections.thresholds ? <ChevronUp className="w-4 h-4 text-muted-foreground mr-2" /> : <ChevronDown className="w-4 h-4 text-muted-foreground mr-2" />}
+          </button>
+          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); const next = { ...s, gradeThresholds: { ...DEFAULTS.gradeThresholds } }; setS(next); saveSettings(next); }} className="gap-1.5 text-xs text-muted-foreground shrink-0">
             <RotateCcw className="w-3.5 h-3.5" /> Reset
           </Button>
         </div>
