@@ -126,11 +126,8 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
       )}
 
       {/* Bottom bar — hint + complete */}
-      <div
-        className="flex items-center justify-between px-3 py-2 border-t border-border/40 bg-secondary/10"
-        onClick={e => e.stopPropagation()}
-      >
-        <span className="text-xs font-semibold text-primary">View full details →</span>
+      <div className="flex items-center justify-between px-3 py-2 border-t border-border/40 bg-secondary/10">
+        <span className="text-xs font-semibold text-primary" onClick={() => onOpen(analysis)}>View full details →</span>
         <button
           onClick={(e) => {
             e.stopPropagation();
