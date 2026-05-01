@@ -22,7 +22,7 @@ function GoalPill({ label, value }) {
 }
 
 export default function MonthCard({ entry, onEdit }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!entry.notes);
 
   const pnlPos = entry.pnl > 0;
   const pnlNeg = entry.pnl < 0;
@@ -37,10 +37,13 @@ export default function MonthCard({ entry, onEdit }) {
         className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
         onClick={() => setOpen(o => !o)}
       >
-        <div>
+        <div className="flex-1 min-w-0 mr-3">
           <div className="text-sm font-bold tracking-tight">{entry.month} {entry.year}</div>
           {entry.total_positions != null && (
             <div className="text-[11px] text-muted-foreground mt-0.5">{entry.total_positions} trades · {winratePct} WR</div>
+          )}
+          {!open && entry.notes && (
+            <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{entry.notes.split('\n')[0]}</div>
           )}
         </div>
         <div className="flex items-center gap-3">
