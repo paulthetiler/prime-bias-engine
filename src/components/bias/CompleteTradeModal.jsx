@@ -49,11 +49,12 @@ async function saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes
     screenshot_url: screenshotUrl || null,
   });
 
-  // Remove from active set
+  // Remove from active set — dispatch AFTER removal so dashboard doesn't re-show the card
   const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
   delete active[instrument];
   localStorage.setItem('primebias_active', JSON.stringify(active));
-  window.dispatchEvent(new Event('biasUpdated'));
+  // Defer dispatch so modal state updates first, preventing re-open race
+  setTimeout(() => window.dispatchEvent(new Event('biasUpdated')), 100);
 
   return record;
 }
@@ -65,11 +66,14 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
   const [saving, setSaving] = useState(false);
   const [showJournal, setShowJournal] = useState(false);
   const savedRecordRef = useRef(null);
+  const processingRef = useRef(false);
 
   if (!analysis) return null;
   const { instrument, results } = analysis;
 
   const handlePick = async (resultValue) => {
+    if (processingRef.current) return; // guard against double-tap
+    processingRef.current = true;
     setSelectedResult(resultValue);
     setSaving(true);
 
@@ -78,6 +82,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       record = await saveTrade({ analysis, result: resultValue, entry: '', exit: '', pnl: '', exitReason: '', notes: '', screenshotUrl: '' });
     } catch (err) {
       setSaving(false);
+      processingRef.current = false;
       toast.error('Failed to save trade. Please try again.');
       return;
     }
@@ -158,10 +163,12 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
                 {RESULTS.map(r => (
                   <button
                     key={r.value}
-                    onClick={(e) => { e.stopPropagation(); handlePick(r.value); }}
+                    disabled={saving || processingRef.current}
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); handlePick(r.value); }}
                     className={cn(
                       'rounded-xl border-2 py-4 text-sm font-bold transition-all active:scale-95',
-                      'border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary/5'
+                      'border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary/5',
+                      'disabled:opacity-50 disabled:pointer-events-none'
                     )}
                   >
                     <div className="text-2xl mb-1">{r.emoji}</div>
@@ -218,12 +225,15 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
   const [savedResult, setSavedResult] = useState(null);
   const [phase, setPhase] = useState('form'); // 'form' | 'journal_prompt'
   const savedTradeRef = useRef(null);
+  const processingRef = useRef(false);
 
   if (!analysis) return null;
   const { instrument, results } = analysis;
 
   const handleSave = async () => {
     if (!result) { toast.error('Please select a result'); return; }
+    if (processingRef.current) return;
+    processingRef.current = true;
     setSaving(true);
     const record = await saveTrade({ analysis, result, entry, exit, pnl, exitReason, notes, screenshotUrl: '' });
     savedTradeRef.current = record;
