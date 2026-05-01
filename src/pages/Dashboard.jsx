@@ -257,14 +257,23 @@ export default function Dashboard() {
 
   if (Object.values(activeAssets).length === 0) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center">
-        <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-          <Crosshair className="w-10 h-10 text-muted-foreground" />
+      <>
+        <div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center">
+          <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+            <Crosshair className="w-10 h-10 text-muted-foreground" />
+          </div>
+          <h1 className="text-xl font-bold mb-2">PrimeBias</h1>
+          <p className="text-muted-foreground text-sm mb-6">Go to the Bias Tool tab to add assets for analysis</p>
+          <Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button>
         </div>
-        <h1 className="text-xl font-bold mb-2">PrimeBias</h1>
-        <p className="text-muted-foreground text-sm mb-6">Go to the Bias Tool tab to add assets for analysis</p>
-        <Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button>
-      </div>
+        {completeAnalysis && (
+          <CompleteTradeModal
+            analysis={completeAnalysis}
+            onClose={() => setCompleteAnalysis(null)}
+            onCompleted={() => setCompleteAnalysis(null)}
+          />
+        )}
+      </>
     );
   }
 
