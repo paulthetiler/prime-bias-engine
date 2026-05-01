@@ -251,6 +251,21 @@ export default function Dashboard() {
 
   let analyses = Object.values(activeAssets);
 
+  // DEBUG: Log all active analyses with visibility reasoning
+  const completedIds = JSON.parse(localStorage.getItem('primebias_completedAnalysisIds') || '[]');
+  console.log('[Dashboard Load]', {
+    allActiveAssets: Object.keys(activeAssets).map(inst => ({
+      instrument: inst,
+      analysisId: activeAssets[inst]?.analysisId,
+    })),
+    completedAnalysisIds: completedIds,
+    visibilityReasons: analyses.map(a => ({
+      instrument: a.instrument,
+      analysisId: a.analysisId,
+      shown: true,
+    })),
+  });
+
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
   if (filters.filterHideWait) analyses = analyses.filter(a => a.results?.tradeAction !== 'WAIT');
   if (filters.filterHideExtended) analyses = analyses.filter(a => !(a.results?.winningScore >= 90));

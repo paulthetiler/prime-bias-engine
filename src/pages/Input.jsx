@@ -194,6 +194,13 @@ export default function Input() {
     localStorage.setItem('primebias_instrument', instrument);
     setActiveAssets({ ...active });
     window.dispatchEvent(new Event('biasUpdated'));
+    
+    // DEBUG: Log Bias Tool save
+    console.log('[Bias Tool Save]', {
+      instrument,
+      analysisId,
+      primebias_active: active,
+    });
 
     // ── DB auto-save: only on actual user edits, debounced 1.5 s ──
     if (!isLoadingRef.current) {

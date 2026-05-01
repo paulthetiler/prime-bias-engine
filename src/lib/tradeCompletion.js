@@ -50,9 +50,14 @@ export async function completeTrade(analysis, result, details = {}) {
   // Generate analysisId if not present
   const id = analysisId || generateAnalysisId(instrument);
 
+  console.log('[Trade Completion Start]', {
+    instrument,
+    analysisId: id,
+  });
+
   // 1. Save to DB FIRST — so if this fails, nothing is removed from the UI
-  const alignment = calcAlignment(results || {});
-  const record = await base44.entities.CompletedTrade.create({
+   const alignment = calcAlignment(results || {});
+   const record = await base44.entities.CompletedTrade.create({
     instrument,
     status: 'completed',
     result,
@@ -82,30 +87,48 @@ export async function completeTrade(analysis, result, details = {}) {
     screenshot_url:   details.screenshotUrl || null,
   });
 
-  // 2. Lock this specific analysisId
-  lockAnalysis(id);
+  console.log('[Trade Completion - DB Save Result]', {
+    recordId: record.id,
+    instrument: record.instrument,
+    result: record.result,
+  });
 
-  // 3. Remove this specific analysis from active set (by ID)
-  const active = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
-  if (active[instrument]) {
-    const analyses = Array.isArray(active[instrument]) 
-      ? active[instrument].filter(a => a.analysisId !== id)
-      : active[instrument].analysisId === id ? [] : [active[instrument]];
-    
-    if (analyses.length === 0) {
-      delete active[instrument];
-    } else if (analyses.length === 1) {
-      active[instrument] = analyses[0];
-    } else {
-      active[instrument] = analyses;
-    }
-  }
-  localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+   // 2. Lock this specific analysisId
+   lockAnalysis(id);
 
-  // 4. Notify all listeners
-  window.dispatchEvent(new Event('biasUpdated'));
+   // 3. Remove this specific analysis from active set (by ID)
+   const activeBefore = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
+   const active = activeBefore;
+   if (active[instrument]) {
+     const analyses = Array.isArray(active[instrument]) 
+       ? active[instrument].filter(a => a.analysisId !== id)
+       : active[instrument].analysisId === id ? [] : [active[instrument]];
 
-  return record;
+     if (analyses.length === 0) {
+       delete active[instrument];
+     } else if (analyses.length === 1) {
+       active[instrument] = analyses[0];
+     } else {
+       active[instrument] = analyses;
+     }
+   }
+   const activeAfter = active;
+   localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeAfter));
+
+   const locks = getLocks();
+
+   console.log('[Trade Completion - Final State]', {
+     instrument,
+     analysisId: id,
+     primebias_activeBefore: activeBefore,
+     primebias_activeAfter: activeAfter,
+     completedAnalysisLocks: locks,
+   });
+
+   // 4. Notify all listeners
+   window.dispatchEvent(new Event('biasUpdated'));
+
+   return record;
 }
 
 /**
