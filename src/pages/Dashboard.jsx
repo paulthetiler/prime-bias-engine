@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { calculateBias } from '@/lib/biasEngine';
@@ -10,6 +10,7 @@ import { getSettings } from '@/lib/userSettings';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import WhyThisTrade from '@/components/bias/WhyThisTrade';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
+import TradeJournalModal from '@/components/journal/TradeJournalModal';
 
 const gradeColors = {
   A: 'text-emerald-600 dark:text-emerald-400',
@@ -37,7 +38,7 @@ function TrendPill({ label, dir, strength }) {
   );
 }
 
-function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
+function AssetCard({ analysis, onOpen, onComplete, onJournal, settings, compact }) {
   const { instrument, results, targetInfo } = analysis;
   const [pressed, setPressed] = useState(false);
   if (!results) return null;
@@ -127,17 +128,23 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
 
       {/* Bottom bar — hint + complete */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-border/40 bg-secondary/10">
-        <span className="text-xs font-semibold text-primary" onClick={() => onOpen(analysis)}>View full details →</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onComplete(analysis);
-          }}
-          className="flex items-center gap-1.5 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
-        >
-          <CheckCircle2 className="w-3 h-3" />
-          Complete
-        </button>
+        <span className="text-xs font-semibold text-primary" onClick={(e) => { e.stopPropagation(); onOpen(analysis); }}>View full details →</span>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); onJournal(analysis); }}
+            className="flex items-center gap-1 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
+          >
+            <BookOpen className="w-3 h-3" />
+            Journal
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onComplete(analysis); }}
+            className="flex items-center gap-1 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            Complete
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -187,6 +194,7 @@ export default function Dashboard() {
   const [timeToNextHour, setTimeToNextHour] = useState('');
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [completeAnalysis, setCompleteAnalysis] = useState(null);
+  const [journalAnalysis, setJournalAnalysis] = useState(null);
   const [settings, setSettings] = useState(getSettings());
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(() => {
@@ -341,6 +349,7 @@ export default function Dashboard() {
               analysis={a}
               onOpen={setSelectedAnalysis}
               onComplete={setCompleteAnalysis}
+              onJournal={setJournalAnalysis}
               settings={settings}
               compact={settings.compactMode}
             />
@@ -362,6 +371,13 @@ export default function Dashboard() {
           analysis={completeAnalysis}
           onClose={() => setCompleteAnalysis(null)}
           onCompleted={() => setCompleteAnalysis(null)}
+        />
+      )}
+
+      {journalAnalysis && (
+        <TradeJournalModal
+          analysis={journalAnalysis}
+          onClose={() => setJournalAnalysis(null)}
         />
       )}
     </div>

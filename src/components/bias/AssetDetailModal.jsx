@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { X, Edit2 } from 'lucide-react';
+import { X, Edit2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhyThisTrade from './WhyThisTrade';
 import { calcAlignment, alignmentColor, alignmentBg } from '@/lib/alignmentUtils';
+import TradeJournalModal from '@/components/journal/TradeJournalModal';
 
 const gradeColors = {
   A: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30',
@@ -41,6 +42,7 @@ function TrendPill({ label, dir, strength }) {
 }
 
 export default function AssetDetailModal({ analysis, onClose, onEdit, settings }) {
+  const [showJournal, setShowJournal] = useState(false);
   if (!analysis) return null;
   const { instrument, results, targetInfo } = analysis;
   if (!results) return null;
@@ -71,6 +73,10 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
             <div className="text-xs text-muted-foreground">Full Decision View</div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowJournal(true)} className="gap-1.5 h-8">
+              <BookOpen className="w-3.5 h-3.5" />
+              Journal
+            </Button>
             <Button variant="outline" size="sm" onClick={onEdit} className="gap-1.5 h-8">
               <Edit2 className="w-3.5 h-3.5" />
               Edit
@@ -146,6 +152,10 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
           )}
         </div>
       </div>
+
+      {showJournal && (
+        <TradeJournalModal analysis={analysis} onClose={() => setShowJournal(false)} />
+      )}
     </div>
   );
 }
