@@ -48,23 +48,7 @@ export async function completeTrade(analysis, result, details = {}) {
   if (!instrument) throw new Error('No instrument on analysis');
   if (!result)     throw new Error('No result provided');
 
-  // 1. Lock immediately — prevents Input from re-writing
-  addLock(instrument);
-
-  // 2. Remove from active set synchronously
-  const active = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
-  delete active[instrument];
-  localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
-
-  // 3. Clear selected instrument pointer if it points here
-  if (localStorage.getItem(INSTRUMENT_KEY) === instrument) {
-    localStorage.removeItem(INSTRUMENT_KEY);
-  }
-
-  // 4. Notify all listeners — localStorage is correct at this point
-  window.dispatchEvent(new Event('biasUpdated'));
-
-  // 5. Save to DB (async, but UI is already updated)
+  // 1. Save to DB FIRST — so if this fails, nothing is removed from the UI
   const alignment = calcAlignment(results || {});
   const record = await base44.entities.CompletedTrade.create({
     instrument,
@@ -95,6 +79,28 @@ export async function completeTrade(analysis, result, details = {}) {
     notes:            details.notes       || null,
     screenshot_url:   details.screenshotUrl || null,
   });
+
+  // 2. Lock — prevents Input from re-writing this instrument
+  addLock(instrument);
+
+  // 3. Remove only this instrument from active set
+  const active = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
+  delete active[instrument];
+  localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+
+  // 4. Update selected instrument pointer — switch to another active one if possible.
+  //    Never fully remove it; that can trigger "new user" empty screens in Input.
+  if (localStorage.getItem(INSTRUMENT_KEY) === instrument) {
+    const remaining = Object.keys(active);
+    if (remaining.length > 0) {
+      localStorage.setItem(INSTRUMENT_KEY, remaining[0]);
+    }
+    // If none remain, leave the key pointing to the now-locked instrument.
+    // The lock prevents Input from re-adding it. Dashboard shows empty state naturally.
+  }
+
+  // 5. Notify all listeners
+  window.dispatchEvent(new Event('biasUpdated'));
 
   return record;
 }

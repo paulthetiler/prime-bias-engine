@@ -270,9 +270,12 @@ export default function Dashboard() {
           <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mb-4">
             <Crosshair className="w-10 h-10 text-muted-foreground" />
           </div>
-          <h1 className="text-xl font-bold mb-2">PrimeBias</h1>
-          <p className="text-muted-foreground text-sm mb-6">Go to the Bias Tool tab to add assets for analysis</p>
-          <Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button>
+          <h1 className="text-xl font-bold mb-2">No Active Analyses</h1>
+          <p className="text-muted-foreground text-sm mb-6">All trades completed. Add new assets in the Bias Tool to continue.</p>
+          <div className="flex gap-3">
+            <Button variant="outline" className="rounded-full" onClick={() => navigate('/trade-history')}>Trade History</Button>
+            <Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button>
+          </div>
         </div>
         {completeAnalysis && (
           <CompleteTradeModal
