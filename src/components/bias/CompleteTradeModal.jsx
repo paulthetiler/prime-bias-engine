@@ -32,12 +32,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     processingRef.current = true;
     setSaving(true);
 
-    console.log("PB_DEBUG_OUTCOME_CLICKED", {
-      outcome: resultValue,
-      instrument,
-      analysisId: getAnalysisId(analysis),
-      timestamp: new Date().toISOString(),
-    });
+    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "1 outcome clicked");
 
     let record;
     try {
@@ -50,6 +45,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     }
 
     setSaving(false);
+    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "2 trade saved");
 
     const analysisId = getAnalysisId(analysis);
     const label = RESULTS.find(r => r.value === resultValue)?.label || resultValue;
@@ -65,20 +61,8 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       duration: 6000,
     });
 
-    console.log("PB_DEBUG_AFTER_OUTCOME_NAVIGATE", {
-      instrument,
-      analysisId,
-      recordId: record?.id,
-      route: "/trade-history",
-    });
-
     localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
-
-    console.log("PB_DEBUG_BEFORE_NAVIGATE", {
-      currentPath: window.location.pathname,
-      target: "/trade-history",
-      recordId: record?.id,
-    });
+    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "3 navigating to trade-history");
 
     navigate("/trade-history", {
       replace: true,
@@ -86,20 +70,15 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     });
 
     setTimeout(() => {
-      console.log("PB_DEBUG_AFTER_NAVIGATE_TIMEOUT", {
-        currentPath: window.location.pathname,
-        expected: "/trade-history",
-        recordId: record?.id,
-      });
-
       if (window.location.pathname !== "/trade-history") {
-        console.warn("PB_DEBUG_NAVIGATE_FAILED_FORCING_LOCATION");
         window.location.assign("/trade-history");
       }
     }, 100);
 
     setTimeout(() => {
+      localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "4 removing active analysis");
       removeCompletedActiveAnalysis(analysis);
+      localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "5 active analysis removed");
       onCompleted?.(record);
     }, 500);
   };
@@ -187,12 +166,7 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     processingRef.current = true;
     setSaving(true);
 
-    console.log("PB_DEBUG_OUTCOME_CLICKED", {
-      outcome: result,
-      instrument,
-      analysisId: getAnalysisId(analysis),
-      timestamp: new Date().toISOString(),
-    });
+    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "1 outcome clicked");
 
     let record;
     try {
@@ -203,6 +177,8 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
       toast.error('Failed to save trade. Please try again.');
       return;
     }
+
+    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "2 trade saved");
 
     const analysisId = getAnalysisId(analysis);
     toast.success(`${instrument} saved to Trade History`, {
@@ -217,20 +193,8 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     });
     setSaving(false);
 
-    console.log("PB_DEBUG_AFTER_OUTCOME_NAVIGATE", {
-      instrument,
-      analysisId,
-      recordId: record?.id,
-      route: "/trade-history",
-    });
-
     localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
-
-    console.log("PB_DEBUG_BEFORE_NAVIGATE", {
-      currentPath: window.location.pathname,
-      target: "/trade-history",
-      recordId: record?.id,
-    });
+    localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "3 navigating to trade-history");
 
     navigate("/trade-history", {
       replace: true,
@@ -238,20 +202,15 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     });
 
     setTimeout(() => {
-      console.log("PB_DEBUG_AFTER_NAVIGATE_TIMEOUT", {
-        currentPath: window.location.pathname,
-        expected: "/trade-history",
-        recordId: record?.id,
-      });
-
       if (window.location.pathname !== "/trade-history") {
-        console.warn("PB_DEBUG_NAVIGATE_FAILED_FORCING_LOCATION");
         window.location.assign("/trade-history");
       }
     }, 100);
 
     setTimeout(() => {
+      localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "4 removing active analysis");
       removeCompletedActiveAnalysis(analysis);
+      localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "5 active analysis removed");
       onCompleted?.(record);
     }, 500);
   };
