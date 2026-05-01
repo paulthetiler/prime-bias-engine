@@ -41,9 +41,9 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       return;
     }
 
-    // Remove from active storage
-    removeCompletedActiveAnalysis(analysis);
-
+    // NOTE: Do NOT remove from active storage — keep instrument and inputs in Bias Tool
+    // Only the analysisId is locked; Dashboard will filter it out
+    
     const label = RESULTS.find(r => r.value === resultValue)?.label || resultValue;
     toast.success(`${instrument} saved as ${label}`);
 
@@ -144,8 +144,8 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
       return;
     }
 
-    // Remove from active storage
-    removeCompletedActiveAnalysis(analysis);
+    // NOTE: Do NOT remove from active storage — keep instrument and inputs in Bias Tool
+    // Only the analysisId is locked; Dashboard will filter it out
 
     const resultLabel = RESULTS.find(r => r.value === result)?.label || result;
     toast.success(`${instrument} saved as ${resultLabel}`);

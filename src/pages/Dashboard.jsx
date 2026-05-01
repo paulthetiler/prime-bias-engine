@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { calculateBias } from '@/lib/biasEngine';
 import { calcAlignment } from '@/lib/alignmentUtils';
 import { getSettings } from '@/lib/userSettings';
-import { getLocks } from '@/lib/tradeCompletion';
+import { isAnalysisLocked } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import WhyThisTrade from '@/components/bias/WhyThisTrade';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
@@ -270,7 +270,7 @@ export default function Dashboard() {
     setActiveAssets(active);
   };
 
-  let analyses = Object.values(activeAssets);
+  let analyses = Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId));
 
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
   if (filters.filterHideWait) analyses = analyses.filter(a => a.results?.tradeAction !== 'WAIT');
