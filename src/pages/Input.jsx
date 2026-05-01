@@ -188,13 +188,12 @@ export default function Input() {
           await base44.entities.BiasAnalysis.create({
             instrument,
             timestamp: new Date().toISOString(),
-            inputs,
-            results: res,
             overall_bias: overallBias,
             grade: res?.grade || 'F',
-            confidence_score: res?.confidenceScore || 0,
+            confidence_score: res?.winningScore || 0,
             trade_action: res?.tradeAction || 'NO_TRADE',
             warnings: res?.warnings || [],
+            notes: `${res?.mainDirection} | ${res?.grade} | Score: ${res?.winningScore} | ${res?.status}`,
           });
           setAutoSaveStatus('saved');
           setTimeout(() => setAutoSaveStatus('idle'), 2000);
