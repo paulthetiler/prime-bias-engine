@@ -72,17 +72,20 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
       onTouchStart={() => setPressed(true)}
       onTouchEnd={() => setPressed(false)}
     >
-      {/* Asset name row */}
+      {/* Asset name + Direction row */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
-        <span className="font-bold text-sm tracking-tight">{instrument}</span>
+        <div>
+          <span className="font-bold text-sm tracking-tight text-foreground">{instrument}</span>
+          <div className={cn('text-2xl font-black leading-tight tracking-tight', dirColor)}>{mainDirection}</div>
+        </div>
         <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
       </div>
 
       {/* Split layout */}
-      <div className="flex min-h-[100px] border-t border-border/50">
+      <div className="flex min-h-[90px] border-t border-border/50">
         {/* Left — Grade */}
-        <div className="flex flex-col items-center justify-center px-4 py-3 bg-secondary/50 border-r border-border/50 min-w-[80px]">
-          <span className="text-4xl font-black tracking-tight text-foreground leading-none">{grade}</span>
+        <div className="flex flex-col items-center justify-center px-4 py-3 bg-secondary/50 border-r border-border/50 min-w-[72px]">
+          <span className="text-3xl font-black tracking-tight text-foreground leading-none">{grade}</span>
           <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight">{gradeLabel}</span>
         </div>
 
@@ -127,7 +130,7 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
         className="flex items-center justify-between px-3 py-2 border-t border-border/40 bg-secondary/10"
         onClick={e => e.stopPropagation()}
       >
-        <span className="text-[10px] text-muted-foreground/50">Tap for full breakdown</span>
+        <span className="text-xs font-semibold text-primary">View full details →</span>
         <button
           onClick={(e) => {
             e.stopPropagation();
