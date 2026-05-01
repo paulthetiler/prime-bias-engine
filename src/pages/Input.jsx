@@ -25,22 +25,26 @@ function saveActiveStore(active) {
   localStorage.setItem('primebias_active', JSON.stringify(active));
 }
 
-/** Load saved inputs for an instrument, or return defaults. Never returns undefined. */
+// ── Separate input storage (decoupled from active trades) ────────────────────
+function getInputStore() {
+  return JSON.parse(localStorage.getItem('primebias_inputs') || '{}');
+}
+
+function saveInputStore(inputs) {
+  localStorage.setItem('primebias_inputs', JSON.stringify(inputs));
+}
+
+/** Load saved inputs for an instrument from input storage, or return defaults. */
 function loadInputsForInstrument(instrument) {
   if (!instrument) return getDefaultInputs();
-  const active = getActiveStore();
-  const data = active[instrument];
-  // data might be an object (single analysis) or an array (multiple)
-  if (Array.isArray(data)) return data[0]?.inputs || getDefaultInputs();
-  return data?.inputs || getDefaultInputs();
+  const inputs = getInputStore();
+  return inputs[instrument]?.inputs || getDefaultInputs();
 }
 
 function loadExtraCheckForInstrument(instrument) {
   if (!instrument) return { h1: null, m15: null };
-  const active = getActiveStore();
-  const data = active[instrument];
-  if (Array.isArray(data)) return data[0]?.extraCheck || { h1: null, m15: null };
-  return data?.extraCheck || { h1: null, m15: null };
+  const inputs = getInputStore();
+  return inputs[instrument]?.extraCheck || { h1: null, m15: null };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -177,7 +181,13 @@ export default function Input() {
     const targetData = calculateTarget(atrValue, res.grade, res.status);
     setTargetInfo(targetData);
 
-    // ── Persist to localStorage immediately ──
+    // ── Persist inputs to separate storage (decoupled from active trades) ──
+    const inputStore = getInputStore();
+    inputStore[instrument] = { inputs, extraCheck };
+    saveInputStore(inputStore);
+    localStorage.setItem('primebias_instrument', instrument);
+
+    // ── Persist to active store (for dashboard display) ──
     const active = getActiveStore();
     const analysisId = active[instrument]?.analysisId || generateAnalysisId(instrument);
     active[instrument] = {
@@ -191,7 +201,6 @@ export default function Input() {
       targetInfo: targetData,
     };
     saveActiveStore(active);
-    localStorage.setItem('primebias_instrument', instrument);
     setActiveAssets({ ...active });
     window.dispatchEvent(new Event('biasUpdated'));
     
@@ -248,6 +257,7 @@ export default function Input() {
 
   const handleClearAll = () => {
     localStorage.removeItem('primebias_active');
+    localStorage.removeItem('primebias_inputs');
     localStorage.removeItem('primebias_instrument');
     setInstrument('');
     setInputs(getDefaultInputs());
@@ -258,9 +268,16 @@ export default function Input() {
   };
 
   const handleRemoveInstrument = () => {
+    // Remove from active trades
     const active = getActiveStore();
     delete active[instrument];
     saveActiveStore(active);
+
+    // Also remove from input storage if user wants a full reset
+    const inputStore = getInputStore();
+    delete inputStore[instrument];
+    saveInputStore(inputStore);
+
     localStorage.removeItem('primebias_instrument');
     setActiveAssets({ ...active });
     window.dispatchEvent(new Event('biasUpdated'));
