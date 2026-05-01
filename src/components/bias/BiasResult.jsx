@@ -74,30 +74,26 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
           </div>
 
           {/* Right — Decision info */}
-          <div className="flex flex-col justify-center px-4 py-3 gap-1.5 flex-1">
+          <div className="flex flex-col justify-center px-4 py-4 flex-1 gap-2.5">
             {/* Status badge */}
-            <span className={cn('self-start text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
+            <span className={cn('self-start text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border mb-0.5', statusBadge)}>
               {status}
             </span>
 
-            {/* Direction */}
-            <div className="flex items-baseline gap-2">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground w-14 shrink-0">Direction</span>
-              <span className={cn('text-base font-bold', dirColor)}>{mainDirection}</span>
-            </div>
+            {/* Grid: label → value */}
+            <div className="grid gap-y-2" style={{ gridTemplateColumns: 'auto 1fr' }}>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground pr-5 self-center">Direction</span>
+              <span className={cn('text-sm font-bold text-right', dirColor)}>{mainDirection}</span>
 
-            {/* Action */}
-            <div className="flex items-baseline gap-2">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground w-14 shrink-0">Action</span>
-              <span className={cn('text-sm font-bold px-2 py-0.5 rounded-md', actionColors[tradeAction])}>
-                {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
-              </span>
-            </div>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground pr-5 self-center">Action</span>
+              <div className="flex justify-end">
+                <span className={cn('text-xs font-bold px-2 py-0.5 rounded-md', actionColors[tradeAction])}>
+                  {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
+                </span>
+              </div>
 
-            {/* Target */}
-            <div className="flex items-baseline gap-2">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground w-14 shrink-0">Target</span>
-              <span className="text-sm font-mono font-semibold text-foreground">{targetNote || '—'}</span>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground pr-5 self-center">Target</span>
+              <span className="text-xs font-mono font-semibold text-foreground text-right">{targetNote || '—'}</span>
             </div>
           </div>
         </div>
