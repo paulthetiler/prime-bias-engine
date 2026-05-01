@@ -1,0 +1,89 @@
+{
+  "name": "MonthlyJournal",
+  "type": "object",
+  "properties": {
+    "month": {
+      "type": "string",
+      "description": "Month name e.g. April"
+    },
+    "year": {
+      "type": "number",
+      "description": "Year e.g. 2025"
+    },
+    "start_balance": {
+      "type": "number",
+      "description": "Starting balance for the month"
+    },
+    "end_balance": {
+      "type": "number",
+      "description": "Ending balance for the month"
+    },
+    "pnl": {
+      "type": "number",
+      "description": "Profit or loss in \u00a3"
+    },
+    "pnl_percent": {
+      "type": "number",
+      "description": "P&L as a percentage"
+    },
+    "total_positions": {
+      "type": "number",
+      "description": "Total number of trades taken"
+    },
+    "winrate": {
+      "type": "number",
+      "description": "Win rate as a decimal e.g. 0.65"
+    },
+    "total_pips": {
+      "type": "number",
+      "description": "Total pips for the month"
+    },
+    "ave_win": {
+      "type": "number",
+      "description": "Average win in \u00a3"
+    },
+    "ave_pip": {
+      "type": "number",
+      "description": "Average pips per trade"
+    },
+    "bid_size": {
+      "type": "number",
+      "description": "Current lot/bid size"
+    },
+    "next_bid": {
+      "type": "number",
+      "description": "Next lot size target"
+    },
+    "wage": {
+      "type": "number",
+      "description": "Wage drawn this month"
+    },
+    "goal_month": {
+      "type": "number",
+      "description": "Monthly \u00a3 target"
+    },
+    "goal_week": {
+      "type": "number",
+      "description": "Weekly \u00a3 target"
+    },
+    "goal_day": {
+      "type": "number",
+      "description": "Daily \u00a3 target"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Trading rules for this month"
+    },
+    "notes": {
+      "type": "string",
+      "description": "General notes / reflections"
+    }
+  },
+  "required": [
+    "month",
+    "year"
+  ]
+}

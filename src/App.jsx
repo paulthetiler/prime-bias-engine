@@ -17,6 +17,7 @@ import TradeHistory from '@/pages/TradeHistory';
 import ATR from '@/pages/ATR';
 import Settings from '@/pages/Settings.jsx';
 import EngineTest from '@/pages/EngineTest.jsx';
+import Journal from '@/pages/Journal.jsx';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -54,6 +55,7 @@ const AuthenticatedApp = () => {
           <Route path="/trade-history" element={<TradeHistory />} />
           <Route path="/atr" element={<ATR />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/journal" element={<Journal />} />
 
         </Route>
         <Route path="/admin/engine-test" element={<EngineTest />} />
