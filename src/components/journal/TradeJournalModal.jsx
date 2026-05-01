@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { X, BookOpen, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,7 @@ function buildTradeNote(analysis, result) {
 
 export default function TradeJournalModal({ analysis, result, onClose }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const now = new Date();
   const currentMonth = MONTHS[now.getMonth()];
   const currentYear = now.getFullYear();
@@ -71,6 +73,7 @@ export default function TradeJournalModal({ analysis, result, onClose }) {
     toast.success(`Added to ${currentMonth} journal`);
     setSaving(false);
     onClose();
+    navigate('/journal');
   };
 
   const { instrument, results } = analysis;
