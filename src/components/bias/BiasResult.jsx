@@ -81,19 +81,17 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
             </span>
 
             {/* Grid: label → value */}
-            <div className="grid gap-y-2" style={{ gridTemplateColumns: 'auto 1fr' }}>
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground pr-5 self-center">Direction</span>
-              <span className={cn('text-sm font-bold text-right', dirColor)}>{mainDirection}</span>
+            <div className="grid items-center gap-y-2" style={{ gridTemplateColumns: '1fr minmax(100px, auto)', columnGap: '16px' }}>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Direction</span>
+              <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
 
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground pr-5 self-center">Action</span>
-              <div className="flex justify-end">
-                <span className={cn('text-xs font-bold px-2 py-0.5 rounded-md', actionColors[tradeAction])}>
-                  {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
-                </span>
-              </div>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Action</span>
+              <span className={cn('text-xs font-bold px-2 py-0.5 rounded-md self-start', actionColors[tradeAction])}>
+                {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
+              </span>
 
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground pr-5 self-center">Target</span>
-              <span className="text-xs font-mono font-semibold text-foreground text-right">{targetNote || '—'}</span>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Target</span>
+              <span className="text-xs font-mono font-semibold text-foreground">{targetNote || '—'}</span>
             </div>
           </div>
         </div>
