@@ -7,6 +7,10 @@ import { getSettings } from '@/lib/userSettings';
 import { completeTrade, undoCompletion } from '@/lib/tradeCompletion';
 import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 
+function getAnalysisId(analysis) {
+  return analysis?.analysisId;
+}
+
 const RESULTS = [
   { value: 'win',       label: 'WIN',        emoji: '✅', color: 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
   { value: 'loss',      label: 'LOSS',       emoji: '❌', color: 'border-red-500 bg-red-500/15 text-red-600 dark:text-red-400' },
@@ -42,13 +46,14 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     setSavedRecord(record);
     setSaving(false);
 
+    const analysisId = getAnalysisId(analysis);
     const label = RESULTS.find(r => r.value === resultValue)?.label || resultValue;
     toast(`${instrument} — ${label}`, {
       description: 'Saved to Trade History',
       action: {
         label: 'Undo',
         onClick: async () => {
-          await undoCompletion(instrument, analysis, record?.id);
+          await undoCompletion(analysisId, record?.id);
           toast.success(`${instrument} restored to Summary`);
         },
       },
@@ -169,7 +174,17 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     }
 
     savedTradeRef.current = record;
-    toast.success(`${instrument} saved to Trade History`);
+    const analysisId = getAnalysisId(analysis);
+    toast.success(`${instrument} saved to Trade History`, {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          await undoCompletion(analysisId, record?.id);
+          toast.success(`${instrument} restored to Summary`);
+        },
+      },
+      duration: 6000,
+    });
     setSaving(false);
 
     // Close Dashboard modal immediately, then show journal flow

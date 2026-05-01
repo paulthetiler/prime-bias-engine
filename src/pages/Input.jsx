@@ -13,7 +13,7 @@ import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Lo
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSettings } from '@/lib/userSettings';
-import { isLocked } from '@/lib/tradeCompletion';
+import { generateAnalysisId } from '@/lib/tradeCompletion';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,13 +29,18 @@ function saveActiveStore(active) {
 function loadInputsForInstrument(instrument) {
   if (!instrument) return getDefaultInputs();
   const active = getActiveStore();
-  return active[instrument]?.inputs || getDefaultInputs();
+  const data = active[instrument];
+  // data might be an object (single analysis) or an array (multiple)
+  if (Array.isArray(data)) return data[0]?.inputs || getDefaultInputs();
+  return data?.inputs || getDefaultInputs();
 }
 
 function loadExtraCheckForInstrument(instrument) {
   if (!instrument) return { h1: null, m15: null };
   const active = getActiveStore();
-  return active[instrument]?.extraCheck || { h1: null, m15: null };
+  const data = active[instrument];
+  if (Array.isArray(data)) return data[0]?.extraCheck || { h1: null, m15: null };
+  return data?.extraCheck || { h1: null, m15: null };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -87,22 +92,17 @@ export default function Input() {
     return () => window.removeEventListener('atrUpdated', reload);
   }, []);
 
-  // ── External removal listener (trade completed from Dashboard) ───────────
+  // ── Reload active analyses on completion (from Dashboard/elsewhere) ───────
   useEffect(() => {
     const onBiasUpdated = () => {
-      // If the selected instrument is now locked (completed), clear Input state
-      if (instrument && isLocked(instrument)) {
-        isLoadingRef.current = true;
-        setInstrument('');
-        setInputs(getDefaultInputs());
-        setExtraCheck({ h1: null, m15: null });
-        Promise.resolve().then(() => { isLoadingRef.current = false; });
-      }
+      // Reload active assets (in case a trade was just completed)
+      // But don't clear the current instrument — only refresh data if it still exists
+      const active = getActiveStore();
+      setActiveAssets({ ...active });
     };
     window.addEventListener('biasUpdated', onBiasUpdated);
     return () => window.removeEventListener('biasUpdated', onBiasUpdated);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instrument]);
+  }, []);
 
   // ── Timer countdown ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -178,12 +178,11 @@ export default function Input() {
     setTargetInfo(targetData);
 
     // ── Persist to localStorage immediately ──
-    // Never re-add an instrument that has been completed (locked).
-    if (isLocked(instrument)) return;
-
     const active = getActiveStore();
+    const analysisId = active[instrument]?.analysisId || generateAnalysisId(instrument);
     active[instrument] = {
       instrument,
+      analysisId,
       inputs,
       extraCheck,
       results: res,

@@ -1,13 +1,12 @@
 /**
  * Single source of truth for trade completion.
- * All localStorage mutations happen here, synchronously, before biasUpdated is dispatched.
+ * Locks are keyed by analysisId (not instrument), so multiple analyses of the same instrument work.
  */
 import { base44 } from '@/api/base44Client';
 import { calcAlignment } from '@/lib/alignmentUtils';
 
-const ACTIVE_KEY      = 'primebias_active';
-const INSTRUMENT_KEY  = 'primebias_instrument';
-const LOCKS_KEY       = 'primebias_completed_locks';
+const ACTIVE_KEY = 'primebias_active';
+const LOCKS_KEY  = 'primebias_completed_locks'; // set of completed analysisIds
 
 // ── Lock helpers ──────────────────────────────────────────────────────────────
 
@@ -15,19 +14,19 @@ export function getLocks() {
   try { return JSON.parse(localStorage.getItem(LOCKS_KEY) || '{}'); } catch { return {}; }
 }
 
-export function isLocked(instrument) {
-  return instrument in getLocks();
+export function isAnalysisLocked(analysisId) {
+  return analysisId in getLocks();
 }
 
-export function addLock(instrument) {
+export function lockAnalysis(analysisId) {
   const locks = getLocks();
-  locks[instrument] = Date.now();
+  locks[analysisId] = Date.now();
   localStorage.setItem(LOCKS_KEY, JSON.stringify(locks));
 }
 
-export function removeLock(instrument) {
+export function unlockAnalysis(analysisId) {
   const locks = getLocks();
-  delete locks[instrument];
+  delete locks[analysisId];
   localStorage.setItem(LOCKS_KEY, JSON.stringify(locks));
 }
 
@@ -36,17 +35,20 @@ export function removeLock(instrument) {
 /**
  * completeTrade(analysis, result, details?)
  *
- * 1. Locks the instrument immediately (prevents any writes during async save)
- * 2. Removes from primebias_active synchronously
- * 3. Clears primebias_instrument if it matches
- * 4. Dispatches biasUpdated so UI reflects removal before DB call returns
- * 5. Saves CompletedTrade record to DB
- * 6. Returns the saved record
+ * analysis MUST have a unique analysisId. If not, one is generated.
+ * 1. Save to DB first (so if it fails, nothing is removed from the UI)
+ * 2. Lock the analysisId (prevents this specific analysis from re-rendering)
+ * 3. Remove from primebias_active
+ * 4. Dispatch biasUpdated
+ * 5. Return the saved record
  */
 export async function completeTrade(analysis, result, details = {}) {
-  const { instrument, results, targetInfo, inputs, extraCheck, timestamp } = analysis || {};
+  const { instrument, results, targetInfo, inputs, extraCheck, timestamp, analysisId } = analysis || {};
   if (!instrument) throw new Error('No instrument on analysis');
   if (!result)     throw new Error('No result provided');
+
+  // Generate analysisId if not present
+  const id = analysisId || generateAnalysisId(instrument);
 
   // 1. Save to DB FIRST — so if this fails, nothing is removed from the UI
   const alignment = calcAlignment(results || {});
@@ -80,42 +82,52 @@ export async function completeTrade(analysis, result, details = {}) {
     screenshot_url:   details.screenshotUrl || null,
   });
 
-  // 2. Lock — prevents Input from re-writing this instrument
-  addLock(instrument);
+  // 2. Lock this specific analysisId
+  lockAnalysis(id);
 
-  // 3. Remove only this instrument from active set
+  // 3. Remove this specific analysis from active set (by ID)
   const active = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
-  delete active[instrument];
+  if (active[instrument]) {
+    const analyses = Array.isArray(active[instrument]) 
+      ? active[instrument].filter(a => a.analysisId !== id)
+      : active[instrument].analysisId === id ? [] : [active[instrument]];
+    
+    if (analyses.length === 0) {
+      delete active[instrument];
+    } else if (analyses.length === 1) {
+      active[instrument] = analyses[0];
+    } else {
+      active[instrument] = analyses;
+    }
+  }
   localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
 
-  // 4. Update selected instrument pointer — switch to another active one if possible.
-  //    Never fully remove it; that can trigger "new user" empty screens in Input.
-  if (localStorage.getItem(INSTRUMENT_KEY) === instrument) {
-    const remaining = Object.keys(active);
-    if (remaining.length > 0) {
-      localStorage.setItem(INSTRUMENT_KEY, remaining[0]);
-    }
-    // If none remain, leave the key pointing to the now-locked instrument.
-    // The lock prevents Input from re-adding it. Dashboard shows empty state naturally.
-  }
-
-  // 5. Notify all listeners
+  // 4. Notify all listeners
   window.dispatchEvent(new Event('biasUpdated'));
 
   return record;
 }
 
 /**
- * undoCompletion(instrument, analysis, recordId)
+ * undoCompletion(analysisId, recordId)
  * Restores a trade back to active and removes the lock.
  */
-export async function undoCompletion(instrument, analysis, recordId) {
+export async function undoCompletion(analysisId, recordId) {
   if (recordId) {
     await base44.entities.CompletedTrade.delete(recordId);
   }
-  removeLock(instrument);
-  const active = JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
-  active[instrument] = analysis;
-  localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+  unlockAnalysis(analysisId);
+  // (The analysis is already in primebias_active because we only lock it; removal happens on explicit complete)
   window.dispatchEvent(new Event('biasUpdated'));
+}
+
+/**
+ * Generate a unique analysis ID
+ */
+export function generateAnalysisId(instrument) {
+  const now = new Date();
+  const date = now.toISOString().split('T')[0];
+  const time = now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
+  const rand = Math.random().toString(36).substring(2, 8);
+  return `${instrument}-${date}-${time}-${rand}`;
 }
