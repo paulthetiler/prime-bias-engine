@@ -247,6 +247,23 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const handleOpenComplete = (analysis) => {
+    const active = JSON.parse(localStorage.getItem("primebias_active") || "{}");
+    const latest = active[analysis.instrument];
+
+    const latestAnalysis = Array.isArray(latest)
+      ? latest.find(a => a.analysisId === analysis.analysisId) || latest[0]
+      : latest;
+
+    console.log("PB_DEBUG_OPEN_COMPLETE_MODAL", {
+      clickedInstrument: analysis.instrument,
+      clickedAnalysisId: analysis.analysisId,
+      latestAnalysisId: latestAnalysis?.analysisId,
+    });
+
+    setCompleteAnalysis(latestAnalysis || analysis);
+  };
+
   const handleEditInstrument = (instrument) => {
     setSelectedAnalysis(null);
     sessionStorage.setItem('selectedInstrument', instrument);
@@ -392,7 +409,7 @@ export default function Dashboard() {
               key={a.instrument}
               analysis={a}
               onOpen={setSelectedAnalysis}
-              onComplete={setCompleteAnalysis}
+              onComplete={handleOpenComplete}
               settings={settings}
               compact={settings.compactMode}
             />

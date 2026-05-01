@@ -34,6 +34,22 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
 
     localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "1 outcome clicked");
 
+    const active = JSON.parse(localStorage.getItem("primebias_active") || "{}");
+    const current = active[instrument];
+    const currentAnalysisId = Array.isArray(current) ? current[0]?.analysisId : current?.analysisId;
+
+    if (currentAnalysisId && currentAnalysisId !== analysis.analysisId) {
+      alert(`DEBUG MISMATCH: modal has ${analysis.analysisId} but active has ${currentAnalysisId}`);
+      setSaving(false);
+      processingRef.current = false;
+      return;
+    }
+
+    console.log("PB_DEBUG_COMPLETE_TRADE_ID_CHECK", {
+      modalAnalysisId: analysis.analysisId,
+      activeStorageId: currentAnalysisId,
+    });
+
     let record;
     try {
       record = await completeTrade(analysis, resultValue);
@@ -167,6 +183,22 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
     setSaving(true);
 
     localStorage.setItem("PB_DEBUG_COMPLETION_STEP", "1 outcome clicked");
+
+    const active = JSON.parse(localStorage.getItem("primebias_active") || "{}");
+    const current = active[instrument];
+    const currentAnalysisId = Array.isArray(current) ? current[0]?.analysisId : current?.analysisId;
+
+    if (currentAnalysisId && currentAnalysisId !== analysis.analysisId) {
+      alert(`DEBUG MISMATCH: modal has ${analysis.analysisId} but active has ${currentAnalysisId}`);
+      setSaving(false);
+      processingRef.current = false;
+      return;
+    }
+
+    console.log("PB_DEBUG_COMPLETE_TRADE_ID_CHECK", {
+      modalAnalysisId: analysis.analysisId,
+      activeStorageId: currentAnalysisId,
+    });
 
     let record;
     try {
