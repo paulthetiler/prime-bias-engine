@@ -200,9 +200,9 @@ export default function Input() {
           setAutoSaveStatus('saved');
           setTimeout(() => setAutoSaveStatus('idle'), 2000);
         } catch (err) {
-          console.error('AutoSave error:', err?.message || err);
-          setAutoSaveStatus('error');
-          setTimeout(() => setAutoSaveStatus('idle'), 3000);
+          console.warn('AutoSave error (non-critical):', err?.message || err);
+          // Don't show error to user — autosave to BiasAnalysis is non-critical
+          setAutoSaveStatus('idle');
         }
       }, 1500);
     }
