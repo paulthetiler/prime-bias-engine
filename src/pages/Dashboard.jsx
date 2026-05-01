@@ -257,22 +257,11 @@ export default function Dashboard() {
     console.log("PB_DEBUG_DASHBOARD_COMPLETION_HANDLER", {
       recordId: record?.id,
       instrument: record?.instrument,
-      route: "/trade-history",
       timestamp: new Date().toISOString(),
     });
 
-    setIsCompletingTrade(true);
     setCompleteAnalysis(null);
-    localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
-
-    navigate("/trade-history", {
-      replace: true,
-      state: { focusedTradeId: record?.id }
-    });
-
-    requestAnimationFrame(() => {
-      window.dispatchEvent(new Event("biasUpdated"));
-    });
+    setIsCompletingTrade(false);
   };
 
   let analyses = Object.values(activeAssets);

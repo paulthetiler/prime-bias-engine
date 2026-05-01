@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ const RESULTS = [
 
 // ── Quick mode ────────────────────────────────────────────────────────────────
 function QuickCompleteModal({ analysis, onClose, onCompleted }) {
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const processingRef = useRef(false);
 
@@ -70,7 +72,14 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
       route: "/trade-history",
     });
 
-    onCompleted(record);
+    localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
+
+    navigate("/trade-history", {
+      replace: true,
+      state: { focusedTradeId: record?.id }
+    });
+
+    onCompleted?.(record);
   };
 
   return (
@@ -138,6 +147,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
 
 // ── Detailed mode ─────────────────────────────────────────────────────────────
 function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
+  const navigate = useNavigate();
   const [result, setResult] = useState('');
   const [entry, setEntry] = useState('');
   const [exit, setExit] = useState('');
@@ -192,7 +202,14 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
       route: "/trade-history",
     });
 
-    onCompleted(record);
+    localStorage.setItem("primebias_last_completed_trade", JSON.stringify(record));
+
+    navigate("/trade-history", {
+      replace: true,
+      state: { focusedTradeId: record?.id }
+    });
+
+    onCompleted?.(record);
   };
 
   return (
