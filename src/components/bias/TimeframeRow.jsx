@@ -38,8 +38,8 @@ export default function TimeframeRow({ tf, indicators, onChange, result, inputSt
           </>
         )}
       </div>
-      <div className="col-span-1 text-center">
-        <div className={cn('font-bold text-sm', biasColor)}>
+      <div className="col-span-1 text-right overflow-hidden">
+        <div className={cn('font-bold text-xs leading-tight truncate', biasColor)}>
           {result?.bias || '—'}
         </div>
         <div className="text-[10px] text-muted-foreground font-mono">
