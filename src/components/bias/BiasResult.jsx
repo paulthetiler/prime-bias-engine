@@ -59,37 +59,37 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
     : 'bg-secondary text-muted-foreground border-border';
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
 
       {/* ── MAIN RESULT CARD ── Split layout */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="flex min-h-[120px]">
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+        <div className="flex min-h-[100px]">
 
           {/* Left — Grade */}
-          <div className="flex flex-col items-center justify-center px-5 py-4 bg-secondary/60 border-r border-border min-w-[90px]">
-            <span className="text-5xl font-black tracking-tight text-foreground leading-none">{grade}</span>
-            <span className="text-xs font-medium text-muted-foreground mt-1.5 text-center leading-tight">{gradeLabel}</span>
+          <div className="flex flex-col items-center justify-center px-4 py-3 bg-secondary/40 border-r border-border min-w-[76px]">
+            <span className="text-4xl font-black tracking-tight text-foreground leading-none">{grade}</span>
+            <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight">{gradeLabel}</span>
           </div>
 
           {/* Right — Decision info */}
-          <div className="flex flex-col justify-center px-4 py-4 flex-1 gap-2.5">
+          <div className="flex flex-col justify-center px-3 py-3 flex-1 gap-2">
             {/* Status badge */}
-            <span className={cn('self-start text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border mb-0.5', statusBadge)}>
+            <span className={cn('self-start text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
               {status}
             </span>
 
             {/* Grid: label → value */}
-            <div className="grid items-center gap-y-2" style={{ gridTemplateColumns: '1fr minmax(100px, auto)', columnGap: '16px' }}>
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Direction</span>
+            <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '80px 1fr' }}>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Direction</span>
               <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
 
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Action</span>
-              <span className={cn('text-xs font-bold px-2 py-0.5 rounded-md self-start', actionColors[tradeAction])}>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Action</span>
+              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit', actionColors[tradeAction])}>
                 {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
               </span>
 
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Target</span>
-              <span className="text-xs font-mono font-semibold text-foreground">{targetNote || '—'}</span>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Target</span>
+              <span className="text-[11px] font-mono font-semibold text-foreground">{targetNote || '—'}</span>
             </div>
           </div>
         </div>
@@ -97,8 +97,8 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
 
       {/* ── BLOCK BREAKDOWN ── */}
       <div>
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Block Breakdown</div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5">Block Breakdown</div>
+        <div className="grid grid-cols-3 gap-1.5">
           <TrendPill label="Deep" value={deepTrend} sub={deepStrength} />
           <TrendPill label="DD" value={ddBias} sub={ddStrength} />
           <TrendPill label="Now" value={nowBias} sub={nowStrength} />
@@ -107,22 +107,21 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
 
       {/* ── BACKEND SCORE (optional) ── */}
       {settings?.showBackendScore && (
-        <div className="rounded-lg border border-border bg-secondary/60 p-3 space-y-1.5">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Backend Score</div>
+        <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Score</span>
-            <span className="font-mono font-bold text-foreground">{winningScore ?? 0} pts</span>
+            <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Score</span>
+            <span className="font-mono font-semibold text-foreground">{winningScore ?? 0} pts</span>
           </div>
         </div>
       )}
 
       {/* ── WARNINGS ── */}
       {warnings.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {warnings.map((w, i) => (
-            <div key={i} className="flex items-start gap-2 rounded-lg bg-yellow-100 dark:bg-yellow-500/10 border border-yellow-300 dark:border-yellow-500/20 p-2.5 text-xs text-yellow-800 dark:text-yellow-300">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{w}</span>
+            <div key={i} className="flex items-start gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-500/8 border border-amber-200/60 dark:border-amber-500/15 p-2.5 text-xs text-amber-800 dark:text-amber-300 backdrop-blur-sm">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-70" />
+              <span className="leading-snug">{w}</span>
             </div>
           ))}
         </div>
@@ -148,12 +147,14 @@ function strengthColor(direction, strength) {
 }
 
 function TrendPill({ label, value, sub }) {
-  const color = value === 'BUY' || value === 'BULL' ? 'text-primary' : value === 'SELL' || value === 'BEAR' ? 'text-destructive' : 'text-muted-foreground';
+  const color = value === 'BUY' || value === 'BULL' ? 'text-primary'
+    : value === 'SELL' || value === 'BEAR' ? 'text-destructive'
+    : 'text-foreground/40';
   return (
-    <div className="rounded-lg bg-secondary/80 border border-border p-2 text-center">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={cn('text-sm font-bold', color)}>{value || '—'}</div>
-      {sub && <div className={cn('text-[9px] mt-0.5', strengthColor(value, sub))}>{sub}</div>}
+    <div className="rounded-lg bg-secondary/50 border border-border/70 p-2 text-center shadow-sm">
+      <div className="text-[8px] uppercase tracking-wider text-muted-foreground/70 mb-0.5">{label}</div>
+      <div className={cn('text-[12px] font-bold leading-tight', color)}>{value || '—'}</div>
+      {sub && <div className={cn('text-[8px] mt-0.5 leading-tight', strengthColor(value, sub))}>{sub}</div>}
     </div>
   );
 }

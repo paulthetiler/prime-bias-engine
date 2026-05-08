@@ -289,7 +289,7 @@ export default function Input() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-3 space-y-2.5">
+    <div className="p-3 space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <h1 className="text-base font-bold tracking-tight">Bias Tool</h1>
@@ -410,8 +410,8 @@ export default function Input() {
       {/* Broadstroke Section */}
       {instrument && (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2 px-1">Broadstroke — Deep Trend</div>
-          <div className="space-y-1.5">
+          <div className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5 px-1">Broadstroke — Deep Trend</div>
+          <div className="space-y-1">
             {TIMEFRAMES.filter(tf => tf.group === 'broadstroke').map(tf => (
               <TimeframeRow
                 key={tf.key}
@@ -429,8 +429,8 @@ export default function Input() {
       {/* Trigger Section */}
       {instrument && (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2 px-1">Trigger — Execution</div>
-          <div className="space-y-1.5">
+          <div className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5 px-1">Trigger — Execution</div>
+          <div className="space-y-1">
             {TIMEFRAMES.filter(tf => tf.group === 'trigger').map(tf => (
               <TimeframeRow
                 key={tf.key}
@@ -470,16 +470,18 @@ export default function Input() {
 
       {/* ATR & Target */}
       {instrument && (
-        <div className="grid grid-cols-2 gap-3 bg-accent/30 rounded-lg p-3 border border-border">
-          <div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">ATR Used</div>
-            <div className="text-lg font-mono font-bold text-foreground">{baseAtr ? baseAtr.toFixed(6) : '—'}</div>
-          </div>
-          <div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Target</div>
-            <div className="text-lg font-mono font-bold text-foreground">
-              {targetInfo?.target ? targetInfo.target.toFixed(6) : '—'}
-              {targetInfo?.targetType && <span className="text-xs text-muted-foreground ml-1">({targetInfo.targetType})</span>}
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="grid grid-cols-2 divide-x divide-border">
+            <div className="px-3 py-2.5">
+              <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">ATR Used</div>
+              <div className="text-base font-mono font-bold text-foreground">{baseAtr ? baseAtr.toFixed(6) : '—'}</div>
+            </div>
+            <div className="px-3 py-2.5">
+              <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Target</div>
+              <div className="text-base font-mono font-bold text-foreground">
+                {targetInfo?.target ? targetInfo.target.toFixed(6) : '—'}
+              </div>
+              {targetInfo?.targetType && <div className="text-[9px] text-muted-foreground">{targetInfo.targetType}</div>}
             </div>
           </div>
         </div>

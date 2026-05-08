@@ -12,20 +12,20 @@ export default function TimeframeRow({ tf, indicators, onChange, result, inputSt
 
   return (
     <div className={cn(
-      'flex items-center gap-2 py-2 px-3 rounded-lg',
-      isBS ? 'bg-secondary/50' : 'bg-accent/30'
+      'flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg',
+      isBS ? 'bg-secondary/50' : 'bg-accent/20'
     )}>
       {/* Label */}
-      <div className="w-8 shrink-0">
-        <div className="text-[9px] text-muted-foreground uppercase tracking-wider leading-tight">{isBS ? 'BS' : 'TR'}</div>
-        <div className="font-bold text-sm leading-tight">{tf.shortLabel}</div>
+      <div className="w-7 shrink-0">
+        <div className="text-[8px] text-muted-foreground/60 uppercase tracking-wider leading-tight">{isBS ? 'BS' : 'TR'}</div>
+        <div className="font-semibold text-[13px] leading-tight text-foreground">{tf.shortLabel}</div>
       </div>
 
       {/* Buttons */}
-      <div className="flex gap-1.5 flex-1 min-w-0">
+      <div className="flex gap-1 flex-1 min-w-0">
         {tf.key === 'h1' || tf.key === 'm15' || tf.key === 'm5' ? (
           <>
-            <div className="flex-1 opacity-30">
+            <div className="flex-1 opacity-25 pointer-events-none">
               <IndicatorButton value={0} onChange={() => {}} label="Close" inputStyle={inputStyle} />
             </div>
             <div className="flex-1"><IndicatorButton value={indicators.macd} onChange={(v) => handleChange('macd', v)} label="MACD" inputStyle={inputStyle} /></div>
@@ -43,11 +43,11 @@ export default function TimeframeRow({ tf, indicators, onChange, result, inputSt
       </div>
 
       {/* Bias result */}
-      <div className="w-10 shrink-0 text-right">
-        <div className={cn('font-bold text-xs leading-tight', biasColor)}>
+      <div className="w-11 shrink-0 text-right">
+        <div className={cn('font-semibold text-[11px] leading-tight', biasColor === 'text-muted-foreground' ? 'text-foreground/50' : biasColor)}>
           {result?.bias || '—'}
         </div>
-        <div className="text-[10px] text-muted-foreground font-mono">
+        <div className="text-[9px] text-muted-foreground/70 font-mono">
           {result?.total ?? 0}
         </div>
       </div>

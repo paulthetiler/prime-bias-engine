@@ -13,14 +13,14 @@ function TapCycleButton({ value, onChange, label }) {
     <button
       onClick={cycle}
       className={cn(
-        'w-full h-12 rounded-lg font-mono text-sm font-semibold transition-all duration-150 active:scale-95 border-2',
-        value === 1 && 'bg-primary/15 border-primary text-primary',
-        value === -1 && 'bg-destructive/15 border-destructive text-destructive',
-        value === 0 && 'bg-secondary border-border text-muted-foreground'
+        'w-full h-10 rounded-md font-mono font-semibold transition-all duration-150 active:scale-95 border flex flex-col items-center justify-center gap-0',
+        value === 1 && 'bg-primary/10 border-primary/60 text-primary',
+        value === -1 && 'bg-destructive/10 border-destructive/60 text-destructive',
+        value === 0 && 'bg-secondary border-border text-muted-foreground/60'
       )}
     >
-      <div className="text-[10px] uppercase tracking-wider opacity-70">{label}</div>
-      <div className="text-base">
+      <div className="text-[8px] uppercase tracking-wide font-semibold opacity-60 leading-none">{label}</div>
+      <div className="text-[13px] font-bold leading-none mt-0.5">
         {value === 1 ? '+1' : value === -1 ? '−1' : '0'}
       </div>
     </button>
