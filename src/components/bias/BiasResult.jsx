@@ -13,49 +13,47 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
   const m15r = tf.m15?.result ?? '?';
   const m5r  = tf.m5?.result  ?? '?';
 
-  const dirColor = mainDirection === 'BUY' ? 'text-emerald-600 dark:text-emerald-400' : mainDirection === 'SELL' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
-  const dirBg = mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border';
+  const dirColor = mainDirection === 'BUY' ? 'text-primary' : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
+  const dirBg = mainDirection === 'BUY' ? 'bg-primary/10 border-primary/30' : mainDirection === 'SELL' ? 'bg-destructive/10 border-destructive/30' : 'bg-secondary border-border';
 
   const gradeColors = {
-    A: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/30',
-    B: 'text-blue-600 dark:text-blue-400 bg-blue-500/15 border-blue-500/30',
+    A: 'text-primary bg-primary/15 border-primary/30',
+    B: 'text-foreground bg-secondary border-border',
     C: 'text-yellow-700 dark:text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
     D: 'text-orange-600 dark:text-orange-400 bg-orange-500/15 border-orange-500/30',
-    F: 'text-red-600 dark:text-red-400 bg-red-500/15 border-red-500/30',
+    F: 'text-destructive bg-destructive/15 border-destructive/30',
   };
 
   const actionColors = {
-    TRADE: 'bg-emerald-500 text-white',
+    TRADE: 'bg-primary text-white',
     WAIT: 'bg-yellow-500 text-black',
-    NO_TRADE: 'bg-red-500 text-white',
+    NO_TRADE: 'bg-destructive text-white',
   };
 
   const actionLabels = { TRADE: 'TRADE', WAIT: 'WAIT', NO_TRADE: 'NO TRADE' };
 
   // Now momentum color — based on nowBias direction, NOT mainDirection
-  const nowColor = nowBias === 'BUY' ? 'text-emerald-600 dark:text-emerald-400' : nowBias === 'SELL' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
-  const nowScoreColor = plusMinusScore > 0 ? 'text-emerald-400' : plusMinusScore < 0 ? 'text-red-400' : 'text-muted-foreground';
+  const nowColor = nowBias === 'BUY' ? 'text-primary' : nowBias === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
+  const nowScoreColor = plusMinusScore > 0 ? 'text-primary' : plusMinusScore < 0 ? 'text-destructive' : 'text-muted-foreground';
 
-  // Strength colour inherits direction: buy-side = green shades, sell-side = red/pink shades, neutral = grey
-  // STRONG = full colour, MEDIUM = mid, WEAK = pale/muted
   function strengthColor(direction, strength) {
     const isBuy  = direction === 'BUY'  || direction === 'BULL';
     const isSell = direction === 'SELL' || direction === 'BEAR';
     if (!isBuy && !isSell) return 'text-muted-foreground';
     if (isBuy) {
-      if (strength === 'STRONG') return 'text-emerald-600 dark:text-emerald-400';
-      if (strength === 'MEDIUM') return 'text-emerald-600 dark:text-emerald-500';
-      if (strength === 'WEAK')   return 'text-emerald-700 dark:text-emerald-700';
+      if (strength === 'STRONG') return 'text-primary';
+      if (strength === 'MEDIUM') return 'text-primary/80';
+      if (strength === 'WEAK')   return 'text-primary/50';
       return 'text-muted-foreground';
     }
-    if (strength === 'STRONG') return 'text-red-600 dark:text-red-400';
-    if (strength === 'MEDIUM') return 'text-orange-600 dark:text-orange-400';
-    if (strength === 'WEAK')   return 'text-rose-700 dark:text-rose-600';
+    if (strength === 'STRONG') return 'text-destructive';
+    if (strength === 'MEDIUM') return 'text-orange-500';
+    if (strength === 'WEAK')   return 'text-destructive/50';
     return 'text-muted-foreground';
   }
 
   const statusBadge = status === 'Ready' || status === 'Scalp'
-    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+    ? 'bg-primary/15 text-primary border-primary/30'
     : status === 'Wait' || status === 'Weak'
     ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
     : 'bg-secondary text-muted-foreground border-border';
@@ -138,19 +136,19 @@ function strengthColor(direction, strength) {
   const isSell = direction === 'SELL' || direction === 'BEAR';
   if (!isBuy && !isSell) return 'text-muted-foreground';
   if (isBuy) {
-    if (strength === 'STRONG') return 'text-emerald-600 dark:text-emerald-400';
-    if (strength === 'MEDIUM') return 'text-emerald-600 dark:text-emerald-500';
-    if (strength === 'WEAK')   return 'text-emerald-700 dark:text-emerald-700';
+    if (strength === 'STRONG') return 'text-primary';
+    if (strength === 'MEDIUM') return 'text-primary/80';
+    if (strength === 'WEAK')   return 'text-primary/50';
     return 'text-muted-foreground';
   }
-  if (strength === 'STRONG') return 'text-red-600 dark:text-red-400';
-  if (strength === 'MEDIUM') return 'text-orange-600 dark:text-orange-400';
-  if (strength === 'WEAK')   return 'text-rose-700 dark:text-rose-600';
+  if (strength === 'STRONG') return 'text-destructive';
+  if (strength === 'MEDIUM') return 'text-orange-500';
+  if (strength === 'WEAK')   return 'text-destructive/50';
   return 'text-muted-foreground';
 }
 
 function TrendPill({ label, value, sub }) {
-  const color = value === 'BUY' || value === 'BULL' ? 'text-emerald-600 dark:text-emerald-400' : value === 'SELL' || value === 'BEAR' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
+  const color = value === 'BUY' || value === 'BULL' ? 'text-primary' : value === 'SELL' || value === 'BEAR' ? 'text-destructive' : 'text-muted-foreground';
   return (
     <div className="rounded-lg bg-secondary/80 border border-border p-2 text-center">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>

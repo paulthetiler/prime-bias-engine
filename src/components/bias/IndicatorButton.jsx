@@ -14,8 +14,8 @@ function TapCycleButton({ value, onChange, label }) {
       onClick={cycle}
       className={cn(
         'w-full h-12 rounded-lg font-mono text-sm font-semibold transition-all duration-150 active:scale-95 border-2',
-        value === 1 && 'bg-emerald-500/20 border-emerald-500 text-emerald-700 dark:text-emerald-400',
-        value === -1 && 'bg-red-500/20 border-red-500 text-red-700 dark:text-red-400',
+        value === 1 && 'bg-primary/15 border-primary text-primary',
+        value === -1 && 'bg-destructive/15 border-destructive text-destructive',
         value === 0 && 'bg-secondary border-border text-muted-foreground'
       )}
     >
@@ -38,8 +38,8 @@ function ButtonStyleInput({ value, onChange, label }) {
           className={cn(
             'flex-1 h-8 rounded text-[10px] font-bold border transition-colors',
             value === 1
-              ? 'bg-emerald-500 text-white border-emerald-500'
-              : 'bg-secondary border-border text-muted-foreground hover:border-emerald-500/50'
+              ? 'bg-primary text-white border-primary'
+              : 'bg-secondary border-border text-muted-foreground hover:border-primary/50'
           )}
         >B</button>
         <button
@@ -56,8 +56,8 @@ function ButtonStyleInput({ value, onChange, label }) {
           className={cn(
             'flex-1 h-8 rounded text-[10px] font-bold border transition-colors',
             value === -1
-              ? 'bg-red-500 text-white border-red-500'
-              : 'bg-secondary border-border text-muted-foreground hover:border-red-500/50'
+              ? 'bg-destructive text-white border-destructive'
+              : 'bg-secondary border-border text-muted-foreground hover:border-destructive/50'
           )}
         >S</button>
       </div>

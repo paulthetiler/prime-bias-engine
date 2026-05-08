@@ -37,7 +37,7 @@ export default function EngineBreakdown({ results }) {
                 <span className="text-muted-foreground">wt: {weight}</span>
                 <span className={cn(
                   'font-mono font-semibold',
-                  result === 1 ? 'text-emerald-400' : result === -1 ? 'text-red-400' : 'text-muted-foreground'
+                  result === 1 ? 'text-primary' : result === -1 ? 'text-destructive' : 'text-muted-foreground'
                 )}>{side}: {contrib}</span>
               </div>
             );
@@ -45,11 +45,11 @@ export default function EngineBreakdown({ results }) {
           <div className="border-t border-border pt-2 mt-2 flex justify-between text-sm font-semibold">
             <span>Total</span>
             <span className="font-mono">
-              <span className="text-emerald-400">+{posScore}</span>
+              <span className="text-primary">+{posScore}</span>
               {' / '}
-              <span className="text-red-400">−{negScore}</span>
+              <span className="text-destructive">−{negScore}</span>
               {' → '}
-              <span className={mainDirection === 'BUY' ? 'text-emerald-400' : 'text-red-400'}>{confidenceScore}</span>
+              <span className={mainDirection === 'BUY' ? 'text-primary' : 'text-destructive'}>{confidenceScore}</span>
             </span>
           </div>
         </div>
@@ -73,7 +73,7 @@ function Section({ title, subtitle, children }) {
 function TFRow({ tf, data }) {
   if (!data) return null;
   const { indicators = {}, total = 0, result = 0, bias } = data;
-  const biasColor = bias === 'BUY' ? 'text-emerald-400' : bias === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+  const biasColor = bias === 'BUY' ? 'text-primary' : bias === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
 
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
@@ -98,8 +98,8 @@ function Pill({ value, label }) {
   return (
     <span className={cn(
       'inline-flex items-center justify-center w-5 h-5 rounded text-[9px] font-bold',
-      value === 1 && 'bg-emerald-500/20 text-emerald-400',
-      value === -1 && 'bg-red-500/20 text-red-400',
+      value === 1 && 'bg-primary/20 text-primary',
+      value === -1 && 'bg-destructive/20 text-destructive',
       value === 0 && 'bg-secondary text-muted-foreground'
     )}>
       {value === 1 ? '+' : value === -1 ? '−' : '0'}

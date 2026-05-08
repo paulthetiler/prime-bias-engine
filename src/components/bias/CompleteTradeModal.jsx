@@ -76,7 +76,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
         {/* Snapshot */}
         <div className="px-4 pb-3">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className={cn('font-bold', results?.mainDirection === 'BUY' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+            <span className={cn('font-bold', results?.mainDirection === 'BUY' ? 'text-primary' : 'text-destructive')}>
               {results?.mainDirection}
             </span>
             <span>Grade <span className="text-foreground font-semibold">{results?.grade}</span></span>
@@ -179,7 +179,7 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
           {/* Snapshot */}
           <div className="rounded-xl bg-secondary/50 border border-border p-3 grid grid-cols-3 gap-2 text-center text-xs">
             <div>
-              <div className={cn('font-bold text-sm', results?.mainDirection === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>{results?.mainDirection}</div>
+              <div className={cn('font-bold text-sm', results?.mainDirection === 'BUY' ? 'text-primary' : 'text-destructive')}>{results?.mainDirection}</div>
               <div className="text-muted-foreground">Direction</div>
             </div>
             <div>

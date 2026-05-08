@@ -15,22 +15,22 @@ import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 
 
 const gradeColors = {
-  A: 'text-emerald-600 dark:text-emerald-400',
-  B: 'text-blue-600 dark:text-blue-400',
+  A: 'text-primary',
+  B: 'text-foreground',
   C: 'text-yellow-700 dark:text-yellow-400',
   D: 'text-orange-600 dark:text-orange-400',
-  F: 'text-red-600 dark:text-red-400',
+  F: 'text-destructive',
 };
 
 const actionColors = {
-  TRADE: 'bg-emerald-500 text-white',
+  TRADE: 'bg-primary text-white',
   WAIT: 'bg-yellow-500 text-black',
-  NO_TRADE: 'bg-red-500 text-white',
+  NO_TRADE: 'bg-destructive text-white',
 };
 
 function TrendPill({ label, dir, strength }) {
-  const color = dir === 'BUY' || dir === 'BULL' ? 'text-emerald-600 dark:text-emerald-400'
-    : dir === 'SELL' || dir === 'BEAR' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
+  const color = dir === 'BUY' || dir === 'BULL' ? 'text-primary'
+    : dir === 'SELL' || dir === 'BEAR' ? 'text-destructive' : 'text-muted-foreground';
   return (
     <div className="rounded-lg bg-secondary border border-border p-2 text-center flex-1 min-w-0">
       <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
@@ -50,13 +50,13 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
     deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength,
   } = results;
 
-  const dirColor = mainDirection === 'BUY' ? 'text-emerald-600 dark:text-emerald-400'
-    : mainDirection === 'SELL' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
-  const dirBorder = mainDirection === 'BUY' ? 'border-emerald-500/30'
-    : mainDirection === 'SELL' ? 'border-red-500/30' : 'border-border';
+  const dirColor = mainDirection === 'BUY' ? 'text-primary'
+    : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
+  const dirBorder = mainDirection === 'BUY' ? 'border-primary/30'
+    : mainDirection === 'SELL' ? 'border-destructive/30' : 'border-border';
 
   const statusBadge = status === 'Ready' || status === 'Scalp'
-    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+    ? 'bg-primary/15 text-primary border-primary/30'
     : status === 'Wait' || status === 'Weak'
     ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
     : 'bg-secondary text-muted-foreground border-border';

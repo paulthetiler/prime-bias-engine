@@ -6,17 +6,17 @@ import WhyThisTrade from './WhyThisTrade';
 import { calcAlignment, alignmentColor, alignmentBg } from '@/lib/alignmentUtils';
 
 const gradeColors = {
-  A: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30',
-  B: 'text-blue-400 bg-blue-500/15 border-blue-500/30',
+  A: 'text-primary bg-primary/15 border-primary/30',
+  B: 'text-foreground bg-secondary border-border',
   C: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
   D: 'text-orange-400 bg-orange-500/15 border-orange-500/30',
-  F: 'text-red-400 bg-red-500/15 border-red-500/30',
+  F: 'text-destructive bg-destructive/15 border-destructive/30',
 };
 
 const actionColors = {
-  TRADE: 'bg-emerald-500 text-white',
+  TRADE: 'bg-primary text-white',
   WAIT: 'bg-yellow-500 text-black',
-  NO_TRADE: 'bg-red-500 text-white',
+  NO_TRADE: 'bg-destructive text-white',
 };
 
 function Row({ label, value, valueClass }) {
@@ -29,8 +29,8 @@ function Row({ label, value, valueClass }) {
 }
 
 function TrendPill({ label, dir, strength }) {
-  const color = dir === 'BUY' || dir === 'BULL' ? 'text-emerald-400'
-    : dir === 'SELL' || dir === 'BEAR' ? 'text-red-400' : 'text-muted-foreground';
+  const color = dir === 'BUY' || dir === 'BULL' ? 'text-primary'
+    : dir === 'SELL' || dir === 'BEAR' ? 'text-destructive' : 'text-muted-foreground';
   return (
     <div className="rounded-lg bg-secondary border border-border p-2.5 text-center flex-1">
       <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
@@ -52,7 +52,7 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
   } = results;
 
   const alignment = calcAlignment(results);
-  const dirColor = mainDirection === 'BUY' ? 'text-emerald-400' : mainDirection === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+  const dirColor = mainDirection === 'BUY' ? 'text-primary' : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
   const showTarget = settings?.showTarget !== false;
   const showScore = settings?.showScore !== false;
   const showAlignment = settings?.showAlignment !== false;
@@ -84,7 +84,7 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
         <div className="p-4 space-y-4 pb-[120px]">
           {/* Direction + Status */}
           <div className="grid grid-cols-2 gap-3">
-            <div className={cn('rounded-xl border-2 p-4 text-center', mainDirection === 'BUY' ? 'bg-emerald-500/10 border-emerald-500/30' : mainDirection === 'SELL' ? 'bg-red-500/10 border-red-500/30' : 'bg-secondary border-border')}>
+            <div className={cn('rounded-xl border-2 p-4 text-center', mainDirection === 'BUY' ? 'bg-primary/10 border-primary/30' : mainDirection === 'SELL' ? 'bg-destructive/10 border-destructive/30' : 'bg-secondary border-border')}>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Direction</div>
               <div className={cn('text-3xl font-bold', dirColor)}>{mainDirection}</div>
             </div>
