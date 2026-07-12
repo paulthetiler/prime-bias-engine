@@ -4,6 +4,7 @@ import { useTheme } from '@/lib/useTheme';
 import { Button } from '@/components/ui/button';
 import { Moon, Sun, BookOpen, ChevronDown, ChevronUp, RotateCcw, History, Sparkles } from 'lucide-react';
 import HowToGuide from '@/components/HowToGuide';
+import { InstallCard } from '@/components/InstallApp';
 import { getSettings, saveSettings, DEFAULTS } from '@/lib/userSettings';
 import { cn } from '@/lib/utils';
 
@@ -115,6 +116,9 @@ export default function Settings() {
           {theme === 'dark' ? 'Light' : 'Dark'}
         </Button>
       </div>
+
+      {/* Install App */}
+      <InstallCard />
 
       {/* Display Settings */}
       <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
