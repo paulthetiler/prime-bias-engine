@@ -5,10 +5,8 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getSettings } from '@/lib/userSettings';
 import { completeTrade } from '@/lib/tradeCompletion';
-
-function getAnalysisId(analysis) {
-  return analysis?.analysisId;
-}
+import { celebrateWin } from '@/lib/celebrate';
+import { tap } from '@/lib/haptics';
 
 const RESULTS = [
   { value: 'win',       label: 'WIN',        emoji: '✅', color: 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
@@ -45,6 +43,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
     
     const label = RESULTS.find(r => r.value === resultValue)?.label || resultValue;
     toast.success(`${instrument} saved as ${label}`);
+    if (resultValue === 'win') celebrateWin();
 
     setSaving(false);
     onClose();
@@ -95,7 +94,7 @@ function QuickCompleteModal({ analysis, onClose, onCompleted }) {
                 <button
                   key={r.value}
                   disabled={saving}
-                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); handlePick(r.value); }}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); tap(); handlePick(r.value); }}
                   className={cn(
                     'rounded-xl border-2 py-4 text-sm font-bold transition-all active:scale-95',
                     'border-border bg-secondary text-foreground hover:border-primary/50 hover:bg-primary/5',
@@ -148,6 +147,7 @@ function DetailedCompleteModal({ analysis, onClose, onCompleted }) {
 
     const resultLabel = RESULTS.find(r => r.value === result)?.label || result;
     toast.success(`${instrument} saved as ${resultLabel}`);
+    if (result === 'win') celebrateWin();
 
     setSaving(false);
     onClose();

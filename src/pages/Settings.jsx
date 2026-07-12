@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/lib/useTheme';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, BookOpen, ChevronDown, ChevronUp, RotateCcw, History } from 'lucide-react';
+import { Moon, Sun, BookOpen, ChevronDown, ChevronUp, RotateCcw, History, Sparkles } from 'lucide-react';
 import HowToGuide from '@/components/HowToGuide';
 import { getSettings, saveSettings, DEFAULTS } from '@/lib/userSettings';
 import { cn } from '@/lib/utils';
@@ -292,6 +292,18 @@ export default function Settings() {
         <Button variant="outline" size="sm" onClick={() => navigate('/history')} className="gap-2">
           <History className="w-4 h-4" />
           Open
+        </Button>
+      </div>
+
+      {/* Welcome Tour */}
+      <div className="border border-border rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold">Welcome Tour</div>
+          <div className="text-xs text-muted-foreground">Replay the quick intro walkthrough</div>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.dispatchEvent(new Event('openOnboarding'))} className="gap-2">
+          <Sparkles className="w-4 h-4" />
+          Replay
         </Button>
       </div>
 

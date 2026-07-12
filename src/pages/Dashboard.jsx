@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { calculateBias, engineOptionsFromSettings } from '@/lib/biasEngine';
 import { calcAlignment } from '@/lib/alignmentUtils';
+import { gradeText } from '@/lib/gradeStyles';
 import { getSettings } from '@/lib/userSettings';
 import { isAnalysisLocked } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
@@ -13,14 +14,6 @@ import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 
 
-
-const gradeColors = {
-  A: 'text-primary',
-  B: 'text-foreground',
-  C: 'text-yellow-700 dark:text-yellow-400',
-  D: 'text-orange-600 dark:text-orange-400',
-  F: 'text-destructive',
-};
 
 const actionColors = {
   TRADE: 'bg-primary text-white',
@@ -88,7 +81,7 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
       <div className="flex min-h-[90px] border-t border-border/50">
         {/* Left — Grade */}
         <div className="flex flex-col items-center justify-center px-4 py-3 bg-secondary/50 border-r border-border/50 min-w-[72px]">
-          <span className="text-3xl font-black tracking-tight text-foreground leading-none">{grade}</span>
+          <span className={cn('text-3xl font-black tracking-tight leading-none', gradeText(grade))}>{grade}</span>
           <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight">{gradeLabel}</span>
         </div>
 

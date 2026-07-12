@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import TopNav from './TopNav';
 import BottomNav from './BottomNav';
 import PageTransition from './PageTransition';
+import Onboarding from '@/components/Onboarding';
 
 export default function AppLayout() {
   return (
@@ -14,6 +15,7 @@ export default function AppLayout() {
         </PageTransition>
       </main>
       <BottomNav />
+      <Onboarding />
     </div>
   );
 }
