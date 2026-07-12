@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Moon, Sun, BookOpen, ChevronDown, ChevronUp, RotateCcw, History, Sparkles } from 'lucide-react';
 import HowToGuide from '@/components/HowToGuide';
 import { InstallCard } from '@/components/InstallApp';
+import ExportBackup from '@/components/ExportBackup';
 import { getSettings, saveSettings, DEFAULTS } from '@/lib/userSettings';
 import { cn } from '@/lib/utils';
 
@@ -119,6 +120,9 @@ export default function Settings() {
 
       {/* Install App */}
       <InstallCard />
+
+      {/* Backup / Export */}
+      <ExportBackup />
 
       {/* Display Settings */}
       <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
