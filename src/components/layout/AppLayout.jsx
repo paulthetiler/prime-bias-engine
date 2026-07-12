@@ -1,6 +1,5 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import TopNav from './TopNav';
 import BottomNav from './BottomNav';
 import PageTransition from './PageTransition';

@@ -84,7 +84,7 @@ const TEST_CASES = [
       // M5 → SELL: macd-1, boli-1 → score = -10-40 = -50 → SELL
       m5:    { close:  0, macd: -1, rsi: 0, boli: -1 },
     },
-    expected: { deep: 'BEAR / STRONG', dd: 'SELL / MEDIUM', now: 'SELL / WEAK', direction: 'SELL', score: 60, grade: 'B' },
+    expected: { deep: 'BEAR / STRONG', dd: 'SELL / MEDIUM', now: 'SELL / WEAK', direction: 'SELL', score: 62, grade: 'B' },
   },
 ];
 

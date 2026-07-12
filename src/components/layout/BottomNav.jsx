@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { BarChart3, Timer, Settings } from 'lucide-react';
+import { BarChart3, Timer, Settings, History, BookOpen } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/engine', icon: BarChart3, label: 'Engine' },
+  { path: '/trade-history', icon: History, label: 'Trades' },
+  { path: '/journal', icon: BookOpen, label: 'Journal' },
   { path: '/atr', icon: Timer, label: 'ATR' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
@@ -22,7 +24,7 @@ export default function BottomNav() {
               key={item.path}
               to={item.path}
               className={cn(
-                'flex flex-col items-center gap-0.5 py-2 px-4 rounded-lg transition-colors',
+                'flex flex-col items-center gap-0.5 py-2 px-2.5 rounded-lg transition-colors',
                 active ? 'text-primary' : 'text-muted-foreground'
               )}
             >

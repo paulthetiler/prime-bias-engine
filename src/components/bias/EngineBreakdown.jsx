@@ -1,11 +1,11 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { TIMEFRAMES, TF_GRADE_WEIGHTS } from '@/lib/biasEngine';
+import { TIMEFRAMES, TF_SCORE_WEIGHTS } from '@/lib/biasEngine';
 
 export default function EngineBreakdown({ results }) {
   if (!results) return null;
 
-  const { timeframes = {}, posScore = 0, negScore = 0, mainDirection, confidenceScore = 0 } = results;
+  const { timeframes = {}, buyScore = 0, sellScore = 0, mainDirection, winningScore = 0 } = results;
 
   return (
     <div className="space-y-4">
@@ -27,9 +27,9 @@ export default function EngineBreakdown({ results }) {
         <h3 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wider">Grading Weights</h3>
         <div className="space-y-1.5">
           {TIMEFRAMES.map(tf => {
-            const weight = TF_GRADE_WEIGHTS[tf.key] ?? 0;
+            const weight = TF_SCORE_WEIGHTS[tf.key] ?? 0;
             const result = timeframes[tf.key]?.result ?? 0;
-            const contrib = result === 1 ? weight : result === -1 ? weight : 0;
+            const contrib = result === 0 ? 0 : weight;
             const side = result === 1 ? 'POS' : result === -1 ? 'NEG' : '—';
             return (
               <div key={tf.key} className="flex items-center justify-between text-xs">
@@ -45,11 +45,11 @@ export default function EngineBreakdown({ results }) {
           <div className="border-t border-border pt-2 mt-2 flex justify-between text-sm font-semibold">
             <span>Total</span>
             <span className="font-mono">
-              <span className="text-primary">+{posScore}</span>
+              <span className="text-primary">+{buyScore}</span>
               {' / '}
-              <span className="text-destructive">−{negScore}</span>
+              <span className="text-destructive">−{sellScore}</span>
               {' → '}
-              <span className={mainDirection === 'BUY' ? 'text-primary' : 'text-destructive'}>{confidenceScore}</span>
+              <span className={mainDirection === 'BUY' ? 'text-primary' : 'text-destructive'}>{winningScore}</span>
             </span>
           </div>
         </div>

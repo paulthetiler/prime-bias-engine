@@ -1,30 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import EngineBreakdown from '@/components/bias/EngineBreakdown';
+import { calculateBias, engineOptionsFromSettings } from '@/lib/biasEngine';
+import { getSettings } from '@/lib/userSettings';
+
+// Always recompute results from stored inputs so the breakdown reflects current settings.
+function withFreshResults(entry) {
+  if (!entry?.inputs) return entry;
+  return { ...entry, results: calculateBias(entry.inputs, entry.extraCheck || null, engineOptionsFromSettings(getSettings())) };
+}
 
 export default function Engine() {
   const [analysis, setAnalysis] = useState(null);
   const [instruments, setInstruments] = useState([]);
 
   const [selected, setSelected] = useState(null);
-  
+
   useEffect(() => {
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
     const instruments = Object.keys(active);
     if (instruments.length > 0 && !selected) setSelected(instruments[0]);
-    if (selected && active[selected]) setAnalysis(active[selected]);
+    if (selected && active[selected]) setAnalysis(withFreshResults(active[selected]));
   }, [selected]);
 
   useEffect(() => {
     const load = () => {
       const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
-      if (selected && active[selected]) setAnalysis(active[selected]);
+      if (selected && active[selected]) setAnalysis(withFreshResults(active[selected]));
     };
     window.addEventListener('biasUpdated', load);
     window.addEventListener('storage', load);
+    window.addEventListener('settingsUpdated', load);
     return () => {
       window.removeEventListener('biasUpdated', load);
       window.removeEventListener('storage', load);
+      window.removeEventListener('settingsUpdated', load);
     };
   }, [selected]);
 

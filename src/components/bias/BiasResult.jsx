@@ -1,20 +1,13 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle, MinusCircle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
-export default function BiasResult({ results, rawTimeframes, settings }) {
+export default function BiasResult({ results, settings }) {
   if (!results) return null;
 
-  const { mainDirection, grade, gradeLabel, confidenceScore, tradeAction, status, strength, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, plusMinusScore, winningScore, warnings, targetNote, timeframes } = results;
-  
-  // Debug panel — shows raw TF results and engine NOW output
-  const tf = timeframes || rawTimeframes || {};
-  const h1r  = tf.h1?.result  ?? '?';
-  const m15r = tf.m15?.result ?? '?';
-  const m5r  = tf.m5?.result  ?? '?';
+  const { mainDirection, grade, gradeLabel, tradeAction, status, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, winningScore, warnings, targetNote } = results;
 
   const dirColor = mainDirection === 'BUY' ? 'text-primary' : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
-  const dirBg = mainDirection === 'BUY' ? 'bg-primary/10 border-primary/30' : mainDirection === 'SELL' ? 'bg-destructive/10 border-destructive/30' : 'bg-secondary border-border';
 
   const gradeColors = {
     A: 'text-primary bg-primary/15 border-primary/30',
@@ -29,28 +22,6 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
     WAIT: 'bg-yellow-500 text-black',
     NO_TRADE: 'bg-destructive text-white',
   };
-
-  const actionLabels = { TRADE: 'TRADE', WAIT: 'WAIT', NO_TRADE: 'NO TRADE' };
-
-  // Now momentum color — based on nowBias direction, NOT mainDirection
-  const nowColor = nowBias === 'BUY' ? 'text-primary' : nowBias === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
-  const nowScoreColor = plusMinusScore > 0 ? 'text-primary' : plusMinusScore < 0 ? 'text-destructive' : 'text-muted-foreground';
-
-  function strengthColor(direction, strength) {
-    const isBuy  = direction === 'BUY'  || direction === 'BULL';
-    const isSell = direction === 'SELL' || direction === 'BEAR';
-    if (!isBuy && !isSell) return 'text-muted-foreground';
-    if (isBuy) {
-      if (strength === 'STRONG') return 'text-primary';
-      if (strength === 'MEDIUM') return 'text-primary/80';
-      if (strength === 'WEAK')   return 'text-primary/50';
-      return 'text-muted-foreground';
-    }
-    if (strength === 'STRONG') return 'text-destructive';
-    if (strength === 'MEDIUM') return 'text-orange-500';
-    if (strength === 'WEAK')   return 'text-destructive/50';
-    return 'text-muted-foreground';
-  }
 
   const statusBadge = status === 'Ready' || status === 'Scalp'
     ? 'bg-primary/15 text-primary border-primary/30'
@@ -116,7 +87,7 @@ export default function BiasResult({ results, rawTimeframes, settings }) {
       )}
 
       {/* ── WARNINGS ── */}
-      {warnings.length > 0 && (
+      {warnings?.length > 0 && (
         <div className="space-y-1">
           {warnings.map((w, i) => (
             <div key={i} className="flex items-start gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-500/8 border border-amber-200/60 dark:border-amber-500/15 p-2.5 text-xs text-amber-800 dark:text-amber-300 backdrop-blur-sm">

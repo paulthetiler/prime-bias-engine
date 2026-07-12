@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
@@ -13,6 +13,8 @@ import Dashboard from '@/pages/Dashboard.jsx';
 import Input from '@/pages/Input';
 import Engine from '@/pages/Engine';
 import History from '@/pages/History';
+import TradeHistory from '@/pages/TradeHistory.jsx';
+import Journal from '@/pages/Journal.jsx';
 
 import ATR from '@/pages/ATR';
 import Settings from '@/pages/Settings.jsx';
@@ -68,6 +70,8 @@ const AuthenticatedApp = () => {
           <Route path="/input" element={<Input />} />
           <Route path="/engine" element={<Engine />} />
           <Route path="/history" element={<History />} />
+          <Route path="/trade-history" element={<TradeHistory />} />
+          <Route path="/journal" element={<Journal />} />
 
           <Route path="/atr" element={<ATR />} />
           <Route path="/settings" element={<Settings />} />

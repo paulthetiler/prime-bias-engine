@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight, Crosshair } from 'lucide-react';
+import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight, Crosshair, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { calculateBias } from '@/lib/biasEngine';
+import { calculateBias, engineOptionsFromSettings } from '@/lib/biasEngine';
 import { calcAlignment } from '@/lib/alignmentUtils';
 import { getSettings } from '@/lib/userSettings';
 import { isAnalysisLocked } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
-import WhyThisTrade from '@/components/bias/WhyThisTrade';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
+import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 
 
 
@@ -176,6 +176,8 @@ export default function Dashboard() {
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [completeAnalysis, setCompleteAnalysis] = useState(null);
   const [lastCompletedTrade, setLastCompletedTrade] = useState(null);
+  const [journalTrade, setJournalTrade] = useState(null);       // record to journal
+  const [journalPrompt, setJournalPrompt] = useState(null);     // record awaiting journal decision
   const [settings, setSettings] = useState(getSettings());
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(() => {
@@ -190,10 +192,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     const load = () => {
+      const opts = engineOptionsFromSettings(getSettings());
       const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
       Object.keys(active).forEach(key => {
         if (active[key]?.inputs) {
-          active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null);
+          active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null, opts);
         }
       });
       setActiveAssets(active);
@@ -208,9 +211,11 @@ export default function Dashboard() {
     load();
     window.addEventListener('biasUpdated', load);
     window.addEventListener('storage', load);
+    window.addEventListener('settingsUpdated', load);
     return () => {
       window.removeEventListener('biasUpdated', load);
       window.removeEventListener('storage', load);
+      window.removeEventListener('settingsUpdated', load);
     };
   }, []);
 
@@ -242,12 +247,6 @@ export default function Dashboard() {
       ? latest.find(a => a.analysisId === analysis.analysisId) || latest[0]
       : latest;
 
-    console.log("PB_DEBUG_OPEN_COMPLETE_MODAL", {
-      clickedInstrument: analysis.instrument,
-      clickedAnalysisId: analysis.analysisId,
-      latestAnalysisId: latestAnalysis?.analysisId,
-    });
-
     setCompleteAnalysis(latestAnalysis || analysis);
   };
 
@@ -260,15 +259,58 @@ export default function Dashboard() {
   const handleTradeCompleted = (record) => {
     setCompleteAnalysis(null);
     setLastCompletedTrade(record);
+    setJournalPrompt(record); // offer to journal the trade
     // Reload active assets to reflect the removed analysis
+    const opts = engineOptionsFromSettings(getSettings());
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
     Object.keys(active).forEach(key => {
       if (active[key]?.inputs) {
-        active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null);
+        active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null, opts);
       }
     });
     setActiveAssets(active);
   };
+
+  // Modals that must render regardless of which layout branch is active.
+  const journalModals = (
+    <>
+      {journalPrompt && (
+        <div className="fixed inset-0 z-[65] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setJournalPrompt(null)}>
+          <div
+            className="w-full max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl p-5 text-center space-y-4"
+            style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center mx-auto">
+              <BookOpen className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <div className="text-base font-bold">Journal this trade?</div>
+              <div className="text-sm text-muted-foreground mt-1">
+                {journalPrompt.instrument} saved. Capture what happened while it's fresh.
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setJournalPrompt(null)}>Skip</Button>
+              <Button
+                className="flex-1 gap-1.5"
+                onClick={() => { setJournalTrade(journalPrompt); setJournalPrompt(null); }}
+              >
+                <BookOpen className="w-4 h-4" /> Journal
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {journalTrade && (
+        <TradeJournalFlow
+          trade={journalTrade}
+          onClose={() => setJournalTrade(null)}
+          onDone={() => setJournalTrade(null)}
+        />
+      )}
+    </>
+  );
 
   let analyses = Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId));
 
@@ -315,6 +357,7 @@ export default function Dashboard() {
             onCompleted={handleTradeCompleted}
           />
         )}
+        {journalModals}
       </>
     );
   }
@@ -341,6 +384,7 @@ export default function Dashboard() {
             onCompleted={handleTradeCompleted}
           />
         )}
+        {journalModals}
       </>
     );
   }
@@ -438,6 +482,7 @@ export default function Dashboard() {
           onCompleted={handleTradeCompleted}
         />
       )}
+      {journalModals}
     </div>
   );
 }

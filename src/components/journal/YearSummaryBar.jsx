@@ -14,12 +14,12 @@ export default function YearSummaryBar({ entries }) {
   if (!entries.length) return null;
 
   const totalPnl = entries.reduce((s, e) => s + (e.pnl || 0), 0);
-  const startBal = entries.reduce((min, e) => (e.start_balance != null && e.start_balance < min ? e.start_balance : min), Infinity);
-  const endBal = entries.reduce((max, e) => (e.end_balance != null && e.end_balance > max ? e.end_balance : max), -Infinity);
+  // Entries arrive in chronological order — growth is first start → last end balance.
+  const startBal = entries.find(e => e.start_balance != null)?.start_balance ?? null;
+  const endBal = [...entries].reverse().find(e => e.end_balance != null)?.end_balance ?? null;
   const totalPips = entries.reduce((s, e) => s + (e.total_pips || 0), 0);
   const totalTrades = entries.reduce((s, e) => s + (e.total_positions || 0), 0);
-  const wins = entries.filter(e => e.pnl > 0).length;
-  const growth = startBal && startBal !== Infinity && endBal !== -Infinity
+  const growth = startBal != null && endBal != null && startBal !== 0
     ? (((endBal - startBal) / startBal) * 100).toFixed(1)
     : null;
 

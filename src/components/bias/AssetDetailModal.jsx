@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { X, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhyThisTrade from './WhyThisTrade';
-import { calcAlignment, alignmentColor, alignmentBg } from '@/lib/alignmentUtils';
+import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
 
 const gradeColors = {
   A: 'text-primary bg-primary/15 border-primary/30',

@@ -1,6 +1,5 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, MinusCircle } from 'lucide-react';
 import { TIMEFRAMES } from '@/lib/biasEngine';
 
 export default function LiveGrid({ analyses }) {
@@ -19,19 +18,21 @@ export default function LiveGrid({ analyses }) {
   });
 
   // Summary stats
+  const gradeTally = {};
   const summary = analyses.reduce((acc, a) => {
     if (!a.results) return acc;
     const { mainDirection, grade, tradeAction } = a.results;
+    if (grade) gradeTally[grade] = (gradeTally[grade] || 0) + 1;
     return {
       buys: acc.buys + (mainDirection === 'BUY' ? 1 : 0),
       sells: acc.sells + (mainDirection === 'SELL' ? 1 : 0),
       trades: acc.trades + (tradeAction === 'TRADE' ? 1 : 0),
-      avgGrade: acc.avgGrade + (grade ? grade.charCodeAt(0) : 70),
       total: acc.total + 1
     };
-  }, { buys: 0, sells: 0, trades: 0, avgGrade: 0, total: 0 });
+  }, { buys: 0, sells: 0, trades: 0, total: 0 });
 
-  const avgGradeChar = String.fromCharCode(Math.round(summary.avgGrade / Math.max(summary.total, 1)));
+  // Most common grade (avoids inventing a non-existent letter like "E").
+  const avgGradeChar = Object.entries(gradeTally).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
 
   return (
     <div className="space-y-4">
@@ -56,7 +57,6 @@ export default function LiveGrid({ analyses }) {
             {gridData.map((row, idx) => {
               const { instrument, tf, data, overall } = row;
               const isFirstRow = idx === 0 || gridData[idx - 1].instrument !== instrument;
-              const isLastRow = idx === gridData.length - 1 || gridData[idx + 1].instrument !== instrument;
 
               if (!data) return null;
 
@@ -77,7 +77,7 @@ export default function LiveGrid({ analyses }) {
                   <td className="px-2 py-2 text-center"><IndicatorBox value={indicators.boli} /></td>
                   <td className="px-2 py-2 text-center text-sm font-mono text-muted-foreground">{total}</td>
                   <td className={cn('px-2 py-2 text-center text-sm font-semibold rounded', biasBg)}>{bias || '—'}</td>
-                  {isFirstRow && isLastRow ? (
+                  {isFirstRow ? (
                     <td className="px-3 py-2 align-top" rowSpan={TIMEFRAMES.length}>
                       <div className="space-y-1.5">
                         <div>
