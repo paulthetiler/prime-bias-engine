@@ -12,6 +12,7 @@ import { isAnalysisLocked } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
+import { InstallBanner } from '@/components/InstallApp';
 
 
 
@@ -422,6 +423,8 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      <InstallBanner />
 
       {showFilters && <FilterBar filters={filters} onChange={setFilters} />}
 
