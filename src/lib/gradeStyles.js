@@ -40,3 +40,18 @@ export const directionText = (dir) =>
   dir === 'BUY' ? 'text-emerald-600 dark:text-emerald-400'
   : dir === 'SELL' ? 'text-red-600 dark:text-red-400'
   : 'text-muted-foreground';
+
+// Block direction (BUY/BULL, SELL/BEAR, NEUTRAL) → shaded card bg + border,
+// matching the engine's indicator buttons: green buy, red sell, amber neutral.
+const isBull = (d) => d === 'BUY' || d === 'BULL';
+const isBear = (d) => d === 'SELL' || d === 'BEAR';
+
+export const blockBg = (dir) =>
+  isBull(dir) ? 'bg-emerald-500/10 border-emerald-500/30'
+  : isBear(dir) ? 'bg-red-500/10 border-red-500/30'
+  : 'bg-yellow-500/10 border-yellow-500/30';
+
+export const blockText = (dir) =>
+  isBull(dir) ? 'text-emerald-600 dark:text-emerald-400'
+  : isBear(dir) ? 'text-red-600 dark:text-red-400'
+  : 'text-yellow-600 dark:text-yellow-400';

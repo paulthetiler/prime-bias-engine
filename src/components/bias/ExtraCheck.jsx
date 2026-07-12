@@ -26,11 +26,20 @@ function TriButton({ label, value, onChange }) {
 }
 
 export default function ExtraCheck({ h1, m15, onChange }) {
-  // Determine result
-  let result = null;
+  // Light reflects the AGREED direction:
+  //   both BUY  → green light  ·  both SELL → red light  ·  anything else → no confirmation
+  let result = 'none'; // 'buy' | 'sell' | 'conflict' | 'none'
   if (h1 !== null && m15 !== null) {
-    result = h1 === m15 ? 'green' : 'red';
+    if (h1 === m15) result = h1 === 1 ? 'buy' : 'sell';
+    else result = 'conflict';
   }
+
+  const light = {
+    buy:      { box: 'bg-emerald-500/10 border-emerald-500/30', dot: 'bg-emerald-400', text: 'text-emerald-700 dark:text-emerald-300', label: 'Green Light — Buy confirmed' },
+    sell:     { box: 'bg-red-500/10 border-red-500/30',         dot: 'bg-red-400',     text: 'text-red-700 dark:text-red-300',         label: 'Red Light — Sell confirmed' },
+    conflict: { box: 'bg-yellow-500/10 border-yellow-500/30',   dot: 'bg-yellow-400',  text: 'text-yellow-700 dark:text-yellow-300',   label: 'No confirmation — 1H and 15M disagree' },
+    none:     { box: 'bg-secondary border-border',              dot: 'bg-muted-foreground', text: 'text-muted-foreground',            label: 'Set 1H and 15M to check' },
+  }[result];
 
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2">
@@ -44,18 +53,10 @@ export default function ExtraCheck({ h1, m15, onChange }) {
         <TriButton label="15M" value={m15} onChange={(v) => onChange('m15', v)} />
       </div>
 
-      {result === 'green' && (
-        <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
-          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Green Light</span>
-        </div>
-      )}
-      {result === 'red' && (
-        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0" />
-          <span className="text-xs font-semibold text-red-700 dark:text-red-300">Red Light</span>
-        </div>
-      )}
+      <div className={cn('flex items-center gap-2 rounded-lg border px-3 py-2', light.box)}>
+        <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', light.dot)} />
+        <span className={cn('text-xs font-semibold', light.text)}>{light.label}</span>
+      </div>
     </div>
   );
 }

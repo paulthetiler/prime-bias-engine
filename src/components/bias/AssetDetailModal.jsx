@@ -4,6 +4,7 @@ import { X, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhyThisTrade from './WhyThisTrade';
 import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
+import { blockBg, blockText } from '@/lib/gradeStyles';
 
 const gradeColors = {
   A: 'text-primary bg-primary/15 border-primary/30',
@@ -29,12 +30,10 @@ function Row({ label, value, valueClass }) {
 }
 
 function TrendPill({ label, dir, strength }) {
-  const color = dir === 'BUY' || dir === 'BULL' ? 'text-primary'
-    : dir === 'SELL' || dir === 'BEAR' ? 'text-destructive' : 'text-muted-foreground';
   return (
-    <div className="rounded-lg bg-secondary border border-border p-2.5 text-center flex-1">
+    <div className={cn('rounded-lg border p-2.5 text-center flex-1', blockBg(dir))}>
       <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
-      <div className={cn('text-sm font-bold', color)}>{dir || '—'}</div>
+      <div className={cn('text-sm font-bold', blockText(dir))}>{dir || '—'}</div>
       {strength && <div className="text-[9px] text-muted-foreground mt-0.5">{strength}</div>}
     </div>
   );
