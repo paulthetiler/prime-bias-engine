@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/lib/useTheme';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, BookOpen, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { Moon, Sun, BookOpen, ChevronDown, ChevronUp, RotateCcw, History } from 'lucide-react';
 import HowToGuide from '@/components/HowToGuide';
 import { getSettings, saveSettings, DEFAULTS } from '@/lib/userSettings';
 import { cn } from '@/lib/utils';
@@ -64,6 +65,7 @@ function NumInput({ label, value, onChange, min = 0, max = 100 }) {
 }
 
 export default function Settings() {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [showGuide, setShowGuide] = useState(false);
   const [s, setS] = useState(getSettings());
@@ -124,7 +126,6 @@ export default function Settings() {
             <Toggle label="Score" sub="Show weighted score" value={s.showScore} onChange={v => update('showScore', v)} />
             <Toggle label="Backend score" sub="Show raw engine score and breakdowns" value={s.showBackendScore} onChange={v => update('showBackendScore', v)} />
             <Toggle label="Target" sub="Show calculated price target" value={s.showTarget} onChange={v => update('showTarget', v)} />
-            <Toggle label="Notes" sub="Show notes on cards" value={s.showNotes} onChange={v => update('showNotes', v)} />
             <Toggle label="Compact mode" sub="Smaller cards, hide block breakdown" value={s.compactMode} onChange={v => update('compactMode', v)} />
           </div>
         )}
@@ -280,6 +281,18 @@ export default function Settings() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Analysis Log */}
+      <div className="border border-border rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold">Analysis Log</div>
+          <div className="text-xs text-muted-foreground">Every auto-saved bias analysis</div>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => navigate('/history')} className="gap-2">
+          <History className="w-4 h-4" />
+          Open
+        </Button>
       </div>
 
       {/* How-To Guide */}

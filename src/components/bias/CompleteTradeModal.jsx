@@ -1,11 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getSettings } from '@/lib/userSettings';
-import { completeTrade, undoCompletion, removeCompletedActiveAnalysis } from '@/lib/tradeCompletion';
+import { completeTrade } from '@/lib/tradeCompletion';
 
 function getAnalysisId(analysis) {
   return analysis?.analysisId;

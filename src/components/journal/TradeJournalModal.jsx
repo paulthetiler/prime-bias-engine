@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { X, BookOpen, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,14 +53,20 @@ export default function TradeJournalModal({ analysis, result, onClose }) {
       ? `${existingEntry.notes}\n\n— — —\n\n${note}`
       : note;
 
-    if (existingEntry) {
-      await base44.entities.MonthlyJournal.update(existingEntry.id, { notes: appendedNotes });
-    } else {
-      await base44.entities.MonthlyJournal.create({
-        month: currentMonth,
-        year: currentYear,
-        notes: appendedNotes,
-      });
+    try {
+      if (existingEntry) {
+        await base44.entities.MonthlyJournal.update(existingEntry.id, { notes: appendedNotes });
+      } else {
+        await base44.entities.MonthlyJournal.create({
+          month: currentMonth,
+          year: currentYear,
+          notes: appendedNotes,
+        });
+      }
+    } catch {
+      setSaving(false);
+      toast.error('Failed to save journal entry');
+      return;
     }
 
     qc.invalidateQueries({ queryKey: ['journal'] });

@@ -179,21 +179,26 @@ function calcNowStrength(rH1, rM15, rM5, dir) {
 }
 
 // ─── Grade ────────────────────────────────────────────────────────────────────
-// Thresholds confirmed from Excel:
+// Default thresholds confirmed from Excel:
 //   ≥90→F(Extended), ≥85→C(Risky), ≥75→A, ≥60→B, ≥50→C, ≥40→D, <40→F
-function calcGrade(score) {
-  if (score >= 90) return 'F';
-  if (score >= 85) return 'C';
-  if (score >= 75) return 'A';
-  if (score >= 60) return 'B';
-  if (score >= 50) return 'C';
-  if (score >= 40) return 'D';
+// Thresholds can be overridden via user settings (Settings → Grade Thresholds).
+const DEFAULT_THRESHOLDS = { extended: 90, risky: 85, A: 75, B: 60, C: 50, D: 40 };
+
+function calcGrade(score, thresholds = DEFAULT_THRESHOLDS) {
+  const t = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) };
+  if (score >= t.extended) return 'F';
+  if (score >= t.risky)    return 'C';
+  if (score >= t.A)        return 'A';
+  if (score >= t.B)        return 'B';
+  if (score >= t.C)        return 'C';
+  if (score >= t.D)        return 'D';
   return 'F';
 }
 
-function calcGradeLabel(grade, score) {
-  if (score >= 90) return 'Extended';
-  if (score >= 85) return 'Risky';
+function calcGradeLabel(grade, score, thresholds = DEFAULT_THRESHOLDS) {
+  const t = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) };
+  if (score >= t.extended) return 'Extended';
+  if (score >= t.risky)    return 'Risky';
   if (grade === 'A') return 'Very Good';
   if (grade === 'B') return 'Good';
   if (grade === 'C') return 'Risky';
@@ -202,7 +207,14 @@ function calcGradeLabel(grade, score) {
 }
 
 // ─── Main calculation ─────────────────────────────────────────────────────────
-function calculateBias(inputs, extraCheck = null) {
+function calculateBias(inputs, extraCheck = null, options = {}) {
+  // Optional overrides (from user settings). Defaults preserve the verified engine.
+  const scoreWeights = options.scoreWeights || TF_SCORE_WEIGHTS;
+  const thresholds   = options.thresholds   || DEFAULT_THRESHOLDS;
+  const useM5Override         = !!options.useM5Override;
+  const downgradeOnNowWeakness = !!options.downgradeOnNowWeakness;
+  const requireAlignmentForA   = !!options.requireAlignmentForA;
+
   // 1. TF directions
   const tfResults = {};
   TIMEFRAMES.forEach(tf => {
@@ -213,6 +225,7 @@ function calculateBias(inputs, extraCheck = null) {
     tfResults[tf.key] = {
       result,
       total,
+      indicators: { close: ind.close, macd: ind.macd, rsi: ind.rsi, boli: ind.boli },
       bias: result === 1 ? 'BUY' : result === -1 ? 'SELL' : 'Neutral',
     };
   });
@@ -229,15 +242,18 @@ function calculateBias(inputs, extraCheck = null) {
   const ddStrength = calcBlockStrength(r('day'), r('h4'), r('h1'), ddDir);
 
   // 4. NOW block [H1, M15, M5]
-  const nowDir      = calcBlockDir(r('h1'), r('m15'), r('m5'));
+  // Advanced (opt-in): let M5 dictate the NOW direction when it has a signal.
+  const nowDir      = (useM5Override && r('m5') !== 0)
+    ? r('m5')
+    : calcBlockDir(r('h1'), r('m15'), r('m5'));
   const nowBias     = nowDir === 1 ? 'BUY' : nowDir === -1 ? 'SELL' : 'NEUTRAL';
   const nowStrength = calcNowStrength(r('h1'), r('m15'), r('m5'), nowDir);
 
-  // 5. Grade score — individual TF weights
+  // 5. Grade score — individual TF weights (overridable via settings)
   let buyScore = 0, sellScore = 0;
   TIMEFRAMES.forEach(tf => {
     const res = r(tf.key);
-    const w   = TF_SCORE_WEIGHTS[tf.key];
+    const w   = scoreWeights[tf.key] ?? TF_SCORE_WEIGHTS[tf.key];
     if (res === 1)  buyScore  += w;
     if (res === -1) sellScore += w;
   });
@@ -268,18 +284,34 @@ function calculateBias(inputs, extraCheck = null) {
   const dir           = mainDirection === 'BUY' ? 1 : -1;
 
   // 7. Raw grade
-  const rawGrade = calcGrade(winningScore);
+  const rawGrade = calcGrade(winningScore, thresholds);
 
   // 8. Effective grade — cap at C if Deep conflicts with score direction
   const deepMatchesScore =
     deepDir === 0 ||
     (deepDir === 1  && scoreDirection === 'BUY') ||
     (deepDir === -1 && scoreDirection === 'SELL');
-  const effectiveGrade = deepMatchesScore ? rawGrade : 'C';
+  let effectiveGrade = deepMatchesScore ? rawGrade : 'C';
 
-  // 9. Status / action
+  // Block alignment vs. the score direction (needed for advanced logic + status)
   const nowMatchesScore = nowDir === dir;
   const ddMatchesScore  = ddDir  === dir;
+
+  // 8b. Advanced (opt-in) grade adjustments — default OFF preserves the base engine.
+  const GRADE_ORDER = ['A', 'B', 'C', 'D', 'F'];
+  const capGrade = (g, floor) =>
+    GRADE_ORDER.indexOf(g) < GRADE_ORDER.indexOf(floor) ? floor : g;
+  // Cap to C when the NOW block is WEAK.
+  if (downgradeOnNowWeakness && nowStrength === 'WEAK' && (effectiveGrade === 'A' || effectiveGrade === 'B')) {
+    effectiveGrade = 'C';
+  }
+  // Require all three blocks aligned for an A — otherwise drop to B.
+  if (requireAlignmentForA && effectiveGrade === 'A' &&
+      !(deepMatchesScore && ddMatchesScore && nowMatchesScore)) {
+    effectiveGrade = capGrade(effectiveGrade, 'B');
+  }
+
+  // 9. Status / action
   let status, tradeAction, targetNote;
 
   if (effectiveGrade === 'F' && winningScore >= 90) {
@@ -325,7 +357,7 @@ function calculateBias(inputs, extraCheck = null) {
   const plusMinusScore  = r('h1') + r('m15') + r('m5');
   const alignedCount    = TIMEFRAMES.filter(tf => r(tf.key) === dir).length;
   const confidenceScore = Math.round((alignedCount / TIMEFRAMES.length) * 100);
-  const gradeLabel      = calcGradeLabel(effectiveGrade, winningScore);
+  const gradeLabel      = calcGradeLabel(effectiveGrade, winningScore, thresholds);
 
   return {
     timeframes: tfResults,
@@ -354,12 +386,26 @@ function calculateTarget(atr, grade) {
   return { target: parseFloat(target.toFixed(4)), targetType: grade };
 }
 
-// Legacy compat
-const GRADE_THRESHOLDS = [];
-const TF_GRADE_WEIGHTS = {};
+// Build engine options from a user-settings object (see lib/userSettings.js).
+// Missing/invalid values fall back to the verified defaults.
+function engineOptionsFromSettings(settings) {
+  if (!settings) return {};
+  return {
+    scoreWeights: settings.weights || undefined,
+    thresholds:   settings.gradeThresholds || undefined,
+    useM5Override:          !!settings.useM5Override,
+    downgradeOnNowWeakness: !!settings.downgradeOnNowWeakness,
+    requireAlignmentForA:   !!settings.requireAlignmentForA,
+  };
+}
+
+// Legacy compat — kept as aliases so older imports keep working.
+const GRADE_THRESHOLDS = DEFAULT_THRESHOLDS;
+const TF_GRADE_WEIGHTS = TF_SCORE_WEIGHTS;
 
 export {
-  TIMEFRAMES, WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS,
+  TIMEFRAMES, WEIGHTS, TF_SCORE_WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS,
   ASSETS, BASE_ATR, TARGET_WEIGHTS,
   getDefaultInputs, calculateBias, getATRForAsset, calculateTarget,
+  engineOptionsFromSettings,
 };

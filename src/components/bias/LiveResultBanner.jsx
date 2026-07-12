@@ -53,7 +53,7 @@ export default function LiveResultBanner({ results }) {
         {/* Grade + Status */}
         <div className="text-center shrink-0">
           <div className={cn('text-sm font-bold', gradeColors[grade])}>{grade}</div>
-          <div className={cn('text-[9px] font-semibold rounded px-1 text-white', actionBg[tradeAction])}>{tradeAction === 'NO_TRADE' ? 'WAIT' : tradeAction}</div>
+          <div className={cn('text-[9px] font-semibold rounded px-1 text-white', actionBg[tradeAction])}>{tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}</div>
         </div>
       </div>
     </div>

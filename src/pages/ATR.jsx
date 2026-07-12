@@ -78,20 +78,19 @@ export default function ATR() {
                   <Input
                     type="text"
                     placeholder={`Position ${idx + 1}`}
-                    value={item.asset || ''}
+                    value={searches[`top-${idx}`] ?? (item.asset || '')}
                     onChange={(e) => {
                       setSearches(s => ({ ...s, [`top-${idx}`]: e.target.value }));
                     }}
                     onFocus={() => setOpenDropdowns(o => ({ ...o, [`top-${idx}`]: true }))}
+                    onBlur={() => setTimeout(() => setOpenDropdowns(o => ({ ...o, [`top-${idx}`]: false })), 150)}
                     className="h-9 text-sm"
                   />
                   {item.asset && (
                     <button
                       onClick={() => {
-                        const newTop = [...topAssets];
-                        newTop[idx].asset = '';
-                        setTopAssets(newTop);
-                        setSearches(s => ({ ...s, [`top-${idx}`]: '' }));
+                        setTopAssets(topAssets.map((t, i) => i === idx ? { ...t, asset: '' } : t));
+                        setSearches(s => { const n = { ...s }; delete n[`top-${idx}`]; return n; });
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
@@ -104,10 +103,9 @@ export default function ATR() {
                         <button
                           key={a}
                           onClick={() => {
-                            const newTop = [...topAssets];
-                            newTop[idx].asset = a;
+                            const newTop = topAssets.map((t, i) => i === idx ? { ...t, asset: a } : t);
                             setTopAssets(newTop);
-                            setSearches(s => ({ ...s, [`top-${idx}`]: '' }));
+                            setSearches(s => { const n = { ...s }; delete n[`top-${idx}`]; return n; });
                             setOpenDropdowns(o => ({ ...o, [`top-${idx}`]: false }));
                           }}
                           className="w-full text-left px-3 py-2 hover:bg-accent text-sm"
@@ -150,20 +148,19 @@ export default function ATR() {
                     <Input
                       type="text"
                       placeholder="Asset"
-                      value={item.asset || ''}
+                      value={searches[`extra-${idx}`] ?? (item.asset || '')}
                       onChange={(e) => {
                         setSearches(s => ({ ...s, [`extra-${idx}`]: e.target.value }));
                       }}
                       onFocus={() => setOpenDropdowns(o => ({ ...o, [`extra-${idx}`]: true }))}
+                      onBlur={() => setTimeout(() => setOpenDropdowns(o => ({ ...o, [`extra-${idx}`]: false })), 150)}
                       className="h-9 text-sm"
                     />
                     {item.asset && (
                       <button
                         onClick={() => {
-                          const updated = [...extraAssets];
-                          updated[idx].asset = '';
-                          setExtraAssets(updated);
-                          setSearches(s => ({ ...s, [`extra-${idx}`]: '' }));
+                          setExtraAssets(extraAssets.map((t, i) => i === idx ? { ...t, asset: '' } : t));
+                          setSearches(s => { const n = { ...s }; delete n[`extra-${idx}`]; return n; });
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       >
@@ -176,10 +173,8 @@ export default function ATR() {
                           <button
                             key={a}
                             onClick={() => {
-                              const updated = [...extraAssets];
-                              updated[idx].asset = a;
-                              setExtraAssets(updated);
-                              setSearches(s => ({ ...s, [`extra-${idx}`]: '' }));
+                              setExtraAssets(extraAssets.map((t, i) => i === idx ? { ...t, asset: a } : t));
+                              setSearches(s => { const n = { ...s }; delete n[`extra-${idx}`]; return n; });
                               setOpenDropdowns(o => ({ ...o, [`extra-${idx}`]: false }));
                             }}
                             className="w-full text-left px-3 py-2 hover:bg-accent text-sm"

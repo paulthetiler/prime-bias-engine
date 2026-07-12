@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { calcAlignment } from '@/lib/alignmentUtils';
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget } from '@/lib/biasEngine';
+import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget, engineOptionsFromSettings } from '@/lib/biasEngine';
 import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
 import ExtraCheck from '@/components/bias/ExtraCheck';
@@ -129,7 +129,7 @@ export default function Input() {
       // Only switch if different; switchInstrument handles loading
       if (sel !== instrument) switchInstrument(sel);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   // ── Switch instrument — load saved state from localStorage ─────────────────
@@ -172,13 +172,13 @@ export default function Input() {
       return;
     }
 
-    const res = calculateBias(inputs, extraCheck);
+    const res = calculateBias(inputs, extraCheck, engineOptionsFromSettings(settings));
     setResults(res);
 
     const atrValue = getATRForAsset(instrument, topAssets);
     setBaseAtr(atrValue);
 
-    const targetData = calculateTarget(atrValue, res.grade, res.status);
+    const targetData = calculateTarget(atrValue, res.grade);
     setTargetInfo(targetData);
 
     // ── Persist inputs to separate storage (decoupled from active trades) ──
@@ -203,14 +203,6 @@ export default function Input() {
     saveActiveStore(active);
     setActiveAssets({ ...active });
     window.dispatchEvent(new Event('biasUpdated'));
-    
-    // DEBUG: Browser-visible log
-    console.log("PB_DEBUG_INPUT_SAVE", {
-      instrument,
-      analysisId,
-      primebias_active: active,
-      timestamp: new Date().toISOString(),
-    });
 
     // ── DB auto-save: only on actual user edits, debounced 1.5 s ──
     if (!isLoadingRef.current) {
@@ -241,8 +233,8 @@ export default function Input() {
         }
       }, 1500);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputs, extraCheck, instrument, topAssets]);
+   
+  }, [inputs, extraCheck, instrument, topAssets, settings]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleTFChange = (tfKey, indicators) => {

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -60,9 +59,15 @@ export default function JournalForm({ initial, onSave, onCancel, saving }) {
   // Auto-calc P&L and % from balances
   const handleBalanceChange = (key, val) => {
     const next = { ...form, [key]: val };
-    if (next.start_balance && next.end_balance) {
+    if (next.start_balance != null && next.end_balance != null) {
       next.pnl = parseFloat((next.end_balance - next.start_balance).toFixed(2));
-      next.pnl_percent = parseFloat(((next.pnl / next.start_balance) * 100).toFixed(4));
+      next.pnl_percent = next.start_balance !== 0
+        ? parseFloat(((next.pnl / next.start_balance) * 100).toFixed(4))
+        : null;
+    } else {
+      // A balance was cleared — drop the now-stale auto values.
+      next.pnl = null;
+      next.pnl_percent = null;
     }
     setForm(next);
   };
@@ -71,7 +76,7 @@ export default function JournalForm({ initial, onSave, onCancel, saving }) {
     const cleaned = {
       ...form,
       rules: form.rules.filter(r => r.trim()),
-      winrate: form.winrate ? parseFloat(form.winrate) : null,
+      winrate: form.winrate != null ? parseFloat(form.winrate) : null,
     };
     onSave(cleaned);
   };

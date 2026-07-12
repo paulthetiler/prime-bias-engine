@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function AssetQuickSwitch({ analyses, currentInstrument, onInstrumentChange }) {
   const scrollContainerRef = useRef(null);

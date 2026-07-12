@@ -10,7 +10,6 @@ const DEFAULTS = {
   showBackendScore: false,
   compactMode: false,
   showTarget: true,
-  showNotes: true,
 
   // Input
   inputStyle: 'tap-cycle', // 'tap-cycle' | 'buttons'
