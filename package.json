@@ -12,8 +12,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.27",
-    "@base44/vite-plugin": "^1.0.13",
+    "@base44/sdk": "^0.8.38",
+    "@base44/vite-plugin": "^1.0.30",
     "@hookform/resolvers": "^4.1.2",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
