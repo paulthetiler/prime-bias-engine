@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -6,7 +6,10 @@ import { format } from 'date-fns';
 import { Trash2, RotateCcw, SlidersHorizontal, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { gradeText } from '@/lib/gradeStyles';
 
+// Lazy so recharts only loads when this page is opened, keeping the app's initial bundle lean.
+const PerformanceAnalytics = lazy(() => import('@/components/history/PerformanceAnalytics'));
 
 const resultColors = {
   win:       'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
@@ -15,64 +18,6 @@ const resultColors = {
   not_taken: 'text-muted-foreground bg-secondary border-border',
 };
 const resultLabels = { win: 'Win', loss: 'Loss', breakeven: 'B/E', not_taken: 'Not Taken' };
-
-const gradeColors = {
-  A: 'text-emerald-400', B: 'text-blue-400', C: 'text-yellow-400',
-  D: 'text-orange-400',  F: 'text-red-400',
-};
-
-function StatBox({ label, value, valueClass }) {
-  return (
-    <div className="bg-card border border-border rounded-xl p-3 text-center">
-      <div className={cn('text-xl font-bold', valueClass)}>{value}</div>
-      <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">{label}</div>
-    </div>
-  );
-}
-
-function Analytics({ trades }) {
-  const completed = trades.filter(t => t.result);
-  const wins = completed.filter(t => t.result === 'win').length;
-  const losses = completed.filter(t => t.result === 'loss').length;
-  const bes = completed.filter(t => t.result === 'breakeven').length;
-  const winRate = completed.length > 0 ? Math.round((wins / completed.length) * 100) : 0;
-
-  const gradeCounts = {};
-  completed.forEach(t => { if (t.grade) gradeCounts[t.grade] = (gradeCounts[t.grade] || 0) + 1; });
-  const bestGrade = Object.entries(gradeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-
-  const assetWins = {};
-  const assetTotal = {};
-  completed.forEach(t => {
-    assetTotal[t.instrument] = (assetTotal[t.instrument] || 0) + 1;
-    if (t.result === 'win') assetWins[t.instrument] = (assetWins[t.instrument] || 0) + 1;
-  });
-  const assets = Object.keys(assetTotal);
-  const bestAsset = assets.sort((a, b) => (assetWins[b] || 0) / assetTotal[b] - (assetWins[a] || 0) / assetTotal[a])[0] || '—';
-  const worstAsset = assets.sort((a, b) => (assetWins[a] || 0) / assetTotal[a] - (assetWins[b] || 0) / assetTotal[b])[0] || '—';
-
-  return (
-    <div className="space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Analytics</div>
-      <div className="grid grid-cols-4 gap-2">
-        <StatBox label="Total" value={completed.length} />
-        <StatBox label="Wins" value={wins} valueClass="text-emerald-400" />
-        <StatBox label="Losses" value={losses} valueClass="text-red-400" />
-        <StatBox label="B/E" value={bes} valueClass="text-yellow-400" />
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <StatBox label="Win Rate" value={`${winRate}%`} valueClass={winRate >= 50 ? 'text-emerald-400' : 'text-red-400'} />
-        <StatBox label="Best Grade" value={bestGrade} valueClass={gradeColors[bestGrade]} />
-        <StatBox label="Best Asset" value={bestAsset} valueClass="text-primary" />
-      </div>
-      {worstAsset !== bestAsset && worstAsset !== '—' && (
-        <div className="grid grid-cols-1">
-          <StatBox label="Needs Work" value={worstAsset} valueClass="text-orange-400" />
-        </div>
-      )}
-    </div>
-  );
-}
 
 function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete }) {
   if (!trade) return null;
@@ -99,7 +44,7 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete }) {
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             {[
               { label: 'Direction', value: trade.direction, cls: trade.direction === 'BUY' ? 'text-emerald-400' : 'text-red-400' },
-              { label: 'Grade', value: trade.grade, cls: gradeColors[trade.grade] },
+              { label: 'Grade', value: trade.grade, cls: gradeText(trade.grade) },
               { label: 'Score', value: trade.score, cls: 'text-foreground font-mono' },
               { label: 'Deep', value: trade.deep_trend, cls: '' },
               { label: 'DD', value: trade.dd_bias, cls: '' },
@@ -318,7 +263,11 @@ export default function TradeHistory() {
       )}
 
       {/* Analytics */}
-      {trades.length > 0 && <Analytics trades={trades} />}
+      {trades.length > 0 && (
+        <Suspense fallback={<div className="h-40 rounded-xl bg-secondary animate-pulse" />}>
+          <PerformanceAnalytics trades={trades} />
+        </Suspense>
+      )}
 
       {/* List */}
       {isLoading ? (
@@ -343,7 +292,7 @@ export default function TradeHistory() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{trade.instrument}</span>
-                  <span className={cn('text-xs font-bold', gradeColors[trade.grade])}>{trade.grade}</span>
+                  <span className={cn('text-xs font-bold', gradeText(trade.grade))}>{trade.grade}</span>
                   <span className={cn('text-xs font-semibold', trade.direction === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>{trade.direction}</span>
 
                 </div>
