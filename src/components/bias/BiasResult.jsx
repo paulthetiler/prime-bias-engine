@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
+import { blockBg, blockText } from '@/lib/gradeStyles';
 
 export default function BiasResult({ results, settings }) {
   if (!results) return null;
@@ -101,31 +102,12 @@ export default function BiasResult({ results, settings }) {
   );
 }
 
-function strengthColor(direction, strength) {
-  const isBuy  = direction === 'BUY'  || direction === 'BULL';
-  const isSell = direction === 'SELL' || direction === 'BEAR';
-  if (!isBuy && !isSell) return 'text-muted-foreground';
-  if (isBuy) {
-    if (strength === 'STRONG') return 'text-primary';
-    if (strength === 'MEDIUM') return 'text-primary/80';
-    if (strength === 'WEAK')   return 'text-primary/50';
-    return 'text-muted-foreground';
-  }
-  if (strength === 'STRONG') return 'text-destructive';
-  if (strength === 'MEDIUM') return 'text-orange-500';
-  if (strength === 'WEAK')   return 'text-destructive/50';
-  return 'text-muted-foreground';
-}
-
 function TrendPill({ label, value, sub }) {
-  const color = value === 'BUY' || value === 'BULL' ? 'text-primary'
-    : value === 'SELL' || value === 'BEAR' ? 'text-destructive'
-    : 'text-foreground/40';
   return (
-    <div className="rounded-lg bg-secondary/50 border border-border/70 p-2 text-center shadow-sm">
+    <div className={cn('rounded-lg border p-2 text-center shadow-sm', blockBg(value))}>
       <div className="text-[8px] uppercase tracking-wider text-muted-foreground/70 mb-0.5">{label}</div>
-      <div className={cn('text-[12px] font-bold leading-tight', color)}>{value || '—'}</div>
-      {sub && <div className={cn('text-[8px] mt-0.5 leading-tight', strengthColor(value, sub))}>{sub}</div>}
+      <div className={cn('text-[12px] font-bold leading-tight', blockText(value))}>{value || '—'}</div>
+      {sub && <div className={cn('text-[8px] mt-0.5 leading-tight', blockText(value))}>{sub}</div>}
     </div>
   );
 }

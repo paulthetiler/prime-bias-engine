@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { calculateBias, engineOptionsFromSettings } from '@/lib/biasEngine';
 import { calcAlignment } from '@/lib/alignmentUtils';
-import { gradeText } from '@/lib/gradeStyles';
+import { gradeText, blockBg, blockText } from '@/lib/gradeStyles';
 import { getSettings } from '@/lib/userSettings';
 import { isAnalysisLocked } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
@@ -22,12 +22,10 @@ const actionColors = {
 };
 
 function TrendPill({ label, dir, strength }) {
-  const color = dir === 'BUY' || dir === 'BULL' ? 'text-primary'
-    : dir === 'SELL' || dir === 'BEAR' ? 'text-destructive' : 'text-muted-foreground';
   return (
-    <div className="rounded-lg bg-secondary border border-border p-2 text-center flex-1 min-w-0">
+    <div className={cn('rounded-lg border p-2 text-center flex-1 min-w-0', blockBg(dir))}>
       <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={cn('text-xs font-bold truncate', color)}>{dir || '—'}</div>
+      <div className={cn('text-xs font-bold truncate', blockText(dir))}>{dir || '—'}</div>
       {strength && <div className="text-[9px] text-muted-foreground">{strength}</div>}
     </div>
   );
