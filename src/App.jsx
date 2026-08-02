@@ -3,22 +3,35 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
+import { Suspense, lazy } from 'react';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import Login from '@/components/Login';
 
+// AppLayout stays eager — it's the shell rendered on every authenticated route.
 import AppLayout from '@/components/layout/AppLayout';
-import Dashboard from '@/pages/Dashboard.jsx';
-import Input from '@/pages/Input';
-import Engine from '@/pages/Engine';
-import History from '@/pages/History';
-import TradeHistory from '@/pages/TradeHistory.jsx';
-import Journal from '@/pages/Journal.jsx';
-import JournalStats from '@/pages/JournalStats.jsx';
 
-import ATR from '@/pages/ATR';
-import Settings from '@/pages/Settings.jsx';
-import EngineTest from '@/pages/EngineTest.jsx';
+// Route pages are code-split: each becomes its own chunk fetched on first
+// navigation. This keeps page-only dependencies out of the initial bundle —
+// most notably Recharts + d3 (Journal / Stats only), which no longer load on
+// the Login or Dashboard landing.
+const Dashboard    = lazy(() => import('@/pages/Dashboard.jsx'));
+const Input        = lazy(() => import('@/pages/Input'));
+const Engine       = lazy(() => import('@/pages/Engine'));
+const History      = lazy(() => import('@/pages/History'));
+const TradeHistory = lazy(() => import('@/pages/TradeHistory.jsx'));
+const Journal      = lazy(() => import('@/pages/Journal.jsx'));
+const JournalStats = lazy(() => import('@/pages/JournalStats.jsx'));
+const ATR          = lazy(() => import('@/pages/ATR'));
+const Settings     = lazy(() => import('@/pages/Settings.jsx'));
+const EngineTest   = lazy(() => import('@/pages/EngineTest.jsx'));
+
+// Shown briefly while a route chunk loads. Mirrors the auth-loading spinner.
+const RouteFallback = () => (
+  <div className="fixed inset-0 flex items-center justify-center bg-background">
+    <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+  </div>
+);
 
 
 const AuthenticatedApp = () => {
@@ -54,26 +67,28 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/input" element={<Input />} />
-          <Route path="/engine" element={<Engine />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/trade-history" element={<TradeHistory />} />
-          <Route path="/journal" element={<Journal />} />
-          <Route path="/journal/stats" element={<JournalStats />} />
+    <Suspense fallback={<RouteFallback />}>
+      <AnimatePresence mode="wait">
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/input" element={<Input />} />
+            <Route path="/engine" element={<Engine />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/trade-history" element={<TradeHistory />} />
+            <Route path="/journal" element={<Journal />} />
+            <Route path="/journal/stats" element={<JournalStats />} />
 
-          <Route path="/atr" element={<ATR />} />
-          <Route path="/settings" element={<Settings />} />
+            <Route path="/atr" element={<ATR />} />
+            <Route path="/settings" element={<Settings />} />
 
 
-        </Route>
-        <Route path="/admin/engine-test" element={<EngineTest />} />
-        <Route path="*" element={<PageNotFound />} />
-      </Routes>
-    </AnimatePresence>
+          </Route>
+          <Route path="/admin/engine-test" element={<EngineTest />} />
+          <Route path="*" element={<PageNotFound />} />
+        </Routes>
+      </AnimatePresence>
+    </Suspense>
   );
 };
 
