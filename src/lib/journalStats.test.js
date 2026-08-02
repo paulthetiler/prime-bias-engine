@@ -7,6 +7,8 @@ import {
   buildEquitySeries,
   resolveStartingBalance,
   recordTime,
+  computeGradeBreakdown,
+  computeAssetRanking,
 } from './journalStats';
 
 const NOW = new Date('2026-08-02T12:00:00.000Z').getTime();
@@ -141,6 +143,59 @@ describe('computeStats', () => {
     expect(s.winRate).toBe(0);
     expect(s.hasPnl).toBe(false);
     expect(s.roiPct).toBeNull();
+  });
+});
+
+describe('computeGradeBreakdown', () => {
+  it('returns all five grades in order, win rate over decisive trades only', () => {
+    const trades = [
+      trade({ grade: 'A', result: 'win' }),
+      trade({ grade: 'A', result: 'win' }),
+      trade({ grade: 'A', result: 'loss' }),
+      trade({ grade: 'B', result: 'loss' }),
+      trade({ grade: 'B', result: 'breakeven' }), // non-decisive, ignored
+      trade({ grade: 'B', result: 'not_taken' }),  // non-decisive, ignored
+    ];
+    const rows = computeGradeBreakdown(trades);
+    expect(rows.map(r => r.grade)).toEqual(['A', 'B', 'C', 'D', 'F']);
+    expect(rows.find(r => r.grade === 'A')).toEqual({ grade: 'A', rate: 67, count: 3 });
+    expect(rows.find(r => r.grade === 'B')).toEqual({ grade: 'B', rate: 0, count: 1 });
+    expect(rows.find(r => r.grade === 'C')).toEqual({ grade: 'C', rate: 0, count: 0 });
+  });
+
+  it('handles an empty set without throwing', () => {
+    expect(computeGradeBreakdown([]).every(r => r.count === 0)).toBe(true);
+  });
+});
+
+describe('computeAssetRanking', () => {
+  it('ranks instruments by win rate, best first', () => {
+    const trades = [
+      trade({ instrument: 'GBP/USD', result: 'win' }),
+      trade({ instrument: 'GBP/USD', result: 'win' }),
+      trade({ instrument: 'EUR/USD', result: 'win' }),
+      trade({ instrument: 'EUR/USD', result: 'loss' }),
+    ];
+    const ranked = computeAssetRanking(trades);
+    expect(ranked.map(r => r.asset)).toEqual(['GBP/USD', 'EUR/USD']);
+    expect(ranked[0]).toEqual({ asset: 'GBP/USD', rate: 1, n: 2 });
+    expect(ranked[1]).toEqual({ asset: 'EUR/USD', rate: 0.5, n: 2 });
+  });
+
+  it('excludes instruments below the minimum decisive-trade count', () => {
+    const trades = [
+      trade({ instrument: 'GBP/USD', result: 'win' }),   // only 1 → dropped
+      trade({ instrument: 'EUR/USD', result: 'win' }),
+      trade({ instrument: 'EUR/USD', result: 'loss' }),
+      trade({ instrument: 'USD/JPY', result: 'breakeven' }), // non-decisive
+    ];
+    const ranked = computeAssetRanking(trades);
+    expect(ranked.map(r => r.asset)).toEqual(['EUR/USD']);
+  });
+
+  it('respects a custom minimum', () => {
+    const trades = [trade({ instrument: 'GBP/USD', result: 'win' })];
+    expect(computeAssetRanking(trades, { minTrades: 1 })).toHaveLength(1);
   });
 });
 

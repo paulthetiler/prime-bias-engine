@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -13,9 +13,6 @@ import { toast } from 'sonner';
 import { gradeText } from '@/lib/gradeStyles';
 import { buildRestoredAnalysis } from '@/lib/tradeCompletion';
 import { safeHttpUrl } from '@/lib/safeUrl';
-
-// Lazy so recharts only loads when this page is opened, keeping the app's initial bundle lean.
-const PerformanceAnalytics = lazy(() => import('@/components/history/PerformanceAnalytics'));
 
 const resultColors = {
   win:       'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
@@ -277,13 +274,6 @@ export default function TradeHistory() {
               className="text-xs text-primary hover:underline">Clear filters</button>
           )}
         </div>
-      )}
-
-      {/* Analytics */}
-      {trades.length > 0 && (
-        <Suspense fallback={<div className="h-40 rounded-xl bg-secondary animate-pulse" />}>
-          <PerformanceAnalytics trades={trades} />
-        </Suspense>
       )}
 
       {/* List */}
