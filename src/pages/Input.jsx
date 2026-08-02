@@ -367,8 +367,11 @@ export default function Input() {
       <div className="flex items-center justify-between pt-1">
         <h1 className="text-base font-bold tracking-tight">Bias Tool</h1>
         <div className="flex items-center gap-2">
-          <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-xs font-semibold">
-            {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+          <div className="bg-secondary rounded px-2 py-1 flex flex-col items-center leading-tight">
+            <span className="text-[8px] uppercase tracking-widest text-muted-foreground font-semibold">H1 Close</span>
+            <span className="font-mono text-primary text-xs font-semibold">
+              {timeToNextHour ? `↻ ${timeToNextHour}` : '—'}
+            </span>
           </div>
 
           {/* Auto-save status */}
