@@ -51,6 +51,26 @@ function loadExtraCheckForInstrument(instrument) {
   return inputs[instrument]?.extraCheck || { h1: null, m15: null };
 }
 
+// Turn a raw Supabase/PostgREST error into a short, actionable reason the user
+// can read (and screenshot) on their phone. The two persistent causes worth
+// naming explicitly are a not-yet-applied DB migration and an expired session.
+function describeSaveError(err) {
+  const code = err?.code || '';
+  const msg = String(err?.message || err || 'Unknown error');
+  // 42P10: no unique/exclusion constraint matching ON CONFLICT.
+  // 42703: column does not exist. Both mean migration 0002 hasn't been applied.
+  if (code === '42P10' || code === '42703' || /on conflict|constraint|analysis_id/i.test(msg)) {
+    return 'Database not set up for auto-save (migration 0002 not applied).';
+  }
+  if (err?.status === 401 || /jwt|not authenticated|expired/i.test(msg)) {
+    return 'Your session expired — sign out and back in.';
+  }
+  if (/failed to fetch|network|timeout/i.test(msg)) {
+    return 'Network unavailable — will retry.';
+  }
+  return msg.slice(0, 140);
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Input() {
@@ -72,6 +92,7 @@ export default function Input() {
   const [settings, setSettings] = useState(getSettings());
   const [activeAssets, setActiveAssets] = useState(() => getActiveStore());
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle | saving | saved | error
+  const [autoSaveError, setAutoSaveError] = useState(null); // human-readable reason a save failed
   const [confirmClear, setConfirmClear] = useState(false);
 
   const [topAssets, setTopAssets] = useState(() => {
@@ -105,6 +126,7 @@ export default function Input() {
       await saveBiasAnalysisWithRetry(payload);
       if (saveGenRef.current !== gen) return; // superseded by a newer save
       pendingSaveRef.current = null;
+      setAutoSaveError(null);
       setAutoSaveStatus('saved');
       savedClearTimerRef.current = setTimeout(() => {
         if (saveGenRef.current === gen) setAutoSaveStatus('idle');
@@ -114,6 +136,7 @@ export default function Input() {
       console.warn('AutoSave failed after retries:', err?.message || err);
       // Keep the payload so the user can retry the exact same upsert (no duplicate).
       pendingSaveRef.current = payload;
+      setAutoSaveError(describeSaveError(err));
       setAutoSaveStatus('error');
     }
   }, []);
@@ -183,6 +206,7 @@ export default function Input() {
     // Cancel any pending DB save (and supersede any in-flight retry loop)
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     saveGenRef.current++;
+    setAutoSaveError(null);
     setAutoSaveStatus('idle');
 
     // Flag that we are loading (not a user edit)
@@ -293,6 +317,7 @@ export default function Input() {
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     saveGenRef.current++; // supersede any in-flight retry loop
     pendingSaveRef.current = null;
+    setAutoSaveError(null);
     setAutoSaveStatus('idle');
     setInstrument('');
     setInputs(getDefaultInputs());
@@ -377,9 +402,14 @@ export default function Input() {
       {/* Save-failure banner — restrained, only shown when a sync fails, with retry. */}
       {autoSaveStatus === 'error' && (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <div className="flex items-center gap-2 min-w-0">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className="min-w-0">Your latest changes may not have synced.</span>
+          <div className="flex items-start gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <span>Your latest changes may not have synced.</span>
+              {autoSaveError && (
+                <span className="block text-[11px] opacity-80 break-words">{autoSaveError}</span>
+              )}
+            </div>
           </div>
           <Button
             variant="outline"
