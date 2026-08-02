@@ -5,8 +5,10 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, BarChart3 } from 'lucide-react';
 import {
   computeStats, buildEquitySeries, filterByTimeframe, resolveStartingBalance,
+  computeGradeBreakdown, computeAssetRanking,
 } from '@/lib/journalStats';
 import PerformanceSummary from '@/components/journal/PerformanceSummary';
+import GradeAssetBreakdown from '@/components/journal/GradeAssetBreakdown';
 
 export default function JournalStats() {
   const navigate = useNavigate();
@@ -32,6 +34,8 @@ export default function JournalStats() {
   const windowTrades = useMemo(() => filterByTimeframe(trades, timeframe), [trades, timeframe]);
   const stats = useMemo(() => computeStats(windowTrades, { startingBalance }), [windowTrades, startingBalance]);
   const series = useMemo(() => buildEquitySeries(windowTrades, { startingBalance }), [windowTrades, startingBalance]);
+  const grades = useMemo(() => computeGradeBreakdown(windowTrades), [windowTrades]);
+  const assets = useMemo(() => computeAssetRanking(windowTrades), [windowTrades]);
 
   return (
     <div className="p-4 space-y-4 pb-24">
@@ -61,14 +65,17 @@ export default function JournalStats() {
           <p className="text-xs mt-1">Complete a trade to start tracking your performance.</p>
         </div>
       ) : (
-        <PerformanceSummary
-          stats={stats}
-          series={series}
-          timeframe={timeframe}
-          onTimeframe={setTimeframe}
-          startingBalance={startingBalance}
-          balanceSource={balanceSource}
-        />
+        <>
+          <PerformanceSummary
+            stats={stats}
+            series={series}
+            timeframe={timeframe}
+            onTimeframe={setTimeframe}
+            startingBalance={startingBalance}
+            balanceSource={balanceSource}
+          />
+          <GradeAssetBreakdown grades={grades} assets={assets} />
+        </>
       )}
     </div>
   );

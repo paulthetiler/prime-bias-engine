@@ -192,6 +192,50 @@ export function computeStats(trades = [], { startingBalance = DEFAULT_STARTING_B
   };
 }
 
+/** The trade grades the engine assigns, best → worst. */
+export const GRADES = ['A', 'B', 'C', 'D', 'F'];
+
+/**
+ * Win rate per grade — the engine's report card. One row per grade (always all
+ * five, in order) so the caller can decide whether to hide the empty ones.
+ * Rate is a whole-number percentage over decisive (win/loss) trades.
+ * @param {any[]} trades
+ * @returns {{ grade: string, rate: number, count: number }[]}
+ */
+export function computeGradeBreakdown(trades = []) {
+  const decisive = trades.filter(isDecisive);
+  return GRADES.map(grade => {
+    const rows = decisive.filter(t => t.grade === grade);
+    const wins = rows.filter(t => t.result === 'win').length;
+    const rate = rows.length ? Math.round((wins / rows.length) * 100) : 0;
+    return { grade, rate, count: rows.length };
+  });
+}
+
+/**
+ * Instruments ranked by win rate (best first), so the UI can surface the best
+ * and weakest asset. Only instruments with at least `minTrades` decisive trades
+ * qualify, keeping a single lucky win from topping the table. Rate is a 0–1
+ * fraction.
+ * @param {any[]} trades
+ * @param {{ minTrades?: number }} [opts]
+ * @returns {{ asset: string, rate: number, n: number }[]}
+ */
+export function computeAssetRanking(trades = [], { minTrades = 2 } = {}) {
+  const decisive = trades.filter(isDecisive);
+  /** @type {Record<string, { wins: number, n: number }>} */
+  const byAsset = {};
+  for (const t of decisive) {
+    const bucket = (byAsset[t.instrument] ||= { wins: 0, n: 0 });
+    bucket.n += 1;
+    if (t.result === 'win') bucket.wins += 1;
+  }
+  return Object.entries(byAsset)
+    .filter(([, s]) => s.n >= minTrades)
+    .map(([asset, s]) => ({ asset, rate: s.wins / s.n, n: s.n }))
+    .sort((a, b) => b.rate - a.rate);
+}
+
 /**
  * Cumulative series for the equity curve. Each point exposes three read-outs
  * off the same running P&L so the chart can switch modes without recompute:

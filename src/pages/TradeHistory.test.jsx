@@ -19,9 +19,6 @@ vi.mock('@/api/base44Client', () => ({
   },
 }));
 
-// Avoid pulling recharts into the test.
-vi.mock('@/components/history/PerformanceAnalytics', () => ({ default: () => null }));
-
 const TradeHistory = (await import('./TradeHistory')).default;
 
 const trade = {
