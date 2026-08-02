@@ -5,8 +5,13 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Trash2, RotateCcw, SlidersHorizontal, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { gradeText } from '@/lib/gradeStyles';
+import { generateAnalysisId } from '@/lib/tradeCompletion';
 
 // Lazy so recharts only loads when this page is opened, keeping the app's initial bundle lean.
 const PerformanceAnalytics = lazy(() => import('@/components/history/PerformanceAnalytics'));
@@ -110,6 +115,7 @@ const ALL_GRADES  = ['A', 'B', 'C', 'D', 'F'];
 export default function TradeHistory() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ result: '', grade: '', direction: '', asset: '' });
@@ -132,10 +138,15 @@ export default function TradeHistory() {
   });
 
   const handleRestore = async (trade) => {
-    // Put back into active localStorage
+    // Put back into active localStorage.
+    // A fresh analysisId is essential: the Dashboard filters active analyses by
+    // `!isAnalysisLocked(analysisId)`, and completion locks are keyed by analysisId.
+    // Without one, the restored card can never be cleared by completing it and each
+    // completion would insert a duplicate trade record.
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
     active[trade.instrument] = {
       instrument: trade.instrument,
+      analysisId: generateAnalysisId(trade.instrument),
       inputs: trade.inputs_snapshot || {},
       timestamp: trade.created_at,
       extraCheck: { h1: trade.extra_check_h1 ?? null, m15: trade.extra_check_m15 ?? null },
@@ -154,9 +165,16 @@ export default function TradeHistory() {
     toast.success('Trade archived');
   };
 
-  const handleDelete = async (trade) => {
-    await deleteMutation.mutateAsync(trade.id);
+  // Open a confirmation first — delete is permanent and can't be undone.
+  const handleDelete = (trade) => {
     setSelected(null);
+    setConfirmDelete(trade);
+  };
+
+  const doDelete = async () => {
+    if (!confirmDelete) return;
+    await deleteMutation.mutateAsync(confirmDelete.id);
+    setConfirmDelete(null);
     toast.success('Trade deleted');
   };
 
@@ -325,7 +343,26 @@ export default function TradeHistory() {
         />
       )}
 
-
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this trade?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete?.instrument} will be permanently removed from your trade history.
+              This can’t be undone. To keep it out of your stats but retain the record, use Archive instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={doDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
