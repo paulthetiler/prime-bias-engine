@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSettings } from '@/lib/userSettings';
 import { generateAnalysisId } from '@/lib/tradeCompletion';
-import { saveBiasAnalysis } from '@/lib/autoSave';
+import { saveBiasAnalysisWithRetry } from '@/lib/autoSave';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -85,23 +85,33 @@ export default function Input() {
   const savedClearTimerRef = useRef(null); // clears the transient "Saved ✓" indicator
   // Holds the most recent auto-save payload when a save fails, so the user can retry it.
   const pendingSaveRef = useRef(null);
+  // Monotonic "which save is current" token. A newer save (or an instrument
+  // switch / clear-all) bumps it so an in-flight retry loop knows it's been
+  // superseded and stops touching the status indicator.
+  const saveGenRef = useRef(0);
 
   // ── Auto-save persistence ────────────────────────────────────────────────
   // Deterministic upsert keyed by (user_id, analysis_id): the DB decides whether
   // the row exists, so a failed attempt can be retried with the SAME payload and
-  // never produces a duplicate. Failures surface in the status indicator with a
-  // retry action instead of being swallowed.
+  // never produces a duplicate. Transient failures are retried automatically with
+  // backoff (see saveBiasAnalysisWithRetry) so a brief mobile drop-out self-heals;
+  // only a persistent failure surfaces "Not saved" with a manual retry action.
   const runAutoSave = useCallback(async (payload) => {
     if (!payload) return;
+    const gen = ++saveGenRef.current; // this call is now the current save
     if (savedClearTimerRef.current) clearTimeout(savedClearTimerRef.current);
     setAutoSaveStatus('saving');
     try {
-      await saveBiasAnalysis(payload);
+      await saveBiasAnalysisWithRetry(payload);
+      if (saveGenRef.current !== gen) return; // superseded by a newer save
       pendingSaveRef.current = null;
       setAutoSaveStatus('saved');
-      savedClearTimerRef.current = setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      savedClearTimerRef.current = setTimeout(() => {
+        if (saveGenRef.current === gen) setAutoSaveStatus('idle');
+      }, 2000);
     } catch (err) {
-      console.warn('AutoSave failed:', err?.message || err);
+      if (saveGenRef.current !== gen) return; // superseded — don't clobber status
+      console.warn('AutoSave failed after retries:', err?.message || err);
       // Keep the payload so the user can retry the exact same upsert (no duplicate).
       pendingSaveRef.current = payload;
       setAutoSaveStatus('error');
@@ -170,8 +180,9 @@ export default function Input() {
   function switchInstrument(newInstrument) {
     if (newInstrument === instrument) return;
 
-    // Cancel any pending DB save
+    // Cancel any pending DB save (and supersede any in-flight retry loop)
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    saveGenRef.current++;
     setAutoSaveStatus('idle');
 
     // Flag that we are loading (not a user edit)
@@ -279,6 +290,8 @@ export default function Input() {
     localStorage.removeItem('primebias_active');
     localStorage.removeItem('primebias_inputs');
     localStorage.removeItem('primebias_instrument');
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    saveGenRef.current++; // supersede any in-flight retry loop
     pendingSaveRef.current = null;
     setAutoSaveStatus('idle');
     setInstrument('');
