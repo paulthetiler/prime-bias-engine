@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/lib/useTheme';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, BookOpen, ChevronDown, ChevronUp, RotateCcw, History, Sparkles } from 'lucide-react';
+import { Moon, Sun, BookOpen, ChevronDown, ChevronUp, RotateCcw, History, Sparkles, LogOut } from 'lucide-react';
 import HowToGuide from '@/components/HowToGuide';
 import { InstallCard } from '@/components/InstallApp';
 import ExportBackup from '@/components/ExportBackup';
+import ImportBackup from '@/components/ImportBackup';
 import { getSettings, saveSettings, DEFAULTS } from '@/lib/userSettings';
 import { cn } from '@/lib/utils';
 
@@ -69,6 +71,7 @@ function NumInput({ label, value, onChange, min = 0, max = 100 }) {
 export default function Settings() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
   const [showGuide, setShowGuide] = useState(false);
   const [s, setS] = useState(getSettings());
   const [openSections, setOpenSections] = useState({
@@ -121,8 +124,9 @@ export default function Settings() {
       {/* Install App */}
       <InstallCard />
 
-      {/* Backup / Export */}
+      {/* Backup / Export + Import */}
       <ExportBackup />
+      <ImportBackup />
 
       {/* Display Settings */}
       <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
@@ -324,6 +328,20 @@ export default function Settings() {
         <Button variant="outline" size="sm" onClick={() => setShowGuide(true)} className="gap-2">
           <BookOpen className="w-4 h-4" />
           Guide
+        </Button>
+      </div>
+
+      {/* Account */}
+      <div className="border border-border rounded-xl p-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Account</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {user?.email || 'Signed in'}
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => logout()} className="gap-2 shrink-0">
+          <LogOut className="w-4 h-4" />
+          Sign out
         </Button>
       </div>
 

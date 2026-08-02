@@ -3,10 +3,9 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { useEffect } from 'react';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import Login from '@/components/Login';
 
 import AppLayout from '@/components/layout/AppLayout';
 import Dashboard from '@/pages/Dashboard.jsx';
@@ -22,15 +21,26 @@ import EngineTest from '@/pages/EngineTest.jsx';
 
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isAuthenticated, authError } = useAuth();
 
-  useEffect(() => {
-    if (!isLoadingAuth && !isLoadingPublicSettings && authError?.type === 'auth_required') {
-      navigateToLogin();
-    }
-  }, [isLoadingAuth, isLoadingPublicSettings, authError]);
+  if (authError?.type === 'not_configured') {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background p-4">
+        <div className="max-w-md text-center">
+          <div className="text-4xl mb-4">⚙️</div>
+          <h2 className="text-lg font-bold mb-2">Supabase not configured</h2>
+          <p className="text-sm text-muted-foreground mb-4">{authError.message}</p>
+          <p className="text-xs text-muted-foreground">
+            Copy <code className="font-mono">.env.example</code> to{' '}
+            <code className="font-mono">.env</code>, fill in your project URL and anon key,
+            then restart the dev server. See <code className="font-mono">README.md</code>.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  if (isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
@@ -38,28 +48,8 @@ const AuthenticatedApp = () => {
     );
   }
 
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      return null;
-    } else if (authError.type === 'auth_timeout' || authError.type === 'auth_check_failed') {
-      return (
-        <div className="fixed inset-0 flex items-center justify-center bg-background p-4">
-          <div className="max-w-sm text-center">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-lg font-bold mb-2">Connection Problem</h2>
-            <p className="text-sm text-muted-foreground mb-6">{authError.message}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      );
-    }
+  if (!isAuthenticated) {
+    return <Login />;
   }
 
   return (

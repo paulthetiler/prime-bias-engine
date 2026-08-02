@@ -1,39 +1,79 @@
-**Welcome to your Base44 project** 
+# PrimeBias Engine
 
-**About**
+A React + Vite trading-bias PWA. Originally built on Base44, now running on
+**Supabase** (Postgres + Auth) so it can be developed and hosted anywhere.
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+## Prerequisites
 
-This project contains everything you need to run your app locally.
+- Node.js 18+
+- A free [Supabase](https://supabase.com) project
 
-**Edit the code in your local development environment**
+## 1. Install
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
-
-**Prerequisites:** 
-
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
-
-```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
+```bash
+npm install
 ```
 
-Run the app: `npm run dev`
+## 2. Set up Supabase
 
-**Publish your changes**
+1. Create a project at [supabase.com](https://supabase.com).
+2. In the dashboard, open **SQL Editor**, paste the contents of
+   [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql),
+   and click **Run**. This creates the four tables
+   (`bias_analysis`, `completed_trade`, `monthly_journal`, `trade_journal_entry`)
+   with per-user Row Level Security.
+3. In **Project Settings → API**, copy your **Project URL** and **anon/public key**.
 
-Open [Base44.com](http://Base44.com) and click on Publish.
+## 3. Configure env vars
 
-**Docs & Support**
+```bash
+cp .env.example .env
+```
 
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
+Then fill in:
 
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+```
+VITE_SUPABASE_URL=https://YOUR-PROJECT-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key
+```
+
+## 4. Run
+
+```bash
+npm run dev
+```
+
+Open the app, **Sign up** with an email + password (first run creates your
+account), then sign in. Data syncs to your Supabase project, so the same account
+works across your phone and desktop.
+
+> **Email confirmation:** by default Supabase asks new users to confirm their
+> email. For a personal single-user app you can turn this off under
+> **Authentication → Providers → Email → Confirm email** so sign-up logs you
+> straight in.
+
+## Migrating your data from Base44
+
+1. In your old Base44-hosted app, open **Settings → Backup / Export** and
+   download the JSON backup.
+2. In this app (after signing in), open **Settings → Import / Restore** and
+   select that JSON file. It upserts every trade, journal and analysis into your
+   Supabase account and restores local settings. Re-running it is safe.
+
+## Scripts
+
+| Command             | Description                    |
+| ------------------- | ------------------------------ |
+| `npm run dev`       | Start the dev server           |
+| `npm run build`     | Production build to `./dist`   |
+| `npm run preview`   | Preview the production build   |
+| `npm run lint`      | Lint                           |
+
+## Where things live
+
+- `src/api/supabaseClient.js` — creates the Supabase client from env vars.
+- `src/api/base44Client.js` — the data + auth layer. Keeps the historical
+  `base44` export name (`{ auth, entities }`) but is fully Supabase-backed; no
+  Base44 code remains. Rename freely.
+- `src/lib/AuthContext.jsx` / `src/components/Login.jsx` — auth state + sign-in UI.
+- `supabase/migrations/` — database schema.

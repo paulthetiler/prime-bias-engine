@@ -85,7 +85,7 @@ export default function ExportBackup() {
       <div className="min-w-0">
         <div className="text-sm font-semibold">Backup / Export Data</div>
         <div className="text-xs text-muted-foreground">
-          Download all your trades, journals and settings as a JSON file. Do this before migrating off Base44.
+          Download all your trades, journals and settings as a JSON file.
         </div>
       </div>
       <Button size="sm" onClick={run} disabled={busy} className="gap-2 shrink-0">
