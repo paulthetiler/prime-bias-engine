@@ -26,6 +26,7 @@ function SectionHeader({ title, sub, open, onToggle }) {
   );
 }
 
+/** @param {{ label: any, sub?: any, value: any, onChange: (v: boolean) => void }} props */
 function Toggle({ label, sub, value, onChange }) {
   return (
     <div className="flex items-center justify-between py-2.5">

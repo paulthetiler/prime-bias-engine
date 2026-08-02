@@ -20,7 +20,7 @@ export default function History() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.BiasAnalysis.delete(id),
+    mutationFn: (/** @type {string} */ id) => base44.entities.BiasAnalysis.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['biasHistory'] });
       toast.success('Deleted');
@@ -28,7 +28,7 @@ export default function History() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.BiasAnalysis.update(id, data),
+    mutationFn: /** @param {{ id: string, data: any }} vars */ ({ id, data }) => base44.entities.BiasAnalysis.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['biasHistory'] });
       setSelected(null);

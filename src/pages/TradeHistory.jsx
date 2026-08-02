@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { gradeText } from '@/lib/gradeStyles';
-import { generateAnalysisId } from '@/lib/tradeCompletion';
+import { buildRestoredAnalysis } from '@/lib/tradeCompletion';
+import { safeHttpUrl } from '@/lib/safeUrl';
 
 // Lazy so recharts only loads when this page is opened, keeping the app's initial bundle lean.
 const PerformanceAnalytics = lazy(() => import('@/components/history/PerformanceAnalytics'));
@@ -83,8 +84,8 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete }) {
           {trade.notes && (
             <div><div className="text-xs text-muted-foreground mb-1">Notes</div><p className="text-sm text-muted-foreground">{trade.notes}</p></div>
           )}
-          {trade.screenshot_url && (
-            <a href={trade.screenshot_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-primary hover:underline">
+          {safeHttpUrl(trade.screenshot_url) && (
+            <a href={safeHttpUrl(trade.screenshot_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-primary hover:underline">
               <ExternalLink className="w-3.5 h-3.5" /> View Screenshot
             </a>
           )}
@@ -128,12 +129,12 @@ export default function TradeHistory() {
 
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.CompletedTrade.update(id, data),
+    mutationFn: /** @param {{ id: string, data: any }} vars */ ({ id, data }) => base44.entities.CompletedTrade.update(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['completedTrades'] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.CompletedTrade.delete(id),
+    mutationFn: (/** @type {string} */ id) => base44.entities.CompletedTrade.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['completedTrades'] }),
   });
 
@@ -144,13 +145,7 @@ export default function TradeHistory() {
     // Without one, the restored card can never be cleared by completing it and each
     // completion would insert a duplicate trade record.
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
-    active[trade.instrument] = {
-      instrument: trade.instrument,
-      analysisId: generateAnalysisId(trade.instrument),
-      inputs: trade.inputs_snapshot || {},
-      timestamp: trade.created_at,
-      extraCheck: { h1: trade.extra_check_h1 ?? null, m15: trade.extra_check_m15 ?? null },
-    };
+    active[trade.instrument] = buildRestoredAnalysis(trade);
     localStorage.setItem('primebias_active', JSON.stringify(active));
     window.dispatchEvent(new Event('biasUpdated'));
 

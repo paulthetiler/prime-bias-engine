@@ -226,7 +226,7 @@ export default function Dashboard() {
     const updateCountdown = () => {
       const now = new Date();
       const nextHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0, 0);
-      const diff = nextHour - now;
+      const diff = nextHour.getTime() - now.getTime();
       const mins = Math.floor(diff / 60000);
       const secs = Math.floor((diff % 60000) / 1000);
       setTimeToNextHour(`${mins}m ${secs}s`);

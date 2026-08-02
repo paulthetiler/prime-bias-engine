@@ -17,11 +17,12 @@ npm install
 ## 2. Set up Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the dashboard, open **SQL Editor**, paste the contents of
-   [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql),
-   and click **Run**. This creates the four tables
+2. In the dashboard, open **SQL Editor** and run each file in
+   [`supabase/migrations/`](supabase/migrations/) **in order** (`0001_init.sql`,
+   then `0002_bias_analysis_autosave_key.sql`). `0001` creates the four tables
    (`bias_analysis`, `completed_trade`, `monthly_journal`, `trade_journal_entry`)
-   with per-user Row Level Security.
+   with per-user Row Level Security; `0002` adds the auto-save de-duplication key.
+   (Or, with the CLI: `supabase db push`.)
 3. In **Project Settings → API**, copy your **Project URL** and **anon/public key**.
 
 ## 3. Configure env vars

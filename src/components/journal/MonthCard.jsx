@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+/** @param {{ label: any, value?: any, valueClass?: string }} props */
 function Stat({ label, value, valueClass }) {
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">

@@ -121,6 +121,24 @@ export async function completeTrade(analysis, result, details = {}) {
 }
 
 /**
+ * buildRestoredAnalysis(trade)
+ * Builds the active-store entry for a completed trade being restored to the Summary.
+ * A fresh, valid analysisId is essential: the Dashboard filters active analyses by
+ * `!isAnalysisLocked(analysisId)` and completion locks are keyed by analysisId, so a
+ * restored card must carry one or it can never be cleared by completing it (and each
+ * completion would insert a duplicate trade record).
+ */
+export function buildRestoredAnalysis(trade) {
+  return {
+    instrument: trade.instrument,
+    analysisId: generateAnalysisId(trade.instrument),
+    inputs: trade.inputs_snapshot || {},
+    timestamp: trade.created_at,
+    extraCheck: { h1: trade.extra_check_h1 ?? null, m15: trade.extra_check_m15 ?? null },
+  };
+}
+
+/**
  * removeCompletedActiveAnalysis(analysis)
  * Removes a completed analysis from primebias_active storage.
  * Should be called AFTER navigation is complete.

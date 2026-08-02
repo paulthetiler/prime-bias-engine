@@ -1,5 +1,6 @@
 // Lightweight haptic feedback for mobile. No-ops where unsupported.
 
+/** @param {number | number[]} pattern */
 export function haptic(pattern = 10) {
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {

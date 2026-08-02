@@ -25,7 +25,7 @@ function MonthlyJournal() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: ({ id, data }) =>
+    mutationFn: /** @param {{ id?: string, data: any }} vars */ ({ id, data }) =>
       id
         ? base44.entities.MonthlyJournal.update(id, data)
         : base44.entities.MonthlyJournal.create(data),

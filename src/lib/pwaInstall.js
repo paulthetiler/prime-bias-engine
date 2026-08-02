@@ -19,12 +19,15 @@ if (typeof window !== 'undefined') {
 
 export function isStandalone() {
   if (typeof window === 'undefined') return false;
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  // `navigator.standalone` is a non-standard iOS Safari flag not in the DOM lib types.
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    /** @type {any} */ (window.navigator).standalone === true;
 }
 
 export function isIOS() {
   if (typeof navigator === 'undefined') return false;
-  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  // `window.MSStream` is a legacy IE flag used to exclude old Windows Phones; not in the DOM lib types.
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !(/** @type {any} */ (window).MSStream);
 }
 
 export function useInstallPrompt() {

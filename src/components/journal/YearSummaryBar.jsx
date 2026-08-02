@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
+/** @param {{ label: any, value: any, valueClass?: string }} props */
 function Pill({ label, value, valueClass }) {
   return (
     <div className="flex flex-col items-center">

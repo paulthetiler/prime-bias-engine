@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
 import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget, engineOptionsFromSettings } from '@/lib/biasEngine';
 import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
@@ -13,11 +12,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSettings } from '@/lib/userSettings';
 import { generateAnalysisId } from '@/lib/tradeCompletion';
+import { saveBiasAnalysis } from '@/lib/autoSave';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -82,9 +82,35 @@ export default function Input() {
 
   const autoSaveTimerRef = useRef(null);
   const isLoadingRef = useRef(false); // true while we are loading inputs for an instrument switch
-  // Tracks the bias_analysis row already saved for the current analysis session, so
-  // repeated edits UPDATE one row instead of inserting a new row on every change.
-  const savedAnalysisRef = useRef({ analysisId: null, rowId: null });
+  const savedClearTimerRef = useRef(null); // clears the transient "Saved ✓" indicator
+  // Holds the most recent auto-save payload when a save fails, so the user can retry it.
+  const pendingSaveRef = useRef(null);
+
+  // ── Auto-save persistence ────────────────────────────────────────────────
+  // Deterministic upsert keyed by (user_id, analysis_id): the DB decides whether
+  // the row exists, so a failed attempt can be retried with the SAME payload and
+  // never produces a duplicate. Failures surface in the status indicator with a
+  // retry action instead of being swallowed.
+  const runAutoSave = useCallback(async (payload) => {
+    if (!payload) return;
+    if (savedClearTimerRef.current) clearTimeout(savedClearTimerRef.current);
+    setAutoSaveStatus('saving');
+    try {
+      await saveBiasAnalysis(payload);
+      pendingSaveRef.current = null;
+      setAutoSaveStatus('saved');
+      savedClearTimerRef.current = setTimeout(() => setAutoSaveStatus('idle'), 2000);
+    } catch (err) {
+      console.warn('AutoSave failed:', err?.message || err);
+      // Keep the payload so the user can retry the exact same upsert (no duplicate).
+      pendingSaveRef.current = payload;
+      setAutoSaveStatus('error');
+    }
+  }, []);
+
+  const retryAutoSave = useCallback(() => {
+    if (pendingSaveRef.current) runAutoSave(pendingSaveRef.current);
+  }, [runAutoSave]);
 
   // ── Settings listener ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -121,7 +147,7 @@ export default function Input() {
     const tick = () => {
       const now = new Date();
       const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0, 0);
-      const diff = next - now;
+      const diff = next.getTime() - now.getTime();
       setTimeToNextHour(`${Math.floor(diff / 60000)}m ${Math.floor((diff % 60000) / 1000)}s`);
     };
     tick();
@@ -212,54 +238,31 @@ export default function Input() {
     setActiveAssets({ ...active });
     window.dispatchEvent(new Event('biasUpdated'));
 
-    // A new analysis session (different analysisId) starts a fresh log row.
-    if (savedAnalysisRef.current.analysisId !== analysisId) {
-      savedAnalysisRef.current = { analysisId, rowId: null };
-    }
-
     // ── DB auto-save: only on actual user edits, debounced 1.5 s ──
     if (!isLoadingRef.current) {
+      const direction = res?.mainDirection;
+      const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
+      const grade = ['A','B','C','D','F'].includes(res?.grade) ? res.grade : 'F';
+      const tradeAction = ['TRADE','WAIT','NO_TRADE'].includes(res?.tradeAction) ? res.tradeAction : 'NO_TRADE';
+      // analysis_id makes this a deterministic upsert: one row per analysis session,
+      // enforced by the DB (unique index on user_id, analysis_id — migration 0002).
+      const payload = {
+        analysis_id: analysisId,
+        instrument,
+        timestamp: new Date().toISOString(),
+        overall_bias: overallBias,
+        grade,
+        confidence_score: res?.winningScore || 0,
+        trade_action: tradeAction,
+        warnings: res?.warnings || [],
+        notes: `${direction} | ${grade} | Score: ${res?.winningScore ?? 0} | ${res?.status ?? ''}`,
+      };
       setAutoSaveStatus('saving');
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = setTimeout(async () => {
-        try {
-          const direction = res?.mainDirection;
-          const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
-          const grade = ['A','B','C','D','F'].includes(res?.grade) ? res.grade : 'F';
-          const tradeAction = ['TRADE','WAIT','NO_TRADE'].includes(res?.tradeAction) ? res.tradeAction : 'NO_TRADE';
-          const payload = {
-            instrument,
-            timestamp: new Date().toISOString(),
-            overall_bias: overallBias,
-            grade,
-            confidence_score: res?.winningScore || 0,
-            trade_action: tradeAction,
-            warnings: res?.warnings || [],
-            notes: `${direction} | ${grade} | Score: ${res?.winningScore ?? 0} | ${res?.status ?? ''}`,
-          };
-          // Update the existing log row for this analysis session; otherwise create one.
-          // This keeps a single, current log entry per analysis instead of one row per edit.
-          const existingRowId =
-            savedAnalysisRef.current.analysisId === analysisId ? savedAnalysisRef.current.rowId : null;
-          if (existingRowId) {
-            await base44.entities.BiasAnalysis.update(existingRowId, payload);
-          } else {
-            const saved = await base44.entities.BiasAnalysis.create(payload);
-            savedAnalysisRef.current = { analysisId, rowId: saved?.id ?? null };
-          }
-          setAutoSaveStatus('saved');
-          setTimeout(() => setAutoSaveStatus('idle'), 2000);
-        } catch (err) {
-          console.warn('AutoSave error (non-critical):', err?.message || err);
-          // If an update failed (e.g. the row was deleted), forget it so the next edit re-creates.
-          savedAnalysisRef.current = { analysisId, rowId: null };
-          // Don't show error to user — autosave to BiasAnalysis is non-critical
-          setAutoSaveStatus('idle');
-        }
-      }, 1500);
+      autoSaveTimerRef.current = setTimeout(() => { runAutoSave(payload); }, 1500);
     }
    
-  }, [inputs, extraCheck, instrument, topAssets, settings]);
+  }, [inputs, extraCheck, instrument, topAssets, settings, runAutoSave]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleTFChange = (tfKey, indicators) => {
@@ -276,7 +279,8 @@ export default function Input() {
     localStorage.removeItem('primebias_active');
     localStorage.removeItem('primebias_inputs');
     localStorage.removeItem('primebias_instrument');
-    savedAnalysisRef.current = { analysisId: null, rowId: null };
+    pendingSaveRef.current = null;
+    setAutoSaveStatus('idle');
     setInstrument('');
     setInputs(getDefaultInputs());
     setExtraCheck({ h1: null, m15: null });
@@ -332,10 +336,15 @@ export default function Input() {
               </>
             )}
             {autoSaveStatus === 'error' && (
-              <>
-                <AlertCircle className="w-3 h-3 text-destructive" />
-                <span className="text-destructive font-semibold">Error</span>
-              </>
+              <button
+                type="button"
+                onClick={retryAutoSave}
+                className="flex items-center gap-1 text-destructive font-semibold hover:underline"
+                aria-label="Retry saving. Your latest changes may not have synced."
+              >
+                <AlertCircle className="w-3 h-3" />
+                <span>Not saved</span>
+              </button>
             )}
           </div>
 
@@ -351,6 +360,24 @@ export default function Input() {
           </Button>
         </div>
       </div>
+
+      {/* Save-failure banner — restrained, only shown when a sync fails, with retry. */}
+      {autoSaveStatus === 'error' && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className="min-w-0">Your latest changes may not have synced.</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={retryAutoSave}
+            className="h-7 gap-1.5 shrink-0 border-destructive/40 text-destructive hover:text-destructive"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Retry
+          </Button>
+        </div>
+      )}
 
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
         <AlertDialogContent>

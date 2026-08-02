@@ -9,6 +9,7 @@ import { GRADE_HEX, gradeText } from '@/lib/gradeStyles';
 
 const GRADES = ['A', 'B', 'C', 'D', 'F'];
 
+/** @param {{ label: any, value: any, valueClass?: string }} props */
 function StatBox({ label, value, valueClass }) {
   return (
     <div className="bg-card border border-border rounded-xl p-3 text-center">
@@ -28,7 +29,7 @@ export default function PerformanceAnalytics({ trades }) {
   // ── Equity curve (chronological cumulative P&L) ──
   const chrono = [...completed]
     .filter(t => t.completed_at)
-    .sort((a, b) => new Date(a.completed_at) - new Date(b.completed_at));
+    .sort((a, b) => new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime());
   const hasPnl = chrono.some(t => t.pnl != null);
   let running = 0;
   const equity = chrono.map((t, i) => {

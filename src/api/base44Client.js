@@ -76,6 +76,23 @@ function makeEntity(table) {
       return data;
     },
 
+    // Insert-or-update in a single atomic statement. `onConflict` names the
+    // unique key (e.g. 'user_id,analysis_id') Postgres uses to decide whether the
+    // row already exists — so retrying the same values never creates a duplicate.
+    /**
+     * @param {any} values
+     * @param {{ onConflict?: string }} [options]
+     */
+    async upsert(values, { onConflict } = {}) {
+      const { data, error } = await client()
+        .from(table)
+        .upsert(values, onConflict ? { onConflict } : undefined)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+
     async delete(id) {
       const { error } = await client().from(table).delete().eq('id', id);
       if (error) throw error;
@@ -94,7 +111,7 @@ const auth = {
     const { data, error } = await client().auth.getUser();
     if (error) throw error;
     if (!data?.user) {
-      const err = new Error('Not authenticated');
+      const err = /** @type {Error & { status?: number }} */ (new Error('Not authenticated'));
       err.status = 401;
       throw err;
     }
