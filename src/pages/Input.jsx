@@ -16,7 +16,7 @@ import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Lo
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSettings } from '@/lib/userSettings';
-import { generateAnalysisId } from '@/lib/tradeCompletion';
+import { resolveAnalysisIdForEdit } from '@/lib/tradeCompletion';
 import { saveBiasAnalysisWithRetry } from '@/lib/autoSave';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -257,15 +257,27 @@ export default function Input() {
     localStorage.setItem('primebias_instrument', instrument);
 
     // ── Persist to active store (for dashboard display) ──
+    // If the previous analysis for this instrument was already completed (its id is
+    // locked), a genuine user edit must start a FRESH analysis — new id + timestamp —
+    // so it reappears on the Summary. Otherwise it would inherit the completed lock and
+    // stay hidden forever (e.g. change the engine later that day and it never shows).
+    // A plain load/view (isLoadingRef) keeps the locked id, so completing a trade doesn't
+    // pop back onto the Summary just from opening the Bias Tool.
     const active = getActiveStore();
-    const analysisId = active[instrument]?.analysisId || generateAnalysisId(instrument);
+    const { analysisId, isNew } = resolveAnalysisIdForEdit(
+      active[instrument]?.analysisId,
+      isLoadingRef.current,
+      instrument,
+    );
     active[instrument] = {
       instrument,
       analysisId,
       inputs,
       extraCheck,
       results: res,
-      timestamp: active[instrument]?.timestamp || new Date().toISOString(),
+      timestamp: isNew
+        ? new Date().toISOString()
+        : (active[instrument]?.timestamp || new Date().toISOString()),
       atr: atrValue,
       targetInfo: targetData,
     };

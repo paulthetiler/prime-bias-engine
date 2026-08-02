@@ -121,6 +121,30 @@ export async function completeTrade(analysis, result, details = {}) {
 }
 
 /**
+ * resolveAnalysisIdForEdit(existingId, isLoading, instrument)
+ *
+ * Decides which analysisId the Bias Tool should persist an instrument under.
+ *   - No existing analysis                → fresh id (a brand-new analysis).
+ *   - Existing id is completed (locked)
+ *     AND this is a genuine user edit     → fresh id: a completed trade must not be
+ *                                            edited in place, so editing starts a new
+ *                                            analysis and it reappears on the Summary.
+ *   - Otherwise                           → keep the existing id (a plain load/view,
+ *                                            or an in-progress analysis).
+ *
+ * Returns { analysisId, isNew }. `isNew` signals the caller to also reset the
+ * analysis timestamp so the fresh analysis is dated to now.
+ */
+export function resolveAnalysisIdForEdit(existingId, isLoading, instrument) {
+  const startNew = Boolean(existingId) && isAnalysisLocked(existingId) && !isLoading;
+  const isNew = startNew || !existingId;
+  return {
+    analysisId: isNew ? generateAnalysisId(instrument) : existingId,
+    isNew,
+  };
+}
+
+/**
  * buildRestoredAnalysis(trade)
  * Builds the active-store entry for a completed trade being restored to the Summary.
  * A fresh, valid analysisId is essential: the Dashboard filters active analyses by
