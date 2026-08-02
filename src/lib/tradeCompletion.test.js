@@ -14,6 +14,8 @@ const {
   buildRestoredAnalysis,
   completeTrade,
   isAnalysisLocked,
+  lockAnalysis,
+  resolveAnalysisIdForEdit,
 } = await import('./tradeCompletion');
 // isValidAnalysisId is internal to tradeCompletion, so validity is asserted here
 // through the id format and the lock system (isAnalysisLocked) instead.
@@ -53,6 +55,50 @@ describe('buildRestoredAnalysis', () => {
     const a = buildRestoredAnalysis(sampleTrade);
     const b = buildRestoredAnalysis(sampleTrade);
     expect(a.analysisId).not.toBe(b.analysisId);
+  });
+});
+
+describe('resolveAnalysisIdForEdit', () => {
+  const dashboardVisibleId = (id) => !isAnalysisLocked(id);
+
+  it('keeps the existing id while an analysis is still in progress (not locked)', () => {
+    const existing = 'BITCOIN-2026-08-02-100000-abc123';
+    const { analysisId, isNew } = resolveAnalysisIdForEdit(existing, false, 'BITCOIN');
+    expect(analysisId).toBe(existing);
+    expect(isNew).toBe(false);
+  });
+
+  it('generates a fresh id for a brand-new instrument (no existing analysis)', () => {
+    const { analysisId, isNew } = resolveAnalysisIdForEdit(undefined, false, 'BITCOIN');
+    expect(analysisId).toContain('BITCOIN-');
+    expect(analysisId).not.toBe(undefined);
+    expect(isNew).toBe(true);
+  });
+
+  it('regression: editing a COMPLETED analysis starts a fresh one so it shows on the Summary again', () => {
+    // Reproduces the reported bug: complete a BITCOIN trade, then change the engine
+    // later that day. The old code reused the locked id, so the Summary stayed empty.
+    const completedId = 'BITCOIN-2026-08-02-090000-old111';
+    lockAnalysis(completedId);
+    expect(dashboardVisibleId(completedId)).toBe(false); // hidden after completion
+
+    const { analysisId, isNew } = resolveAnalysisIdForEdit(completedId, false, 'BITCOIN');
+
+    expect(analysisId).not.toBe(completedId); // a brand-new analysis session
+    expect(isNew).toBe(true);
+    expect(isAnalysisLocked(analysisId)).toBe(false); // the new id is not locked…
+    expect(dashboardVisibleId(analysisId)).toBe(true); // …so the card is visible again
+  });
+
+  it('a plain load/view of a completed analysis keeps the locked id (no pop-back on the Summary)', () => {
+    const completedId = 'BITCOIN-2026-08-02-090000-old222';
+    lockAnalysis(completedId);
+
+    // isLoading = true → merely opening the Bias Tool must not resurrect the card.
+    const { analysisId, isNew } = resolveAnalysisIdForEdit(completedId, true, 'BITCOIN');
+    expect(analysisId).toBe(completedId);
+    expect(isNew).toBe(false);
+    expect(dashboardVisibleId(analysisId)).toBe(false); // stays completed/hidden
   });
 });
 
