@@ -9,8 +9,8 @@ import { blockBg, blockText } from '@/lib/gradeStyles';
 const gradeColors = {
   A: 'text-primary bg-primary/15 border-primary/30',
   B: 'text-foreground bg-secondary border-border',
-  C: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
-  D: 'text-orange-400 bg-orange-500/15 border-orange-500/30',
+  C: 'text-yellow-700 dark:text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
+  D: 'text-orange-700 dark:text-orange-400 bg-orange-500/15 border-orange-500/30',
   F: 'text-destructive bg-destructive/15 border-destructive/30',
 };
 
@@ -137,7 +137,7 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
             <div className="space-y-1.5">
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Warnings</div>
               {warnings.map((w, i) => (
-                <div key={i} className="flex items-start gap-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-2.5 text-xs text-yellow-300">
+                <div key={i} className="flex items-start gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-500/8 border border-amber-200/60 dark:border-amber-500/15 p-2.5 text-xs text-amber-800 dark:text-amber-300 backdrop-blur-sm">
                   <span>⚠</span><span>{w}</span>
                 </div>
               ))}
