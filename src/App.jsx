@@ -14,6 +14,7 @@ import Engine from '@/pages/Engine';
 import History from '@/pages/History';
 import TradeHistory from '@/pages/TradeHistory.jsx';
 import Journal from '@/pages/Journal.jsx';
+import JournalStats from '@/pages/JournalStats.jsx';
 
 import ATR from '@/pages/ATR';
 import Settings from '@/pages/Settings.jsx';
@@ -62,6 +63,7 @@ const AuthenticatedApp = () => {
           <Route path="/history" element={<History />} />
           <Route path="/trade-history" element={<TradeHistory />} />
           <Route path="/journal" element={<Journal />} />
+          <Route path="/journal/stats" element={<JournalStats />} />
 
           <Route path="/atr" element={<ATR />} />
           <Route path="/settings" element={<Settings />} />

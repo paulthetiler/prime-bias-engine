@@ -6,7 +6,6 @@ import {
   computeStats,
   buildEquitySeries,
   resolveStartingBalance,
-  enrichEntry,
   recordTime,
 } from './journalStats';
 
@@ -180,23 +179,5 @@ describe('resolveStartingBalance', () => {
     const r = resolveStartingBalance([{ year: 2026, month: 'January' }]);
     expect(r.source).toBe('default');
     expect(r.value).toBe(10000);
-  });
-});
-
-describe('enrichEntry', () => {
-  it('joins P&L, ROI and R-multiple from the linked completed trade', () => {
-    const tradesById = new Map([['ct-1', { id: 'ct-1', result: 'win', target: 3, pnl: 300 }]]);
-    const entry = { id: 'je', completed_trade_id: 'ct-1', result: 'win' };
-    const e = enrichEntry(entry, tradesById, { startingBalance: 10000 });
-    expect(e.pnl).toBe(300);
-    expect(e.roi).toBe(3);
-    expect(e.rMultiple).toBe(3);
-  });
-
-  it('degrades gracefully when the linked trade is missing', () => {
-    const e = enrichEntry({ id: 'je', completed_trade_id: 'nope', result: 'loss', target: 2 }, new Map());
-    expect(e.pnl).toBeNull();
-    expect(e.roi).toBeNull();
-    expect(e.rMultiple).toBe(-1); // falls back to the entry's own result
   });
 });

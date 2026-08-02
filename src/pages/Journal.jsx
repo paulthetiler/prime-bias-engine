@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
-import { Plus, X, BookOpen } from 'lucide-react';
+import { Plus, X, BookOpen, LineChart, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import TradeJournalTab from '@/components/journal/TradeJournalTab';
@@ -100,12 +101,21 @@ function MonthlyJournal() {
 }
 
 export default function Journal() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState('trades'); // 'trades' | 'monthly'
 
   return (
     <div className="p-4 space-y-3 pb-24">
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-lg font-bold tracking-tight">Journal</h1>
+        <button
+          onClick={() => navigate('/journal/stats')}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:border-primary/40 hover:text-primary active:scale-95"
+        >
+          <LineChart className="h-3.5 w-3.5" />
+          Performance
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
       </div>
 
       {/* Tabs */}

@@ -223,21 +223,3 @@ export function buildEquitySeries(trades = [], { startingBalance = DEFAULT_START
 function round2(n) {
   return Math.round(n * 100) / 100;
 }
-
-/**
- * Attach the P&L-bearing fields from a completed trade onto a journal entry so
- * the entry card can show profit, ROI and R-multiple. Falls back gracefully
- * when the linked trade is missing.
- * @param {any} entry a trade_journal_entry
- * @param {Map<string, any>} tradesById completed trades keyed by id
- * @param {{ startingBalance?: number }} [opts]
- */
-export function enrichEntry(entry, tradesById, { startingBalance = DEFAULT_STARTING_BALANCE } = {}) {
-  const trade = entry?.completed_trade_id ? tradesById.get(entry.completed_trade_id) : null;
-  const pnl = trade && hasNumericPnl(trade) ? Number(trade.pnl) : null;
-  const roi = pnl != null && startingBalance ? round2((pnl / startingBalance) * 100) : null;
-  // Prefer the linked trade for R-multiple (it owns direction/result/target),
-  // but the entry carries the same fields, so either works.
-  const r = rMultiple(trade || entry);
-  return { ...entry, pnl, roi, rMultiple: r };
-}
