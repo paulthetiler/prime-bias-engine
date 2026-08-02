@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight, Crosshair, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { calculateBias, engineOptionsFromSettings } from '@/lib/biasEngine';
 import { calcAlignment } from '@/lib/alignmentUtils';
@@ -172,6 +176,7 @@ export default function Dashboard() {
   const [journalPrompt, setJournalPrompt] = useState(null);     // record awaiting journal decision
   const [settings, setSettings] = useState(getSettings());
   const [showFilters, setShowFilters] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [filters, setFilters] = useState(() => {
     const s = getSettings();
     return {
@@ -411,12 +416,9 @@ export default function Dashboard() {
           </button>
           <Button
             variant="ghost" size="icon"
-            onClick={() => {
-              localStorage.removeItem('primebias_active');
-              setActiveAssets({});
-              window.dispatchEvent(new Event('biasUpdated'));
-              toast.success('Analyses cleared');
-            }}
+            onClick={() => setConfirmClear(true)}
+            aria-label="Clear all analyses"
+            title="Clear all analyses"
             className="h-9 w-9 text-destructive hover:text-destructive"
           >
             <Trash2 className="w-4 h-4" />
@@ -477,6 +479,33 @@ export default function Dashboard() {
         />
       )}
       {journalModals}
+
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all analyses?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes every active analysis from the Summary on this device. Your completed
+              trades, journals and history are not affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                localStorage.removeItem('primebias_active');
+                setActiveAssets({});
+                window.dispatchEvent(new Event('biasUpdated'));
+                toast.success('Analyses cleared');
+                setConfirmClear(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Clear all
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

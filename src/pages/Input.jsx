@@ -7,6 +7,10 @@ import BiasResult from '@/components/bias/BiasResult';
 import ExtraCheck from '@/components/bias/ExtraCheck';
 import AssetQuickSwitch from '@/components/bias/AssetQuickSwitch';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
@@ -68,6 +72,7 @@ export default function Input() {
   const [settings, setSettings] = useState(getSettings());
   const [activeAssets, setActiveAssets] = useState(() => getActiveStore());
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle | saving | saved | error
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const [topAssets, setTopAssets] = useState(() => {
     const top = JSON.parse(localStorage.getItem('primebias_top_assets') || '[]');
@@ -77,6 +82,9 @@ export default function Input() {
 
   const autoSaveTimerRef = useRef(null);
   const isLoadingRef = useRef(false); // true while we are loading inputs for an instrument switch
+  // Tracks the bias_analysis row already saved for the current analysis session, so
+  // repeated edits UPDATE one row instead of inserting a new row on every change.
+  const savedAnalysisRef = useRef({ analysisId: null, rowId: null });
 
   // ── Settings listener ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -204,6 +212,11 @@ export default function Input() {
     setActiveAssets({ ...active });
     window.dispatchEvent(new Event('biasUpdated'));
 
+    // A new analysis session (different analysisId) starts a fresh log row.
+    if (savedAnalysisRef.current.analysisId !== analysisId) {
+      savedAnalysisRef.current = { analysisId, rowId: null };
+    }
+
     // ── DB auto-save: only on actual user edits, debounced 1.5 s ──
     if (!isLoadingRef.current) {
       setAutoSaveStatus('saving');
@@ -214,7 +227,7 @@ export default function Input() {
           const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
           const grade = ['A','B','C','D','F'].includes(res?.grade) ? res.grade : 'F';
           const tradeAction = ['TRADE','WAIT','NO_TRADE'].includes(res?.tradeAction) ? res.tradeAction : 'NO_TRADE';
-          await base44.entities.BiasAnalysis.create({
+          const payload = {
             instrument,
             timestamp: new Date().toISOString(),
             overall_bias: overallBias,
@@ -223,11 +236,23 @@ export default function Input() {
             trade_action: tradeAction,
             warnings: res?.warnings || [],
             notes: `${direction} | ${grade} | Score: ${res?.winningScore ?? 0} | ${res?.status ?? ''}`,
-          });
+          };
+          // Update the existing log row for this analysis session; otherwise create one.
+          // This keeps a single, current log entry per analysis instead of one row per edit.
+          const existingRowId =
+            savedAnalysisRef.current.analysisId === analysisId ? savedAnalysisRef.current.rowId : null;
+          if (existingRowId) {
+            await base44.entities.BiasAnalysis.update(existingRowId, payload);
+          } else {
+            const saved = await base44.entities.BiasAnalysis.create(payload);
+            savedAnalysisRef.current = { analysisId, rowId: saved?.id ?? null };
+          }
           setAutoSaveStatus('saved');
           setTimeout(() => setAutoSaveStatus('idle'), 2000);
         } catch (err) {
           console.warn('AutoSave error (non-critical):', err?.message || err);
+          // If an update failed (e.g. the row was deleted), forget it so the next edit re-creates.
+          savedAnalysisRef.current = { analysisId, rowId: null };
           // Don't show error to user — autosave to BiasAnalysis is non-critical
           setAutoSaveStatus('idle');
         }
@@ -251,12 +276,14 @@ export default function Input() {
     localStorage.removeItem('primebias_active');
     localStorage.removeItem('primebias_inputs');
     localStorage.removeItem('primebias_instrument');
+    savedAnalysisRef.current = { analysisId: null, rowId: null };
     setInstrument('');
     setInputs(getDefaultInputs());
     setExtraCheck({ h1: null, m15: null });
     setActiveAssets({});
     window.dispatchEvent(new Event('biasUpdated'));
     toast.success('Cleared all analyses');
+    setConfirmClear(false);
   };
 
   const handleRemoveInstrument = () => {
@@ -315,14 +342,36 @@ export default function Input() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleClearAll}
+            onClick={() => setConfirmClear(true)}
             className="h-8 w-8 text-destructive hover:text-destructive"
+            aria-label="Clear all data"
             title="Clear all data"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all analyses?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This clears every saved instrument and its indicator inputs from the Bias Tool and
+              Summary on this device. Your completed trades, journals and history are not affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearAll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Clear all
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Quick Asset Switcher */}
       {Object.values(activeAssets).length > 0 && (
