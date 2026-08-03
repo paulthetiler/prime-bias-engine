@@ -19,9 +19,13 @@ npm install
 1. Create a project at [supabase.com](https://supabase.com).
 2. In the dashboard, open **SQL Editor** and run each file in
    [`supabase/migrations/`](supabase/migrations/) **in order** (`0001_init.sql`,
-   then `0002_bias_analysis_autosave_key.sql`). `0001` creates the four tables
+   `0002_bias_analysis_autosave_key.sql`, then
+   `0003_cross_device_active_sync.sql`). `0001` creates the four tables
    (`bias_analysis`, `completed_trade`, `monthly_journal`, `trade_journal_entry`)
-   with per-user Row Level Security; `0002` adds the auto-save de-duplication key.
+   with per-user Row Level Security; `0002` adds the auto-save de-duplication key;
+   `0003` adds the columns that make an active analysis a complete, rehydratable
+   snapshot so the **Summary and Bias Tool sync across devices** (without it, the
+   Bias Tool shows "Not saved" and a second device loads an empty Summary).
    (Or, with the CLI: `supabase db push`.)
 3. In **Project Settings → API**, copy your **Project URL** and **anon/public key**.
 

@@ -86,6 +86,10 @@ export async function completeTrade(analysis, result, details = {}) {
   const alignment = calcAlignment(results || {});
   const record = await base44.entities.CompletedTrade.create({
     instrument,
+    // Link back to the analysis session so other devices hide this analysis on
+    // the Summary instead of resurrecting it during hydration (see biasSync).
+    // Requires migration 0003 (completed_trade.analysis_id).
+    analysis_id: id,
     status: 'completed',
     result,
     direction:        results?.mainDirection,

@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { getSettings } from '@/lib/userSettings';
 import { resolveAnalysisIdForEdit } from '@/lib/tradeCompletion';
 import { saveBiasAnalysisWithRetry } from '@/lib/autoSave';
+import { syncLog, syncError } from '@/lib/syncLog';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,8 +60,8 @@ function describeSaveError(err) {
   const msg = String(err?.message || err || 'Unknown error');
   // 42P10: no unique/exclusion constraint matching ON CONFLICT.
   // 42703: column does not exist. Both mean migration 0002 hasn't been applied.
-  if (code === '42P10' || code === '42703' || /on conflict|constraint|analysis_id/i.test(msg)) {
-    return 'Database not set up for auto-save (migration 0002 not applied).';
+  if (code === '42P10' || code === '42703' || /on conflict|constraint|analysis_id|extra_check|column .* does not exist/i.test(msg)) {
+    return 'Database not set up for auto-save (apply migrations 0002 and 0003).';
   }
   if (err?.status === 401 || /jwt|not authenticated|expired/i.test(msg)) {
     return 'Your session expired — sign out and back in.';
@@ -122,18 +123,23 @@ export default function Input() {
     const gen = ++saveGenRef.current; // this call is now the current save
     if (savedClearTimerRef.current) clearTimeout(savedClearTimerRef.current);
     setAutoSaveStatus('saving');
+    syncLog('save', `Saving analysis ${payload.analysis_id} (${payload.instrument}) to Supabase …`);
     try {
-      await saveBiasAnalysisWithRetry(payload);
+      await saveBiasAnalysisWithRetry(payload, {
+        onRetry: (attempt, err) =>
+          syncLog('save', `Transient save failure, retry #${attempt}.`, err?.message || err),
+      });
       if (saveGenRef.current !== gen) return; // superseded by a newer save
       pendingSaveRef.current = null;
       setAutoSaveError(null);
       setAutoSaveStatus('saved');
+      syncLog('save', `Saved ${payload.analysis_id} (${payload.instrument}) ✓`);
       savedClearTimerRef.current = setTimeout(() => {
         if (saveGenRef.current === gen) setAutoSaveStatus('idle');
       }, 2000);
     } catch (err) {
       if (saveGenRef.current !== gen) return; // superseded — don't clobber status
-      console.warn('AutoSave failed after retries:', err?.message || err);
+      syncError('save', `AutoSave failed after retries for ${payload.instrument}.`, err?.message || err);
       // Keep the payload so the user can retry the exact same upsert (no duplicate).
       pendingSaveRef.current = payload;
       setAutoSaveError(describeSaveError(err));
@@ -293,10 +299,18 @@ export default function Input() {
       const tradeAction = ['TRADE','WAIT','NO_TRADE'].includes(res?.tradeAction) ? res.tradeAction : 'NO_TRADE';
       // analysis_id makes this a deterministic upsert: one row per analysis session,
       // enforced by the DB (unique index on user_id, analysis_id — migration 0002).
+      //
+      // The payload is a COMPLETE snapshot (raw inputs + extra_check + results),
+      // not just a summary, so another device can rebuild this exact Summary card
+      // from the row. Without inputs there is nothing to hydrate (a card is
+      // computed from inputs). extra_check/inputs columns require migration 0003.
       const payload = {
         analysis_id: analysisId,
         instrument,
         timestamp: new Date().toISOString(),
+        inputs,
+        extra_check: extraCheck,
+        results: res,
         overall_bias: overallBias,
         grade,
         confidence_score: res?.winningScore || 0,

@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '@/api/supabaseClient';
+import { hydrateOnceForUser } from '@/lib/biasSync';
 
 const AuthContext = createContext(/** @type {any} */ (null));
 
@@ -26,6 +27,10 @@ export const AuthProvider = ({ children }) => {
       const u = session?.user ?? null;
       setUser(u);
       setIsAuthenticated(Boolean(u));
+      // Once we know who is signed in, pull their active analyses down from
+      // Supabase into the local cache so this device shows the same data the
+      // analysis was created on. Idempotent per page load (see biasSync).
+      if (u?.id) hydrateOnceForUser(u.id);
     };
 
     supabase.auth.getSession().then(({ data }) => {
