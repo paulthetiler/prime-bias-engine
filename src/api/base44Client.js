@@ -16,6 +16,8 @@ const TABLES = {
   CompletedTrade: 'completed_trade',
   MonthlyJournal: 'monthly_journal',
   TradeJournalEntry: 'trade_journal_entry',
+  TradingAccount: 'trading_account',
+  AccountTransaction: 'account_transaction',
 };
 
 function client() {
