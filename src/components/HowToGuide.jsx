@@ -136,10 +136,10 @@ Enable or disable this in Settings → Display → Why this trade?`
   D = Dangerous — significant conflict
   F = No Trade — conflicting or flat
 
-  F (Extended) = Score ≥90 — extremely one-sided. Market may be overextended. Do not trade.
-  C (Risky) = Score 85–89 — approaching extended territory. Use caution.
+  Extended = Score >90 — extremely one-sided. Market may be overextended. Do not trade.
+  C (Risky) = Score 80–90 — approaching extended territory. Use caution.
 
-  Note: If the Deep block conflicts with the score direction, the grade is capped at C regardless of score.
+  Note: If the block trend conflicts with the score direction, the grade is capped at C regardless of score.
 
 Trade Action:
   TRADE = High confidence, aligned setup
@@ -218,12 +218,12 @@ Tap "Reset" at the top of Settings to restore all defaults.`
     title: '⚠️ Warnings',
     content: `Yellow warning banners appear when the engine detects conflicting signals:
 
-• Deep Trend conflicts with score direction — grade capped at C
+• Block trend conflicts with score direction — grade capped at C
 • NOW momentum is OPPOSITE to DD — momentum conflict
 • DD block is NEUTRAL — no clear execution trend
 • Deep Trend is NEUTRAL — no macro direction confirmed
-• Score ≥90 — market EXTENDED, high reversal risk
-• Score 85–89 — approaching extended territory, use caution
+• Score >90 — market EXTENDED, high reversal risk
+• Score 80–90 — approaching extended territory, use caution
 
 Warnings don't mean "don't trade" — they flag elevated risk. Always apply your own judgment and proper risk management.`
   },
