@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { gradeText } from '@/lib/gradeStyles';
-import { buildRestoredAnalysis } from '@/lib/tradeCompletion';
+import { buildRestoredAnalysis, computeTradeFinancials } from '@/lib/tradeCompletion';
+import { withDerivedFinancials, hasFinancialResult } from '@/lib/accounts';
 import { safeHttpUrl } from '@/lib/safeUrl';
 
 const resultColors = {
@@ -22,8 +23,10 @@ const resultColors = {
 };
 const resultLabels = { win: 'Win', loss: 'Loss', breakeven: 'B/E', not_taken: 'Not Taken' };
 
-function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete }) {
+function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onAddResult }) {
   if (!trade) return null;
+  const complete = hasFinancialResult(trade);
+  const directional = trade.result === 'win' || trade.result === 'loss';
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
@@ -67,15 +70,22 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete }) {
             ))}
           </div>
 
-          {/* Trade execution */}
-          {(trade.entry_price || trade.exit_price || trade.pnl) && (
+          {/* Financial result */}
+          {complete ? (
             <div className="rounded-xl border border-border bg-secondary/40 p-3 space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Execution</div>
+              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Result</div>
               <div className="grid grid-cols-3 gap-2 text-xs text-center">
+                <div><div className={cn('font-mono font-bold', trade.net_pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>{trade.net_pnl > 0 ? '+' : trade.net_pnl < 0 ? '−' : ''}{Math.abs(trade.net_pnl)}</div><div className="text-muted-foreground">Net P/L</div></div>
+                {trade.fees != null && <div><div className="font-mono font-bold">{trade.fees}</div><div className="text-muted-foreground">Fees</div></div>}
+                {trade.amount_risked != null && <div><div className="font-mono font-bold">{trade.amount_risked}</div><div className="text-muted-foreground">Risked</div></div>}
                 {trade.entry_price && <div><div className="font-mono font-bold">{trade.entry_price}</div><div className="text-muted-foreground">Entry</div></div>}
-                {trade.exit_price  && <div><div className="font-mono font-bold">{trade.exit_price}</div><div className="text-muted-foreground">Exit</div></div>}
-                {trade.pnl != null && <div><div className={cn('font-mono font-bold', trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>{trade.pnl > 0 ? '+' : ''}{trade.pnl}</div><div className="text-muted-foreground">P&L</div></div>}
+                {trade.exit_price && <div><div className="font-mono font-bold">{trade.exit_price}</div><div className="text-muted-foreground">Exit</div></div>}
               </div>
+            </div>
+          ) : directional && (
+            <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3 flex items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">No monetary result recorded yet.</div>
+              <Button size="sm" className="gap-1.5 shrink-0" onClick={() => onAddResult(trade)}>Add result</Button>
             </div>
           )}
 
@@ -111,6 +121,62 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete }) {
   );
 }
 
+// Backfill the monetary result for a historic trade that was logged as a
+// win/loss before amounts were tracked. Positive input only — the outcome sets
+// the sign (see computeTradeFinancials).
+function AddResultModal({ trade, saving, onClose, onSave }) {
+  const [amount, setAmount] = useState('');
+  const [fees, setFees] = useState('');
+  const [risk, setRisk] = useState('');
+  if (!trade) return null;
+  const amountLabel = trade.result === 'loss' ? 'Amount lost' : 'Amount made';
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl"
+        style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <div>
+            <div className="text-base font-bold">Add result</div>
+            <div className="text-xs text-muted-foreground font-mono">{trade.instrument} · {resultLabels[trade.result]}</div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div>
+            <label className="text-xs font-semibold block mb-1">
+              {amountLabel}
+              {trade.result === 'loss' && <span className="text-muted-foreground font-normal"> — enter a positive number</span>}
+            </label>
+            <input type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={e => setAmount(e.target.value)}
+              placeholder="0.00" autoFocus
+              className="w-full h-11 rounded-lg border border-input bg-background px-3 text-base font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Fees (optional)</label>
+              <input type="number" inputMode="decimal" min="0" step="any" value={fees} onChange={e => setFees(e.target.value)} placeholder="0.00"
+                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground block mb-1">Risked (optional)</label>
+              <input type="number" inputMode="decimal" min="0" step="any" value={risk} onChange={e => setRisk(e.target.value)} placeholder="0.00"
+                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button className="flex-1" disabled={saving || amount === ''} onClick={() => onSave({ amount, fees, risk })}>Save result</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const ALL_RESULTS = ['win', 'loss', 'breakeven', 'not_taken'];
 const ALL_GRADES  = ['A', 'B', 'C', 'D', 'F'];
 
@@ -122,10 +188,13 @@ export default function TradeHistory() {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ result: '', grade: '', direction: '', asset: '' });
 
-  const { data: trades = [], isLoading } = useQuery({
+  const [addResultFor, setAddResultFor] = useState(null);
+
+  const { data: rawTrades = [], isLoading } = useQuery({
     queryKey: ['completedTrades'],
     queryFn: () => base44.entities.CompletedTrade.filter({ status: 'completed' }, '-completed_at', 200),
   });
+  const trades = rawTrades.map(withDerivedFinancials);
 
 
 
@@ -172,6 +241,24 @@ export default function TradeHistory() {
     await deleteMutation.mutateAsync(confirmDelete.id);
     setConfirmDelete(null);
     toast.success('Trade deleted');
+  };
+
+  const handleAddResult = (trade) => {
+    setSelected(null);
+    setAddResultFor(trade);
+  };
+
+  const saveResult = async ({ amount, fees, risk }) => {
+    if (!addResultFor) return;
+    const { grossPnl, fees: feeVal, netPnl, amountRisked } = computeTradeFinancials({
+      result: addResultFor.result, amount, fees, amountRisked: risk,
+    });
+    await updateMutation.mutateAsync({
+      id: addResultFor.id,
+      data: { gross_pnl: grossPnl, fees: feeVal, net_pnl: netPnl, amount_risked: amountRisked, pnl: netPnl },
+    });
+    setAddResultFor(null);
+    toast.success('Result added');
   };
 
   const assets = [...new Set(trades.map(t => t.instrument))].sort();
@@ -305,10 +392,12 @@ export default function TradeHistory() {
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   {trade.completed_at ? format(new Date(trade.completed_at), 'dd MMM yyyy HH:mm') : '—'}
-                  {trade.pnl != null && (
-                    <span className={cn('ml-2 font-semibold', trade.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                      {trade.pnl > 0 ? '+' : ''}{trade.pnl}
+                  {hasFinancialResult(trade) ? (
+                    <span className={cn('ml-2 font-semibold', trade.net_pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      {trade.net_pnl > 0 ? '+' : trade.net_pnl < 0 ? '−' : ''}{Math.abs(trade.net_pnl)}
                     </span>
+                  ) : (trade.result === 'win' || trade.result === 'loss') && (
+                    <span className="ml-2 text-primary font-semibold">Add result</span>
                   )}
                 </div>
               </div>
@@ -329,6 +418,16 @@ export default function TradeHistory() {
           onRestore={handleRestore}
           onArchive={handleArchive}
           onDelete={handleDelete}
+          onAddResult={handleAddResult}
+        />
+      )}
+
+      {addResultFor && (
+        <AddResultModal
+          trade={addResultFor}
+          saving={updateMutation.isPending}
+          onClose={() => setAddResultFor(null)}
+          onSave={saveResult}
         />
       )}
 

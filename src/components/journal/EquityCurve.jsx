@@ -5,11 +5,12 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine,
 } from 'recharts';
 
-// The three ways to read the same cumulative series (see buildEquitySeries).
+// Two ways to read the same account-balance series (see accounts.buildEquitySeries):
+//   equity  — cumulative net P/L within the window (baseline 0)
+//   balance — the true account balance after each trade (baseline = opening balance)
 const MODES = [
-  { id: 'equity', label: 'Equity', key: 'equity', prefix: '', suffix: '' },
-  { id: 'roi', label: 'ROI %', key: 'roi', prefix: '', suffix: '%' },
-  { id: 'balance', label: 'Balance', key: 'balance', prefix: '', suffix: '' },
+  { id: 'equity', label: 'Equity', key: 'equity' },
+  { id: 'balance', label: 'Balance', key: 'balance' },
 ];
 
 const UP = '#10b981';
@@ -21,24 +22,28 @@ function fmtNumber(n) {
 }
 
 /**
- * Cumulative account-growth chart with Equity / ROI% / Balance views.
- * @param {{ series: any[], hasPnl: boolean, startingBalance: number, balanceSource?: 'journal'|'default' }} props
+ * Cumulative account-growth chart. The series is the calculated account balance
+ * after each chronologically completed trade (deposits/withdrawals folded in).
+ * @param {{ series: any[], hasPnl: boolean, currentBalance?: number|null, currency?: string|null }} props
  */
-export default function EquityCurve({ series, hasPnl, startingBalance, balanceSource }) {
-  const [mode, setMode] = useState('equity');
+export default function EquityCurve({ series, hasPnl, currentBalance, currency }) {
+  const [mode, setMode] = useState('balance');
   const active = MODES.find(m => m.id === mode) ?? MODES[0];
 
-  // Baseline the chart references: 0 for equity/roi, the starting balance for
-  // the balance view. Colour the curve by whether we finished above baseline.
-  const baseline = mode === 'balance' ? startingBalance : 0;
+  // Baseline: 0 for equity, the opening balance for the balance view. Since every
+  // point carries both, opening = balance − equity is constant across the series.
+  const opening = series.length ? series[0].balance - series[0].equity : 0;
+  const baseline = mode === 'balance' ? opening : 0;
   const last = series.length ? series[series.length - 1][active.key] : baseline;
   const up = last >= baseline;
   const color = up ? UP : DOWN;
+  const cur = currency ? `${currency} ` : '';
 
   const headline = (() => {
     if (!series.length) return '—';
-    const sign = mode !== 'balance' && last > 0 ? '+' : '';
-    return `${sign}${fmtNumber(last)}${active.suffix}`;
+    if (mode === 'balance') return `${cur}${fmtNumber(last)}`;
+    const sign = last > 0 ? '+' : last < 0 ? '−' : '';
+    return `${sign}${cur}${fmtNumber(Math.abs(last))}`;
   })();
 
   return (
@@ -46,7 +51,7 @@ export default function EquityCurve({ series, hasPnl, startingBalance, balanceSo
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-            {active.label === 'ROI %' ? 'Return on Investment' : active.label === 'Balance' ? 'Account Balance' : 'Equity Curve'}
+            {mode === 'balance' ? 'Account Balance' : 'Equity Curve'}
           </div>
           {hasPnl && series.length > 0 && (
             <div className={cn('mt-0.5 font-mono text-xl font-bold tabular-nums', up ? 'text-emerald-500' : 'text-red-500')}>
@@ -96,7 +101,7 @@ export default function EquityCurve({ series, hasPnl, startingBalance, balanceSo
               tickLine={false}
               axisLine={false}
               width={46}
-              tickFormatter={(v) => `${active.suffix === '%' ? v : fmtNumber(v)}${active.suffix}`}
+              tickFormatter={(v) => fmtNumber(v)}
             />
             <ReferenceLine y={baseline} stroke="currentColor" className="text-muted-foreground" strokeDasharray="4 4" opacity={0.5} />
             <Tooltip
@@ -107,20 +112,20 @@ export default function EquityCurve({ series, hasPnl, startingBalance, balanceSo
                 const d = p.date ? format(new Date(p.date), 'dd MMM HH:mm') : `Trade ${i}`;
                 return p.instrument ? `${p.instrument} · ${d}` : d;
               }}
-              formatter={(v) => [`${active.prefix}${fmtNumber(v)}${active.suffix}`, active.label]}
+              formatter={(v) => [`${cur}${fmtNumber(v)}`, active.label]}
             />
             <Area type="monotone" dataKey={active.key} stroke={color} strokeWidth={2.5} fill={`url(#eqFill-${mode})`} animationDuration={500} />
           </AreaChart>
         </ResponsiveContainer>
       ) : (
         <div className="flex h-[190px] flex-col items-center justify-center text-center text-xs text-muted-foreground">
-          <p>{hasPnl ? 'Log at least two priced trades to plot your curve.' : 'Add P&L when completing trades to grow your equity curve.'}</p>
+          <p>{hasPnl ? 'Log at least two priced trades to plot your curve.' : 'Add trade results to unlock this stat.'}</p>
         </div>
       )}
 
-      {mode !== 'equity' && balanceSource === 'default' && (
+      {hasPnl && currentBalance != null && (
         <p className="mt-2 text-[10px] text-muted-foreground">
-          Based on a {fmtNumber(startingBalance)} starting balance. Set a monthly start balance in the Journal to personalise this.
+          Current balance {cur}{fmtNumber(currentBalance)} · includes deposits, withdrawals and realised trade P/L.
         </p>
       )}
     </div>
