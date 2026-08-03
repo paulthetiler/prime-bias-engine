@@ -18,6 +18,14 @@ if (!window.matchMedia) {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = vi.fn();
 }
+// Recharts' ResponsiveContainer observes size changes; jsdom has no ResizeObserver.
+if (!global.ResizeObserver) {
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
 
 afterEach(() => {
   cleanup();

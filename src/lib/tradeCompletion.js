@@ -64,6 +64,50 @@ export function unlockAnalysis(analysisId) {
   localStorage.setItem(LOCKS_KEY, JSON.stringify(locks));
 }
 
+// ── Financial result ─────────────────────────────────────────────────────────
+
+function toNonNegNumber(v) {
+  if (v == null || v === '') return null;
+  const n = Math.abs(parseFloat(v));
+  return Number.isFinite(n) ? n : null;
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Turn the quick-entry inputs into stored money columns. The user always enters
+ * a POSITIVE magnitude; the sign comes from the outcome, so nobody types a minus:
+ *   - win        → gross = +amount
+ *   - loss       → gross = −amount
+ *   - breakeven  → gross = 0 (amount ignored)
+ * net = gross − fees. When a win/loss has no amount entered the result is left
+ * financially INCOMPLETE (net_pnl = null) rather than invented. `not_taken` and
+ * unknown outcomes carry no financials.
+ * @param {{ result?: string, amount?: any, fees?: any, amountRisked?: any }} input
+ * @returns {{ grossPnl: number|null, fees: number|null, netPnl: number|null, amountRisked: number|null }}
+ */
+export function computeTradeFinancials({ result, amount, fees, amountRisked } = {}) {
+  const feeNum = toNonNegNumber(fees);
+  const riskNum = toNonNegNumber(amountRisked);
+  const amtNum = toNonNegNumber(amount);
+
+  if (result === 'breakeven') {
+    const gross = 0;
+    return { grossPnl: gross, fees: feeNum, netPnl: round2(gross - (feeNum ?? 0)), amountRisked: riskNum };
+  }
+  if (result === 'win' || result === 'loss') {
+    if (amtNum == null) {
+      // No monetary amount → financially incomplete (do not invent a value).
+      return { grossPnl: null, fees: feeNum, netPnl: null, amountRisked: riskNum };
+    }
+    const gross = result === 'loss' ? -amtNum : amtNum;
+    return { grossPnl: round2(gross), fees: feeNum, netPnl: round2(gross - (feeNum ?? 0)), amountRisked: riskNum };
+  }
+  return { grossPnl: null, fees: null, netPnl: null, amountRisked: riskNum };
+}
+
 // ── Main completion function ──────────────────────────────────────────────────
 
 /**
@@ -81,6 +125,15 @@ export async function completeTrade(analysis, result, details = {}) {
   if (!result)     throw new Error('No result provided');
 
   const id = analysisId || generateAnalysisId(instrument);
+
+  // Realised money result. The user enters positive magnitudes; sign + net are
+  // derived here so no minus symbols are ever required in the UI.
+  const { grossPnl, fees, netPnl, amountRisked } = computeTradeFinancials({
+    result,
+    amount: details.amount,
+    fees: details.fees,
+    amountRisked: details.amountRisked,
+  });
 
   // Save to DB
   const alignment = calcAlignment(results || {});
@@ -112,7 +165,14 @@ export async function completeTrade(analysis, result, details = {}) {
     completed_at:     new Date().toISOString(),
     entry_price:      details.entry   ? parseFloat(details.entry)   : null,
     exit_price:       details.exit    ? parseFloat(details.exit)    : null,
-    pnl:              details.pnl     ? parseFloat(details.pnl)     : null,
+    // Account-led financial result. `net_pnl` is authoritative; `pnl` is kept in
+    // sync so any legacy reader still sees the same number.
+    account_id:       details.accountId || null,
+    gross_pnl:        grossPnl,
+    fees,
+    net_pnl:          netPnl,
+    amount_risked:    amountRisked,
+    pnl:              netPnl,
     exit_reason:      details.exitReason || null,
     notes:            details.notes       || null,
     screenshot_url:   details.screenshotUrl || null,

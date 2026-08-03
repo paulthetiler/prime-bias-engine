@@ -8,6 +8,7 @@ import HowToGuide from '@/components/HowToGuide';
 import { InstallCard } from '@/components/InstallApp';
 import ExportBackup from '@/components/ExportBackup';
 import ImportBackup from '@/components/ImportBackup';
+import AccountsManager from '@/components/accounts/AccountsManager';
 import { getSettings, saveSettings, DEFAULTS } from '@/lib/userSettings';
 import { cn } from '@/lib/utils';
 
@@ -124,6 +125,9 @@ export default function Settings() {
 
       {/* Install App */}
       <InstallCard />
+
+      {/* Trading accounts + transactions */}
+      <AccountsManager />
 
       {/* Backup / Export + Import */}
       <ExportBackup />

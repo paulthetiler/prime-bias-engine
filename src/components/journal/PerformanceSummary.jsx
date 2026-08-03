@@ -2,31 +2,31 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
-  TrendingUp, TrendingDown, Percent, Target, Scale, Hash, Flame, Trophy,
+  TrendingUp, TrendingDown, Percent, Sigma, Scale, Hash, Flame, Trophy,
 } from 'lucide-react';
 import { TIME_FILTERS } from '@/lib/journalStats';
 import EquityCurve from './EquityCurve';
 
 // ── formatting helpers ────────────────────────────────────────────────────────
+const LOCKED = 'Add trade results to unlock this stat.';
+
 const fmtSigned = (n, opts = {}) => {
   if (n == null || !Number.isFinite(n)) return '—';
-  const s = n.toLocaleString(undefined, { maximumFractionDigits: opts.dp ?? 2, minimumFractionDigits: opts.dp ?? 0 });
-  return `${n > 0 ? '+' : ''}${s}`;
+  const s = Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: opts.dp ?? 2, minimumFractionDigits: opts.dp ?? 0 });
+  const sign = n > 0 ? '+' : n < 0 ? '−' : '';
+  return `${sign}${opts.prefix ?? ''}${s}`;
 };
-const fmtPf = (pf) => {
-  if (pf == null) return '—';
-  if (!Number.isFinite(pf)) return '∞';
-  return pf.toFixed(2);
-};
+const fmtMoney = (n, currency) => (n == null || !Number.isFinite(n) ? '—' : fmtSigned(n, { prefix: currency ? `${currency} ` : '' }));
 
 /**
  * A single metric tile. Colour is opt-in via `tone` so green/red stays reserved
- * for the numbers where direction actually carries meaning.
- * @param {{ icon: any, label: string, value: React.ReactNode, sub?: string, tone?: 'up'|'down'|'neutral', index?: number }} props
+ * for the numbers where direction actually carries meaning. When `value` is null
+ * the tile shows a muted empty-state hint instead of a fake number.
  */
-function MetricCard({ icon: Icon, label, value, sub, tone = 'neutral', index = 0 }) {
-  const toneClass =
-    tone === 'up' ? 'text-emerald-500' : tone === 'down' ? 'text-red-500' : 'text-foreground';
+/** @param {{ icon: any, label: string, value?: any, sub?: any, hint?: any, tone?: 'up'|'down'|'neutral', index?: number }} props */
+function MetricCard({ icon: Icon, label, value, sub, hint, tone = 'neutral', index = 0 }) {
+  const toneClass = tone === 'up' ? 'text-emerald-500' : tone === 'down' ? 'text-red-500' : 'text-foreground';
+  const empty = value == null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -38,30 +38,40 @@ function MetricCard({ icon: Icon, label, value, sub, tone = 'neutral', index = 0
         <Icon className="h-3.5 w-3.5" />
         <span className="text-[10px] font-medium uppercase tracking-wider">{label}</span>
       </div>
-      <div className={cn('mt-1.5 font-mono text-lg font-bold leading-none tabular-nums', toneClass)}>{value}</div>
-      {sub && <div className="mt-1 text-[10px] text-muted-foreground">{sub}</div>}
+      {empty ? (
+        <div className="mt-1.5 text-[11px] leading-tight text-muted-foreground">{hint || LOCKED}</div>
+      ) : (
+        <>
+          <div className={cn('mt-1.5 font-mono text-lg font-bold leading-none tabular-nums', toneClass)}>{value}</div>
+          {sub && <div className="mt-1 text-[10px] text-muted-foreground">{sub}</div>}
+        </>
+      )}
     </motion.div>
   );
 }
 
 /**
  * The dashboard header: time-window chips, a metric grid and the equity curve.
- * @param {{
- *   stats: any,
- *   series: any[],
- *   timeframe: string,
- *   onTimeframe: (id: string) => void,
- *   startingBalance: number,
- *   balanceSource?: 'journal'|'default',
- * }} props
+ * Money figures come from realised net P/L; ROI + balance are account-relative
+ * and passed in from the page (which owns deposits/withdrawals).
  */
-export default function PerformanceSummary({ stats, series, timeframe, onTimeframe, startingBalance, balanceSource }) {
+export default function PerformanceSummary({
+  stats, series, timeframe, onTimeframe,
+  roiPct, openingBalance, currentBalance, currency, monetaryEnabled = true,
+}) {
   const {
-    totalTrades, wins, losses, winRate, hasPnl, netPnl, profitFactor, roiPct,
-    avgRr, bestWinStreak, currentStreak, streakType,
+    totalTrades, wins, losses, winRate, hasPnl, netPnl, profitFactor,
+    avgR, hasRiskData, bestWinStreak, currentStreak, streakType, incompleteCount,
   } = stats;
 
-  const streakValue = currentStreak > 0 ? `${currentStreak}${streakType === 'win' ? 'W' : 'L'}` : '—';
+  const streakValue = currentStreak > 0 ? `${currentStreak}${streakType === 'win' ? 'W' : 'L'}` : null;
+  const showMoney = monetaryEnabled && hasPnl;
+
+  // Profit factor rendering: null → empty; Infinity → "No losing trades".
+  const profitFactorValue = !monetaryEnabled || profitFactor == null
+    ? null
+    : !Number.isFinite(profitFactor) ? '∞' : profitFactor.toFixed(2);
+  const profitFactorSub = Number.isFinite(profitFactor) ? undefined : 'No losing trades';
 
   return (
     <div className="space-y-3">
@@ -89,14 +99,14 @@ export default function PerformanceSummary({ stats, series, timeframe, onTimefra
           index={0}
           icon={netPnl >= 0 ? TrendingUp : TrendingDown}
           label="Net P/L"
-          value={hasPnl ? fmtSigned(netPnl) : '—'}
-          tone={!hasPnl ? 'neutral' : netPnl >= 0 ? 'up' : 'down'}
+          value={showMoney ? fmtMoney(netPnl, currency) : null}
+          tone={!showMoney ? 'neutral' : netPnl >= 0 ? 'up' : 'down'}
         />
         <MetricCard
           index={1}
           icon={Percent}
           label="Win Rate"
-          value={`${Math.round(winRate)}%`}
+          value={totalTrades ? `${Math.round(winRate)}%` : null}
           sub={`${wins}W · ${losses}L`}
           tone={winRate >= 50 ? 'up' : winRate > 0 ? 'down' : 'neutral'}
         />
@@ -104,49 +114,58 @@ export default function PerformanceSummary({ stats, series, timeframe, onTimefra
           index={2}
           icon={TrendingUp}
           label="ROI"
-          value={roiPct == null ? '—' : `${fmtSigned(roiPct, { dp: 1 })}%`}
+          value={monetaryEnabled && roiPct != null ? `${fmtSigned(roiPct, { dp: 1 })}%` : null}
+          sub={monetaryEnabled && roiPct != null && openingBalance != null ? `on ${fmtMoney(openingBalance, currency).replace('+', '')}` : undefined}
           tone={roiPct == null ? 'neutral' : roiPct >= 0 ? 'up' : 'down'}
         />
         <MetricCard
           index={3}
           icon={Scale}
           label="Profit Factor"
-          value={fmtPf(profitFactor)}
-          tone={profitFactor == null ? 'neutral' : profitFactor >= 1 ? 'up' : 'down'}
+          value={profitFactorValue}
+          sub={profitFactorSub}
+          tone={profitFactorValue == null ? 'neutral' : profitFactor >= 1 ? 'up' : 'down'}
         />
         <MetricCard
           index={4}
-          icon={Target}
-          label="Avg R:R"
-          value={avgRr == null ? '—' : `${avgRr.toFixed(1)}`}
-          sub={avgRr == null ? undefined : 'planned'}
+          icon={Sigma}
+          label="Avg R"
+          value={hasRiskData ? `${avgR.toFixed(2)}R` : null}
+          hint="Not enough risk data"
+          tone={!hasRiskData ? 'neutral' : avgR >= 0 ? 'up' : 'down'}
         />
         <MetricCard
           index={5}
           icon={Hash}
           label="Total Trades"
-          value={totalTrades}
+          value={totalTrades || null}
+          sub={incompleteCount ? `${incompleteCount} need a result` : undefined}
         />
         <MetricCard
           index={6}
           icon={Flame}
           label="Streak"
           value={streakValue}
-          sub="current"
+          sub={streakValue ? 'current' : undefined}
           tone={currentStreak > 0 ? (streakType === 'win' ? 'up' : 'down') : 'neutral'}
         />
         <MetricCard
           index={7}
           icon={Trophy}
           label="Best Streak"
-          value={bestWinStreak || '—'}
+          value={bestWinStreak || null}
           sub={bestWinStreak ? 'wins in a row' : undefined}
           tone={bestWinStreak ? 'up' : 'neutral'}
         />
       </div>
 
       {/* Equity curve */}
-      <EquityCurve series={series} hasPnl={hasPnl} startingBalance={startingBalance} balanceSource={balanceSource} />
+      <EquityCurve
+        series={series}
+        hasPnl={showMoney}
+        currentBalance={currentBalance}
+        currency={currency}
+      />
     </div>
   );
 }

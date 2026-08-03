@@ -13,6 +13,7 @@ vi.mock('@/api/base44Client', () => ({
 const {
   buildRestoredAnalysis,
   completeTrade,
+  computeTradeFinancials,
   isAnalysisLocked,
   lockAnalysis,
   resolveAnalysisIdForEdit,
@@ -134,5 +135,54 @@ describe('restore → complete workflow', () => {
     expect(isAnalysisLocked(undefined)).toBe(false);
     const legacy = { instrument: 'EUR/USD', analysisId: undefined };
     expect(dashboardVisible([legacy])).toHaveLength(1); // would stay stuck forever
+  });
+});
+
+describe('computeTradeFinancials', () => {
+  it('a win banks the amount as a positive net (minus fees)', () => {
+    expect(computeTradeFinancials({ result: 'win', amount: 200, fees: 5 }))
+      .toEqual({ grossPnl: 200, fees: 5, netPnl: 195, amountRisked: null });
+  });
+
+  it('a loss stores a negative net from a POSITIVE input (no minus typed)', () => {
+    expect(computeTradeFinancials({ result: 'loss', amount: 150 }))
+      .toEqual({ grossPnl: -150, fees: null, netPnl: -150, amountRisked: null });
+    // fees deepen the loss
+    expect(computeTradeFinancials({ result: 'loss', amount: 150, fees: 10 }).netPnl).toBe(-160);
+    // a stray minus in the input is ignored — magnitude is used
+    expect(computeTradeFinancials({ result: 'loss', amount: -150 }).netPnl).toBe(-150);
+  });
+
+  it('break-even is net 0 (or -fees) regardless of amount', () => {
+    expect(computeTradeFinancials({ result: 'breakeven', amount: 999 }).netPnl).toBe(0);
+    expect(computeTradeFinancials({ result: 'breakeven', fees: 3 }).netPnl).toBe(-3);
+  });
+
+  it('a win/loss with no amount stays financially incomplete (net_pnl null)', () => {
+    expect(computeTradeFinancials({ result: 'win' }).netPnl).toBeNull();
+    expect(computeTradeFinancials({ result: 'loss', amount: '' }).netPnl).toBeNull();
+  });
+
+  it('carries amount risked through when provided', () => {
+    expect(computeTradeFinancials({ result: 'win', amount: 100, amountRisked: 50 }).amountRisked).toBe(50);
+  });
+
+  it('not_taken carries no financials', () => {
+    expect(computeTradeFinancials({ result: 'not_taken', amount: 100 }))
+      .toEqual({ grossPnl: null, fees: null, netPnl: null, amountRisked: null });
+  });
+});
+
+describe('completeTrade financial persistence', () => {
+  it('writes account_id, gross/net/fees/risk and keeps legacy pnl in sync', async () => {
+    const analysis = { instrument: 'EUR/USD', results: {}, analysisId: 'EUR/USD-2026-01-01-000000-x' };
+    await completeTrade(analysis, 'loss', { amount: 80, fees: 4, amountRisked: 40, accountId: 'acc-9' });
+    const payload = createCompleted.mock.calls.at(-1)[0];
+    expect(payload.account_id).toBe('acc-9');
+    expect(payload.gross_pnl).toBe(-80);
+    expect(payload.fees).toBe(4);
+    expect(payload.net_pnl).toBe(-84);
+    expect(payload.amount_risked).toBe(40);
+    expect(payload.pnl).toBe(-84); // legacy column mirrors net_pnl
   });
 });
