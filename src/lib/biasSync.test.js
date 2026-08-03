@@ -6,12 +6,13 @@ const state = vi.hoisted(() => ({ configured: true }));
 const me = vi.fn();
 const biasList = vi.fn();
 const completedFilter = vi.fn();
+const upsert = vi.fn();
 
 vi.mock('@/api/base44Client', () => ({
   base44: {
     auth: { me: (...a) => me(...a) },
     entities: {
-      BiasAnalysis: { list: (...a) => biasList(...a) },
+      BiasAnalysis: { list: (...a) => biasList(...a), upsert: (...a) => upsert(...a) },
       CompletedTrade: { filter: (...a) => completedFilter(...a) },
     },
   },
@@ -23,8 +24,9 @@ vi.mock('@/api/supabaseClient', () => ({
   },
 }));
 
-const { hydrateActiveAnalyses, hydrateOnceForUser, resetHydrationGuard } = await import('./biasSync');
+const { hydrateActiveAnalyses, syncActiveAnalyses, hydrateOnceForUser, resetHydrationGuard } = await import('./biasSync');
 const { isAnalysisLocked } = await import('./tradeCompletion');
+const { getDefaultInputs } = await import('./biasEngine');
 
 const inputs = {
   month: { close: 1, macd: 1, rsi: 1, boli: 1 },
@@ -50,9 +52,22 @@ beforeEach(() => {
   me.mockReset().mockResolvedValue({ id: 'user-1', email: 'a@b.com' });
   biasList.mockReset().mockResolvedValue([]);
   completedFilter.mockReset().mockResolvedValue([]);
+  upsert.mockReset().mockResolvedValue({ id: 'row-1' });
   localStorage.clear();
   resetHydrationGuard();
 });
+
+// A local active-store entry with a complete inputs shape (all timeframes),
+// which calculateBias requires when the push path recomputes results.
+function localEntry(instrument, analysisId, timestamp) {
+  return {
+    instrument,
+    analysisId,
+    inputs: getDefaultInputs(),
+    extraCheck: { h1: null, m15: null },
+    timestamp,
+  };
+}
 
 describe('hydrateActiveAnalyses', () => {
   it('skips when Supabase is not configured', async () => {
@@ -166,6 +181,73 @@ describe('hydrateActiveAnalyses', () => {
     biasList.mockRejectedValue(new Error('network down'));
     const res = await hydrateActiveAnalyses();
     expect(res).toEqual({ ok: false, reason: 'fetch_failed' });
+  });
+});
+
+describe('syncActiveAnalyses (two-way)', () => {
+  it('pushes a local-only analysis up, then pulls the server set down', async () => {
+    // Local device has BITCOIN that never reached the server (created pre-migration).
+    localStorage.setItem('primebias_active', JSON.stringify({
+      BITCOIN: localEntry('BITCOIN', 'BITCOIN-2026-08-03-100000-x', '2026-08-03T10:00:00.000Z'),
+    }));
+    // Server only knows about a different instrument.
+    biasList.mockResolvedValue([biasRow({ instrument: 'DAX', analysis_id: 'DAX-1' })]);
+
+    const res = await syncActiveAnalyses();
+
+    // BITCOIN was uploaded with its full inputs …
+    expect(res.pushed).toBe(1);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    const pushedPayload = upsert.mock.calls[0][0];
+    expect(pushedPayload.analysis_id).toBe('BITCOIN-2026-08-03-100000-x');
+    expect(pushedPayload.instrument).toBe('BITCOIN');
+    expect(pushedPayload.inputs).toBeTruthy();
+    // … and DAX was pulled down.
+    expect(res.hydrated).toBe(1);
+    const active = JSON.parse(localStorage.getItem('primebias_active'));
+    expect(active.BITCOIN).toBeTruthy();
+    expect(active.DAX).toBeTruthy();
+  });
+
+  it('does not re-push an analysis already synced on the server', async () => {
+    const analysisId = 'EUR/USD-2026-08-03-120000-abc';
+    localStorage.setItem('primebias_active', JSON.stringify({
+      'EUR/USD': localEntry('EUR/USD', analysisId, '2026-08-03T12:00:00.000Z'),
+    }));
+    // Server already has this exact analysis with inputs, same timestamp.
+    biasList.mockResolvedValue([biasRow({ analysis_id: analysisId })]);
+
+    const res = await syncActiveAnalyses();
+
+    expect(res.pushed).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('re-pushes when the server row has no inputs (saved before the DB was set up)', async () => {
+    const analysisId = 'EUR/USD-2026-08-03-120000-abc';
+    localStorage.setItem('primebias_active', JSON.stringify({
+      'EUR/USD': localEntry('EUR/USD', analysisId, '2026-08-03T12:00:00.000Z'),
+    }));
+    // A legacy summary-only row: same id, but no inputs to hydrate from.
+    biasList.mockResolvedValue([biasRow({ analysis_id: analysisId, inputs: null })]);
+
+    const res = await syncActiveAnalyses();
+
+    expect(res.pushed).toBe(1);
+    expect(upsert.mock.calls[0][0].inputs).toBeTruthy();
+  });
+
+  it('does not push an analysis completed on another device', async () => {
+    const analysisId = 'BITCOIN-2026-08-03-100000-x';
+    localStorage.setItem('primebias_active', JSON.stringify({
+      BITCOIN: localEntry('BITCOIN', analysisId, '2026-08-03T10:00:00.000Z'),
+    }));
+    completedFilter.mockResolvedValue([{ analysis_id: analysisId, status: 'completed' }]);
+
+    const res = await syncActiveAnalyses();
+
+    expect(res.pushed).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
   });
 });
 

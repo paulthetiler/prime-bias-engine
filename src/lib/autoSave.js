@@ -9,6 +9,39 @@ import { base44 } from '@/api/base44Client';
 
 export const AUTOSAVE_CONFLICT_KEY = 'user_id,analysis_id';
 
+/**
+ * Build the bias_analysis upsert payload from an analysis's parts.
+ *
+ * This is the single source of truth for what a saved analysis row looks like,
+ * shared by the live auto-save (Input page) and the cross-device push
+ * (biasSync). It is a COMPLETE snapshot — raw `inputs` + `extra_check` +
+ * `results` — so another device can rebuild the exact Summary card from the row.
+ *
+ * @param {{ analysisId?: string, instrument?: string, inputs?: any, extraCheck?: any, results?: any, timestamp?: string }} [parts]
+ * @returns {Record<string, any>}
+ */
+export function buildBiasAnalysisPayload({ analysisId, instrument, inputs, extraCheck, results, timestamp } = {}) {
+  const res = results || {};
+  const direction = res.mainDirection;
+  const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
+  const grade = ['A', 'B', 'C', 'D', 'F'].includes(res.grade) ? res.grade : 'F';
+  const tradeAction = ['TRADE', 'WAIT', 'NO_TRADE'].includes(res.tradeAction) ? res.tradeAction : 'NO_TRADE';
+  return {
+    analysis_id: analysisId,
+    instrument,
+    timestamp: timestamp || new Date().toISOString(),
+    inputs,
+    extra_check: extraCheck ?? { h1: null, m15: null },
+    results: res,
+    overall_bias: overallBias,
+    grade,
+    confidence_score: res.winningScore || 0,
+    trade_action: tradeAction,
+    warnings: res.warnings || [],
+    notes: `${direction} | ${grade} | Score: ${res.winningScore ?? 0} | ${res.status ?? ''}`,
+  };
+}
+
 // Backoff schedule (ms) between retry attempts. Its length + 1 is the attempt
 // count: [1s, 2s, 4s] → up to 4 tries over ~7s before giving up. Tuned for the
 // short mobile/roaming drop-outs that were leaving the tool stuck on "Not saved".

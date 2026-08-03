@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSettings } from '@/lib/userSettings';
 import { resolveAnalysisIdForEdit } from '@/lib/tradeCompletion';
-import { saveBiasAnalysisWithRetry } from '@/lib/autoSave';
+import { saveBiasAnalysisWithRetry, buildBiasAnalysisPayload } from '@/lib/autoSave';
 import { syncLog, syncError } from '@/lib/syncLog';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -293,10 +293,6 @@ export default function Input() {
 
     // ── DB auto-save: only on actual user edits, debounced 1.5 s ──
     if (!isLoadingRef.current) {
-      const direction = res?.mainDirection;
-      const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
-      const grade = ['A','B','C','D','F'].includes(res?.grade) ? res.grade : 'F';
-      const tradeAction = ['TRADE','WAIT','NO_TRADE'].includes(res?.tradeAction) ? res.tradeAction : 'NO_TRADE';
       // analysis_id makes this a deterministic upsert: one row per analysis session,
       // enforced by the DB (unique index on user_id, analysis_id — migration 0002).
       //
@@ -304,20 +300,7 @@ export default function Input() {
       // not just a summary, so another device can rebuild this exact Summary card
       // from the row. Without inputs there is nothing to hydrate (a card is
       // computed from inputs). extra_check/inputs columns require migration 0003.
-      const payload = {
-        analysis_id: analysisId,
-        instrument,
-        timestamp: new Date().toISOString(),
-        inputs,
-        extra_check: extraCheck,
-        results: res,
-        overall_bias: overallBias,
-        grade,
-        confidence_score: res?.winningScore || 0,
-        trade_action: tradeAction,
-        warnings: res?.warnings || [],
-        notes: `${direction} | ${grade} | Score: ${res?.winningScore ?? 0} | ${res?.status ?? ''}`,
-      };
+      const payload = buildBiasAnalysisPayload({ analysisId, instrument, inputs, extraCheck, results: res });
       setAutoSaveStatus('saving');
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = setTimeout(() => { runAutoSave(payload); }, 1500);
