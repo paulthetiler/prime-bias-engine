@@ -11,9 +11,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { gradeText } from '@/lib/gradeStyles';
-import { buildRestoredAnalysis, computeTradeFinancials } from '@/lib/tradeCompletion';
+import { buildRestoredAnalysis } from '@/lib/tradeCompletion';
 import { withDerivedFinancials, hasFinancialResult } from '@/lib/accounts';
 import { safeHttpUrl } from '@/lib/safeUrl';
+import ImportResultFlow from '@/components/journal/ImportResultFlow';
 
 const resultColors = {
   win:       'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
@@ -121,62 +122,6 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onAd
   );
 }
 
-// Backfill the monetary result for a historic trade that was logged as a
-// win/loss before amounts were tracked. Positive input only — the outcome sets
-// the sign (see computeTradeFinancials).
-function AddResultModal({ trade, saving, onClose, onSave }) {
-  const [amount, setAmount] = useState('');
-  const [fees, setFees] = useState('');
-  const [risk, setRisk] = useState('');
-  if (!trade) return null;
-  const amountLabel = trade.result === 'loss' ? 'Amount lost' : 'Amount made';
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="w-full max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl"
-        style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <div>
-            <div className="text-base font-bold">Add result</div>
-            <div className="text-xs text-muted-foreground font-mono">{trade.instrument} · {resultLabels[trade.result]}</div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="p-4 space-y-3">
-          <div>
-            <label className="text-xs font-semibold block mb-1">
-              {amountLabel}
-              {trade.result === 'loss' && <span className="text-muted-foreground font-normal"> — enter a positive number</span>}
-            </label>
-            <input type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={e => setAmount(e.target.value)}
-              placeholder="0.00" autoFocus
-              className="w-full h-11 rounded-lg border border-input bg-background px-3 text-base font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Fees (optional)</label>
-              <input type="number" inputMode="decimal" min="0" step="any" value={fees} onChange={e => setFees(e.target.value)} placeholder="0.00"
-                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Risked (optional)</label>
-              <input type="number" inputMode="decimal" min="0" step="any" value={risk} onChange={e => setRisk(e.target.value)} placeholder="0.00"
-                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-          </div>
-          <div className="flex gap-3 pt-1">
-            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button className="flex-1" disabled={saving || amount === ''} onClick={() => onSave({ amount, fees, risk })}>Save result</Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const ALL_RESULTS = ['win', 'loss', 'breakeven', 'not_taken'];
 const ALL_GRADES  = ['A', 'B', 'C', 'D', 'F'];
 
@@ -248,15 +193,11 @@ export default function TradeHistory() {
     setAddResultFor(trade);
   };
 
-  const saveResult = async ({ amount, fees, risk }) => {
+  // ImportResultFlow hands back a ready `completed_trade` update (from a
+  // screenshot, pasted text or manual entry) — we just persist it.
+  const saveResult = async (update) => {
     if (!addResultFor) return;
-    const { grossPnl, fees: feeVal, netPnl, amountRisked } = computeTradeFinancials({
-      result: addResultFor.result, amount, fees, amountRisked: risk,
-    });
-    await updateMutation.mutateAsync({
-      id: addResultFor.id,
-      data: { gross_pnl: grossPnl, fees: feeVal, net_pnl: netPnl, amount_risked: amountRisked, pnl: netPnl },
-    });
+    await updateMutation.mutateAsync({ id: addResultFor.id, data: update });
     setAddResultFor(null);
     toast.success('Result added');
   };
@@ -423,8 +364,9 @@ export default function TradeHistory() {
       )}
 
       {addResultFor && (
-        <AddResultModal
+        <ImportResultFlow
           trade={addResultFor}
+          existingTrades={rawTrades}
           saving={updateMutation.isPending}
           onClose={() => setAddResultFor(null)}
           onSave={saveResult}
