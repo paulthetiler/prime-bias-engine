@@ -2,9 +2,13 @@
 //
 // Everything here is pure and side-effect free so it can be unit tested in
 // isolation and reused by the UI without re-deriving the same numbers in a
-// dozen places. The functions operate on `completed_trade` records (the
-// authoritative P&L history) and, for account-relative figures like ROI and
-// the balance curve, a resolved starting balance.
+// dozen places. The functions operate on `completed_trade` records — the
+// authoritative P&L history. Monetary figures use `net_pnl` (the realised net
+// result after fees); a trade only contributes money when `net_pnl` is a real
+// number. Account-relative figures (balance, ROI, equity curve) live in
+// `lib/accounts.js`, which understands deposits/withdrawals.
+
+import { hasFinancialResult } from './accounts';
 
 /** @typedef {{ id: string, label: string, days: number|null }} TimeFilter */
 
@@ -17,9 +21,8 @@ export const TIME_FILTERS = /** @type {TimeFilter[]} */ ([
   { id: 'all', label: 'All Time', days: null },
 ]);
 
-// When no monthly journal balance is on record we still want the ROI and
-// Account-Balance views to render, so fall back to a neutral round number and
-// surface that assumption in the UI.
+// Retained for seeding a brand-new account's starting balance when the user has
+// no ledger yet (see lib/accounts.DEFAULT_STARTING_BALANCE).
 export const DEFAULT_STARTING_BALANCE = 10000;
 
 /**
@@ -71,31 +74,26 @@ export function filterByTimeframe(records, filterId, now = Date.now()) {
 }
 
 /**
- * Realised R-multiple for a trade, using planned-R accounting: a win banks its
- * planned reward (the `target` R:R, default 1R), a loss gives back 1R, and a
- * break-even is flat. Non-decisive trades return null. This is the standard
- * approximation for journals that don't record the exact stop distance.
+ * Real R-multiple for a trade: realised net P/L divided by the amount risked.
+ * Only defined when a positive `amount_risked` was recorded AND the monetary
+ * result exists — there is no planned-R fallback (that was the source of the
+ * bogus "Avg R:R" figure). Returns null when risk data is missing.
  * @param {any} trade
  * @returns {number|null}
  */
 export function rMultiple(trade) {
-  const target = Number(trade?.target);
-  const reward = Number.isFinite(target) && target > 0 ? target : 1;
-  switch (trade?.result) {
-    case 'win': return reward;
-    case 'loss': return -1;
-    case 'breakeven': return 0;
-    default: return null;
-  }
+  const risk = Number(trade?.amount_risked);
+  if (!Number.isFinite(risk) || risk <= 0) return null;
+  if (!hasFinancialResult(trade)) return null;
+  return Number(trade.net_pnl) / risk;
 }
 
-const isDecisive = (t) => t?.result === 'win' || t?.result === 'loss';
-const hasNumericPnl = (t) => t?.pnl != null && Number.isFinite(Number(t.pnl));
+const isDirectional = (t) => t?.result === 'win' || t?.result === 'loss';
 
 /**
- * Resolve the account's starting capital for ROI / balance figures. Prefers the
- * earliest monthly-journal `start_balance` on record (real user data); falls
- * back to a neutral constant so the dashboard still renders.
+ * Resolve the account's starting capital from legacy monthly-journal data, used
+ * only to seed a brand-new default account. Prefers the earliest monthly-journal
+ * `start_balance` on record; falls back to a neutral constant.
  * @param {any[]} monthlyEntries
  * @param {number} [fallback]
  * @returns {{ value: number, source: 'journal'|'default' }}
@@ -128,52 +126,57 @@ export function sortChronological(records) {
 }
 
 /**
- * Headline performance metrics for a set of completed trades.
+ * Headline performance metrics for a set of completed trades. Money figures use
+ * `net_pnl` and only count trades whose monetary result has been entered.
+ * ROI is NOT computed here — it needs account context (opening balance) and is
+ * produced by lib/accounts.periodRoi.
  * @param {any[]} trades
- * @param {{ startingBalance?: number }} [opts]
  */
-export function computeStats(trades = [], { startingBalance = DEFAULT_STARTING_BALANCE } = {}) {
-  const decisive = trades.filter(isDecisive);
-  const wins = decisive.filter(t => t.result === 'win').length;
-  const losses = decisive.filter(t => t.result === 'loss').length;
-  const winRate = decisive.length ? (wins / decisive.length) * 100 : 0;
+export function computeStats(trades = []) {
+  const directional = trades.filter(isDirectional);
+  const wins = directional.filter(t => t.result === 'win').length;
+  const losses = directional.filter(t => t.result === 'loss').length;
+  const winRate = directional.length ? (wins / directional.length) * 100 : 0;
 
-  // P&L aggregates only consider trades that actually recorded a number.
-  const pnlTrades = trades.filter(hasNumericPnl);
+  // Money aggregates only consider trades with a recorded monetary result.
+  const pnlTrades = trades.filter(hasFinancialResult);
   const hasPnl = pnlTrades.length > 0;
   let grossProfit = 0, grossLoss = 0;
   for (const t of pnlTrades) {
-    const v = Number(t.pnl);
+    const v = Number(t.net_pnl);
     if (v >= 0) grossProfit += v; else grossLoss += Math.abs(v);
   }
   const netPnl = grossProfit - grossLoss;
-  // Profit factor: gross win / gross loss. Undefined with no losing dollars.
+  // Profit factor: gross win / gross loss.
+  //   grossLoss > 0            -> ratio
+  //   no losing dollars, wins  -> Infinity ("No losing trades")
+  //   nothing at all           -> null ("not enough data")
   const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? Infinity : null);
-  const roiPct = hasPnl && startingBalance ? (netPnl / startingBalance) * 100 : null;
 
-  // Average planned Risk:Reward across trades that set a target.
-  const rrValues = trades
-    .map(t => Number(t.target))
-    .filter(v => Number.isFinite(v) && v > 0);
-  const avgRr = rrValues.length ? rrValues.reduce((a, b) => a + b, 0) / rrValues.length : null;
+  // Average REAL R-multiple, only over trades that recorded amount risked.
+  const rValues = trades.map(rMultiple).filter(v => v != null);
+  const hasRiskData = rValues.length > 0;
+  const avgR = hasRiskData ? rValues.reduce((a, b) => a + b, 0) / rValues.length : null;
 
-  // Streaks run over decisive trades in chronological order.
-  const decisiveChrono = sortChronological(decisive);
+  // Streaks run over directional trades in chronological order.
+  const directionalChrono = sortChronological(directional);
   let bestWinStreak = 0, run = 0;
-  for (const t of decisiveChrono) {
+  for (const t of directionalChrono) {
     if (t.result === 'win') { run += 1; bestWinStreak = Math.max(bestWinStreak, run); }
     else run = 0;
   }
   let currentStreak = 0, streakType = /** @type {'win'|'loss'|null} */ (null);
-  for (let i = decisiveChrono.length - 1; i >= 0; i--) {
-    if (streakType === null) { streakType = decisiveChrono[i].result; currentStreak = 1; }
-    else if (decisiveChrono[i].result === streakType) currentStreak += 1;
+  for (let i = directionalChrono.length - 1; i >= 0; i--) {
+    if (streakType === null) { streakType = directionalChrono[i].result; currentStreak = 1; }
+    else if (directionalChrono[i].result === streakType) currentStreak += 1;
     else break;
   }
 
   return {
     totalTrades: trades.length,
-    decisiveCount: decisive.length,
+    directionalCount: directional.length,
+    completeCount: pnlTrades.length,
+    incompleteCount: trades.length - pnlTrades.length,
     wins,
     losses,
     winRate,
@@ -182,13 +185,11 @@ export function computeStats(trades = [], { startingBalance = DEFAULT_STARTING_B
     grossLoss,
     netPnl,
     profitFactor,
-    roiPct,
-    avgRr,
+    avgR,
+    hasRiskData,
     bestWinStreak,
     currentStreak,
     streakType,
-    startingBalance,
-    endingBalance: startingBalance + netPnl,
   };
 }
 
@@ -198,14 +199,14 @@ export const GRADES = ['A', 'B', 'C', 'D', 'F'];
 /**
  * Win rate per grade — the engine's report card. One row per grade (always all
  * five, in order) so the caller can decide whether to hide the empty ones.
- * Rate is a whole-number percentage over decisive (win/loss) trades.
+ * Rate is a whole-number percentage over directional (win/loss) trades.
  * @param {any[]} trades
  * @returns {{ grade: string, rate: number, count: number }[]}
  */
 export function computeGradeBreakdown(trades = []) {
-  const decisive = trades.filter(isDecisive);
+  const directional = trades.filter(isDirectional);
   return GRADES.map(grade => {
-    const rows = decisive.filter(t => t.grade === grade);
+    const rows = directional.filter(t => t.grade === grade);
     const wins = rows.filter(t => t.result === 'win').length;
     const rate = rows.length ? Math.round((wins / rows.length) * 100) : 0;
     return { grade, rate, count: rows.length };
@@ -214,18 +215,18 @@ export function computeGradeBreakdown(trades = []) {
 
 /**
  * Instruments ranked by win rate (best first), so the UI can surface the best
- * and weakest asset. Only instruments with at least `minTrades` decisive trades
- * qualify, keeping a single lucky win from topping the table. Rate is a 0–1
- * fraction.
+ * and weakest asset. Only instruments with at least `minTrades` directional
+ * trades qualify, keeping a single lucky win from topping the table. Rate is a
+ * 0–1 fraction.
  * @param {any[]} trades
  * @param {{ minTrades?: number }} [opts]
  * @returns {{ asset: string, rate: number, n: number }[]}
  */
 export function computeAssetRanking(trades = [], { minTrades = 2 } = {}) {
-  const decisive = trades.filter(isDecisive);
+  const directional = trades.filter(isDirectional);
   /** @type {Record<string, { wins: number, n: number }>} */
   const byAsset = {};
-  for (const t of decisive) {
+  for (const t of directional) {
     const bucket = (byAsset[t.instrument] ||= { wins: 0, n: 0 });
     bucket.n += 1;
     if (t.result === 'win') bucket.wins += 1;
@@ -234,36 +235,4 @@ export function computeAssetRanking(trades = [], { minTrades = 2 } = {}) {
     .filter(([, s]) => s.n >= minTrades)
     .map(([asset, s]) => ({ asset, rate: s.wins / s.n, n: s.n }))
     .sort((a, b) => b.rate - a.rate);
-}
-
-/**
- * Cumulative series for the equity curve. Each point exposes three read-outs
- * off the same running P&L so the chart can switch modes without recompute:
- *   - `equity`  cumulative P&L (starts at 0)
- *   - `balance` starting balance + cumulative P&L
- *   - `roi`     cumulative P&L as % of starting balance
- * Only trades with a numeric P&L contribute; an unpriced win still advances the
- * index but leaves the running total flat.
- * @param {any[]} trades
- * @param {{ startingBalance?: number }} [opts]
- */
-export function buildEquitySeries(trades = [], { startingBalance = DEFAULT_STARTING_BALANCE } = {}) {
-  const chrono = sortChronological(trades.filter(hasNumericPnl));
-  let running = 0;
-  return chrono.map((t, i) => {
-    running += Number(t.pnl);
-    const equity = round2(running);
-    return {
-      i: i + 1,
-      date: t.completed_at || t.created_at || t.created_date || null,
-      instrument: t.instrument,
-      equity,
-      balance: round2(startingBalance + running),
-      roi: startingBalance ? round2((running / startingBalance) * 100) : 0,
-    };
-  });
-}
-
-function round2(n) {
-  return Math.round(n * 100) / 100;
 }

@@ -4,7 +4,6 @@ import {
   filterByTimeframe,
   rMultiple,
   computeStats,
-  buildEquitySeries,
   resolveStartingBalance,
   recordTime,
   computeGradeBreakdown,
@@ -18,8 +17,7 @@ const trade = (over = {}) => ({
   id: 'ct',
   result: 'win',
   direction: 'BUY',
-  target: 2,
-  pnl: 100,
+  net_pnl: 100,
   completed_at: daysAgo(1),
   instrument: 'EUR/USD',
   ...over,
@@ -60,24 +58,24 @@ describe('windowStart / filterByTimeframe', () => {
 });
 
 describe('rMultiple', () => {
-  it('banks the planned target on a win', () => {
-    expect(rMultiple({ result: 'win', target: 2.5 })).toBe(2.5);
+  it('is realised net P/L divided by amount risked', () => {
+    expect(rMultiple({ result: 'win', net_pnl: 200, amount_risked: 100 })).toBe(2);
+    expect(rMultiple({ result: 'loss', net_pnl: -50, amount_risked: 100 })).toBe(-0.5);
+    expect(rMultiple({ result: 'breakeven', net_pnl: 0, amount_risked: 100 })).toBe(0);
   });
-  it('defaults to 1R when no target', () => {
-    expect(rMultiple({ result: 'win' })).toBe(1);
+  it('is null without a positive amount risked (no fake planned-R fallback)', () => {
+    expect(rMultiple({ result: 'win', net_pnl: 200 })).toBeNull();
+    expect(rMultiple({ result: 'win', net_pnl: 200, amount_risked: 0 })).toBeNull();
+    expect(rMultiple({ result: 'win', net_pnl: 200, amount_risked: -5 })).toBeNull();
   });
-  it('is -1 on a loss and 0 on break-even', () => {
-    expect(rMultiple({ result: 'loss', target: 3 })).toBe(-1);
-    expect(rMultiple({ result: 'breakeven' })).toBe(0);
-  });
-  it('is null for non-decisive results', () => {
-    expect(rMultiple({ result: 'not_taken' })).toBeNull();
+  it('is null when the monetary result is missing', () => {
+    expect(rMultiple({ result: 'win', amount_risked: 100 })).toBeNull();
     expect(rMultiple(null)).toBeNull();
   });
 });
 
 describe('computeStats', () => {
-  it('computes win rate over decisive trades only', () => {
+  it('computes win rate over directional trades only', () => {
     const trades = [
       trade({ result: 'win' }),
       trade({ result: 'loss' }),
@@ -87,17 +85,17 @@ describe('computeStats', () => {
     ];
     const s = computeStats(trades);
     expect(s.totalTrades).toBe(5);
-    expect(s.decisiveCount).toBe(3);
+    expect(s.directionalCount).toBe(3);
     expect(s.wins).toBe(2);
     expect(s.losses).toBe(1);
     expect(Math.round(s.winRate)).toBe(67);
   });
 
-  it('computes net P&L, gross figures and profit factor', () => {
+  it('computes net P&L, gross figures and profit factor from net_pnl', () => {
     const trades = [
-      trade({ result: 'win', pnl: 200 }),
-      trade({ result: 'win', pnl: 100 }),
-      trade({ result: 'loss', pnl: -150 }),
+      trade({ result: 'win', net_pnl: 200 }),
+      trade({ result: 'win', net_pnl: 100 }),
+      trade({ result: 'loss', net_pnl: -150 }),
     ];
     const s = computeStats(trades);
     expect(s.grossProfit).toBe(300);
@@ -107,24 +105,54 @@ describe('computeStats', () => {
     expect(s.hasPnl).toBe(true);
   });
 
-  it('profit factor is Infinity with no losses and null with no P&L', () => {
-    expect(computeStats([trade({ result: 'win', pnl: 100 })]).profitFactor).toBe(Infinity);
-    expect(computeStats([trade({ pnl: null }), trade({ pnl: undefined })]).profitFactor).toBeNull();
+  it('break-even counts as complete, contributes 0, and is not in the win-rate denominator', () => {
+    const s = computeStats([
+      trade({ result: 'win', net_pnl: 100 }),
+      trade({ result: 'breakeven', net_pnl: 0 }),
+    ]);
+    expect(s.directionalCount).toBe(1); // breakeven excluded
+    expect(s.winRate).toBe(100);
+    expect(s.completeCount).toBe(2);    // breakeven is financially complete
+    expect(s.grossProfit).toBe(100);
+    expect(s.grossLoss).toBe(0);
   });
 
-  it('averages planned risk:reward from targets', () => {
-    const s = computeStats([trade({ target: 2 }), trade({ target: 4 }), trade({ target: null })]);
-    expect(s.avgRr).toBe(3);
+  it('profit factor is Infinity with no losing dollars and null with no P&L', () => {
+    expect(computeStats([trade({ result: 'win', net_pnl: 100 })]).profitFactor).toBe(Infinity);
+    expect(computeStats([trade({ net_pnl: null }), trade({ net_pnl: undefined })]).profitFactor).toBeNull();
   });
 
-  it('computes ROI against starting balance', () => {
-    const s = computeStats([trade({ pnl: 500 })], { startingBalance: 10000 });
-    expect(s.roiPct).toBe(5);
-    expect(s.endingBalance).toBe(10500);
+  it('excludes financially-incomplete trades from money stats but still counts them', () => {
+    const s = computeStats([
+      trade({ result: 'win', net_pnl: 100 }),
+      trade({ result: 'loss', net_pnl: null }), // historic, no amount entered
+    ]);
+    expect(s.totalTrades).toBe(2);
+    expect(s.completeCount).toBe(1);
+    expect(s.incompleteCount).toBe(1);
+    expect(s.netPnl).toBe(100);        // the null trade does not move P/L
+    expect(s.directionalCount).toBe(2); // but it still counts toward win rate
+    expect(s.wins).toBe(1);
+    expect(s.losses).toBe(1);
+  });
+
+  it('averages REAL R only over trades with amount risked', () => {
+    const s = computeStats([
+      trade({ net_pnl: 200, amount_risked: 100 }), // 2R
+      trade({ net_pnl: -50, amount_risked: 100 }), // -0.5R
+      trade({ net_pnl: 100, amount_risked: null }), // no risk data → ignored
+    ]);
+    expect(s.hasRiskData).toBe(true);
+    expect(s.avgR).toBeCloseTo(0.75, 5);
+  });
+
+  it('reports no risk data when amount risked was never recorded', () => {
+    const s = computeStats([trade({ net_pnl: 100 }), trade({ net_pnl: -20 })]);
+    expect(s.hasRiskData).toBe(false);
+    expect(s.avgR).toBeNull();
   });
 
   it('tracks best win streak and current streak with direction', () => {
-    // chronological: W W L W  -> best win streak 2, current streak 1 win
     const trades = [
       trade({ result: 'win', completed_at: daysAgo(4) }),
       trade({ result: 'win', completed_at: daysAgo(3) }),
@@ -142,19 +170,20 @@ describe('computeStats', () => {
     expect(s.totalTrades).toBe(0);
     expect(s.winRate).toBe(0);
     expect(s.hasPnl).toBe(false);
-    expect(s.roiPct).toBeNull();
+    expect(s.profitFactor).toBeNull();
+    expect(s.avgR).toBeNull();
   });
 });
 
 describe('computeGradeBreakdown', () => {
-  it('returns all five grades in order, win rate over decisive trades only', () => {
+  it('returns all five grades in order, win rate over directional trades only', () => {
     const trades = [
       trade({ grade: 'A', result: 'win' }),
       trade({ grade: 'A', result: 'win' }),
       trade({ grade: 'A', result: 'loss' }),
       trade({ grade: 'B', result: 'loss' }),
-      trade({ grade: 'B', result: 'breakeven' }), // non-decisive, ignored
-      trade({ grade: 'B', result: 'not_taken' }),  // non-decisive, ignored
+      trade({ grade: 'B', result: 'breakeven' }),
+      trade({ grade: 'B', result: 'not_taken' }),
     ];
     const rows = computeGradeBreakdown(trades);
     expect(rows.map(r => r.grade)).toEqual(['A', 'B', 'C', 'D', 'F']);
@@ -182,12 +211,12 @@ describe('computeAssetRanking', () => {
     expect(ranked[1]).toEqual({ asset: 'EUR/USD', rate: 0.5, n: 2 });
   });
 
-  it('excludes instruments below the minimum decisive-trade count', () => {
+  it('excludes instruments below the minimum directional-trade count', () => {
     const trades = [
-      trade({ instrument: 'GBP/USD', result: 'win' }),   // only 1 → dropped
+      trade({ instrument: 'GBP/USD', result: 'win' }),
       trade({ instrument: 'EUR/USD', result: 'win' }),
       trade({ instrument: 'EUR/USD', result: 'loss' }),
-      trade({ instrument: 'USD/JPY', result: 'breakeven' }), // non-decisive
+      trade({ instrument: 'USD/JPY', result: 'breakeven' }),
     ];
     const ranked = computeAssetRanking(trades);
     expect(ranked.map(r => r.asset)).toEqual(['EUR/USD']);
@@ -196,25 +225,6 @@ describe('computeAssetRanking', () => {
   it('respects a custom minimum', () => {
     const trades = [trade({ instrument: 'GBP/USD', result: 'win' })];
     expect(computeAssetRanking(trades, { minTrades: 1 })).toHaveLength(1);
-  });
-});
-
-describe('buildEquitySeries', () => {
-  it('accumulates P&L chronologically across all three read-outs', () => {
-    const trades = [
-      trade({ pnl: 100, completed_at: daysAgo(3) }),
-      trade({ pnl: -40, completed_at: daysAgo(2) }),
-      trade({ pnl: 60, completed_at: daysAgo(1) }),
-    ];
-    const series = buildEquitySeries(trades, { startingBalance: 1000 });
-    expect(series.map(p => p.equity)).toEqual([100, 60, 120]);
-    expect(series.map(p => p.balance)).toEqual([1100, 1060, 1120]);
-    expect(series.map(p => p.roi)).toEqual([10, 6, 12]);
-  });
-
-  it('excludes trades without a numeric P&L', () => {
-    const series = buildEquitySeries([trade({ pnl: null }), trade({ pnl: 50 })]);
-    expect(series).toHaveLength(1);
   });
 });
 
