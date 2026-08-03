@@ -8,99 +8,152 @@ import {
   BASE_ATR,
 } from './biasEngine';
 
-// The six reference cases below are the engine's contract, verified cell-by-cell
-// against the original Excel workbook (see the header comment in biasEngine.js and
-// the in-app /admin/engine-test page). These tests turn that manual page into an
-// automated regression guard so future edits can't silently change the math.
+// Each case below is computed directly from the Excel workbook formulas
+// (tabs "Bias Tool" + B1–B4). The first case is the all-BUY snapshot saved in
+// every workbook tab — its expected values were read straight from the sheet's
+// own cached results. The remaining cases were derived from the Excel formulas
+// to exercise each rule: the ±35 direction dead-zone, the dominant-side total,
+// MODE block direction, anchor-based block strength, the AC35 grade thresholds,
+// and the Q10 grade cap (which forces C when the block trend opposes the score).
 const CASES = [
   {
-    name: 'Bias Tool (GBP/USD)',
+    name: 'all-BUY snapshot (verbatim from workbook)',
     inputs: {
-      month: { close: -1, macd: -1, rsi: 0, boli: 0 },
+      month: { close:  1, macd:  1, rsi: 0, boli: 0 },
       week:  { close: -1, macd:  1, rsi: 0, boli: 0 },
-      day:   { close: -1, macd: -1, rsi: 0, boli: 0 },
-      h4:    { close: -1, macd: -1, rsi: 1, boli: 0 },
-      h1:    { close:  0, macd:  0, rsi: 0, boli: 0 },
+      day:   { close:  1, macd: -1, rsi: 0, boli: 0 },
+      h4:    { close: -1, macd:  1, rsi: 1, boli: 0 },
+      h1:    { close:  0, macd:  0, rsi: 1, boli: 0 },
       m15:   { close:  0, macd:  1, rsi: 1, boli: 0 },
-      m5:    { close:  0, macd:  1, rsi: 1, boli: 0 },
+      m5:    { close:  0, macd:  1, rsi: 1, boli: 1 },
     },
-    expect: { deepTrend: 'BEAR', deepStrength: 'MEDIUM', ddBias: 'SELL', ddStrength: 'WEAK', nowBias: 'BUY', nowStrength: 'WEAK', mainDirection: 'SELL', winningScore: 42, grade: 'D' },
+    extraCheck: null,
+    expect: { deepTrend: 'BULL', deepStrength: 'STRONG', ddBias: 'BUY', ddStrength: 'STRONG', nowBias: 'BUY', nowStrength: 'STRONG', scoreDirection: 'BUY', mainDirection: 'BUY', winningScore: 95, grade: 'F' },
   },
   {
-    name: 'B1 (all BUY)',
+    name: 'all-SELL (mirror of snapshot)',
     inputs: {
-      month: { close:  1, macd:  1, rsi: 0, boli:  1 },
-      week:  { close: -1, macd:  1, rsi: 0, boli:  1 },
-      day:   { close:  1, macd: -1, rsi: 0, boli:  1 },
-      h4:    { close:  1, macd:  1, rsi: 1, boli:  1 },
-      h1:    { close:  0, macd:  1, rsi: 1, boli:  0 },
-      m15:   { close:  0, macd:  1, rsi: 1, boli:  1 },
-      m5:    { close:  0, macd:  1, rsi:-1, boli:  1 },
+      month: { close: -1, macd: -1, rsi:  0, boli:  0 },
+      week:  { close:  1, macd: -1, rsi:  0, boli:  0 },
+      day:   { close: -1, macd:  1, rsi:  0, boli:  0 },
+      h4:    { close:  1, macd: -1, rsi: -1, boli:  0 },
+      h1:    { close:  0, macd:  0, rsi: -1, boli:  0 },
+      m15:   { close:  0, macd: -1, rsi: -1, boli:  0 },
+      m5:    { close:  0, macd: -1, rsi: -1, boli: -1 },
     },
-    expect: { deepTrend: 'BULL', deepStrength: 'STRONG', ddBias: 'BUY', ddStrength: 'STRONG', nowBias: 'BUY', nowStrength: 'STRONG', mainDirection: 'BUY', winningScore: 95, grade: 'F' },
+    extraCheck: null,
+    expect: { deepTrend: 'BEAR', deepStrength: 'STRONG', ddBias: 'SELL', ddStrength: 'STRONG', nowBias: 'SELL', nowStrength: 'STRONG', scoreDirection: 'SELL', mainDirection: 'SELL', winningScore: 95, grade: 'F' },
   },
   {
-    name: 'B2 (SELL biased)',
+    name: 'dead-zone neutrals (weak single indicators stay Neutral)',
     inputs: {
-      month: { close: -1, macd: -1, rsi: -1, boli:  1 },
-      week:  { close: -1, macd: -1, rsi:  0, boli:  0 },
-      day:   { close:  1, macd: -1, rsi:  0, boli:  0 },
-      h4:    { close:  1, macd:  1, rsi: -1, boli:  1 },
-      h1:    { close:  0, macd: -1, rsi: -1, boli:  0 },
-      m15:   { close:  0, macd: -1, rsi:  1, boli: -1 },
-      m5:    { close:  0, macd: -1, rsi:  1, boli:  0 },
+      month: { close: 0, macd: 0, rsi: 1, boli: 0 },
+      week:  { close: 0, macd: 0, rsi: 0, boli: 1 },
+      day:   { close: 1, macd: 0, rsi: 0, boli: 0 },
+      h4:    { close: 0, macd: 1, rsi: 0, boli: 0 },
+      h1:    { close: 0, macd: 1, rsi: 0, boli: 0 },
+      m15:   { close: 0, macd: 1, rsi: 0, boli: 0 },
+      m5:    { close: 0, macd: 1, rsi: 0, boli: 0 },
     },
-    expect: { deepTrend: 'BEAR', deepStrength: 'STRONG', ddBias: 'SELL', ddStrength: 'MEDIUM', nowBias: 'SELL', nowStrength: 'MEDIUM', mainDirection: 'SELL', winningScore: 60, grade: 'B' },
+    extraCheck: null,
+    expect: { deepTrend: 'NEUTRAL', deepStrength: 'WEAK', ddBias: 'NEUTRAL', ddStrength: 'WEAK', nowBias: 'NEUTRAL', nowStrength: 'WEAK', scoreDirection: 'BUY', mainDirection: 'BUY', winningScore: 10, grade: 'C' },
   },
   {
-    name: 'B3 (mixed)',
+    name: 'DEEP anchor conflict (Day opposes M/W → WEAK; cap forces C)',
     inputs: {
-      month: { close: -1, macd:  1, rsi: 0, boli:  1 },
-      week:  { close:  1, macd: -1, rsi: 0, boli: -1 },
-      day:   { close: -1, macd: -1, rsi: 0, boli: -1 },
-      h4:    { close:  1, macd: -1, rsi: 1, boli:  1 },
-      h1:    { close:  0, macd: -1, rsi: 1, boli: -1 },
-      m15:   { close:  0, macd:  1, rsi: 1, boli:  0 },
-      m5:    { close:  0, macd:  1, rsi:-1, boli:  0 },
+      month: { close:  1, macd: 1, rsi: 0, boli:  0 },
+      week:  { close:  1, macd: 1, rsi: 0, boli:  0 },
+      day:   { close: -1, macd: 0, rsi: 0, boli: -1 },
+      h4:    { close:  0, macd: 0, rsi: 0, boli:  0 },
+      h1:    { close:  0, macd: 0, rsi: 0, boli:  0 },
+      m15:   { close:  0, macd: 0, rsi: 0, boli:  0 },
+      m5:    { close:  0, macd: 0, rsi: 0, boli:  0 },
     },
-    expect: { deepTrend: 'BEAR', deepStrength: 'MEDIUM', ddBias: 'SELL', ddStrength: 'MEDIUM', nowBias: 'SELL', nowStrength: 'MEDIUM', mainDirection: 'SELL', winningScore: 53, grade: 'C' },
+    extraCheck: null,
+    expect: { deepTrend: 'BULL', deepStrength: 'WEAK', ddBias: 'NEUTRAL', ddStrength: 'WEAK', nowBias: 'NEUTRAL', nowStrength: 'WEAK', scoreDirection: 'SELL', mainDirection: 'SELL', winningScore: 10, grade: 'C' },
   },
   {
-    name: 'B4 (strong BUY)',
+    name: 'score 55 → grade B',
     inputs: {
-      month: { close:  1, macd:  0, rsi: 0, boli:  0 },
-      week:  { close: -1, macd:  1, rsi: 1, boli:  1 },
-      day:   { close:  1, macd:  1, rsi: 0, boli:  1 },
-      h4:    { close:  1, macd:  1, rsi:-1, boli:  1 },
-      h1:    { close:  0, macd:  1, rsi:-1, boli:  1 },
-      m15:   { close:  0, macd:  1, rsi: 1, boli:  1 },
-      m5:    { close:  0, macd: -1, rsi: 1, boli:  0 },
+      month: { close: 0, macd: 0, rsi: 1, boli: 0 },
+      week:  { close: 0, macd: 0, rsi: 1, boli: 0 },
+      day:   { close: 1, macd: 0, rsi: 0, boli: 0 },
+      h4:    { close: 1, macd: 0, rsi: 0, boli: 1 },
+      h1:    { close: 0, macd: 1, rsi: 0, boli: 0 },
+      m15:   { close: 0, macd: 0, rsi: 1, boli: 1 },
+      m5:    { close: 0, macd: 0, rsi: 1, boli: 1 },
     },
-    expect: { deepTrend: 'BULL', deepStrength: 'STRONG', ddBias: 'BUY', ddStrength: 'STRONG', nowBias: 'BUY', nowStrength: 'STRONG', mainDirection: 'BUY', winningScore: 95, grade: 'F' },
+    extraCheck: null,
+    expect: { deepTrend: 'NEUTRAL', deepStrength: 'WEAK', ddBias: 'BUY', ddStrength: 'WEAK', nowBias: 'BUY', nowStrength: 'WEAK', scoreDirection: 'BUY', mainDirection: 'BUY', winningScore: 55, grade: 'B' },
   },
   {
-    name: 'NOW regression — H1 conflicts → WEAK',
+    name: 'score 80 → risky grade C',
     inputs: {
-      month: { close: -1, macd: -1, rsi: 0, boli: 0 },
-      week:  { close: -1, macd: -1, rsi: 0, boli: 0 },
-      day:   { close: -1, macd: -1, rsi: 0, boli: 0 },
-      h4:    { close: -1, macd: -1, rsi: 0, boli: 0 },
-      h1:    { close:  0, macd:  1, rsi: 1, boli: 0 },
-      m15:   { close:  0, macd: -1, rsi: 0, boli: -1 },
-      m5:    { close:  0, macd: -1, rsi: 0, boli: -1 },
+      month: { close: 1, macd: 1, rsi: 0, boli: 0 },
+      week:  { close: 0, macd: 0, rsi: 0, boli: 0 },
+      day:   { close: 1, macd: 0, rsi: 0, boli: 0 },
+      h4:    { close: 1, macd: 0, rsi: 0, boli: 1 },
+      h1:    { close: 0, macd: 0, rsi: 1, boli: 1 },
+      m15:   { close: 0, macd: 0, rsi: 0, boli: 0 },
+      m5:    { close: 0, macd: 0, rsi: 1, boli: 1 },
     },
-    expect: { deepTrend: 'BEAR', deepStrength: 'STRONG', ddBias: 'SELL', ddStrength: 'MEDIUM', nowBias: 'SELL', nowStrength: 'WEAK', mainDirection: 'SELL', winningScore: 62, grade: 'B' },
+    extraCheck: null,
+    expect: { deepTrend: 'BULL', deepStrength: 'MEDIUM', ddBias: 'BUY', ddStrength: 'STRONG', nowBias: 'BUY', nowStrength: 'MEDIUM', scoreDirection: 'BUY', mainDirection: 'BUY', winningScore: 80, grade: 'C' },
+  },
+  {
+    name: 'dominant-side total: H4 close+ vs boli- → SELL',
+    inputs: {
+      month: { close: 0, macd: 0, rsi: 0, boli:  0 },
+      week:  { close: 0, macd: 0, rsi: 0, boli:  0 },
+      day:   { close: 1, macd: 1, rsi: 0, boli:  0 },
+      h4:    { close: 1, macd: 0, rsi: 0, boli: -1 },
+      h1:    { close: 0, macd: 0, rsi: 1, boli:  1 },
+      m15:   { close: 0, macd: 0, rsi: 1, boli:  1 },
+      m5:    { close: 0, macd: 0, rsi: 0, boli:  0 },
+    },
+    extraCheck: null,
+    expect: { deepTrend: 'NEUTRAL', deepStrength: 'WEAK', ddBias: 'BUY', ddStrength: 'MEDIUM', nowBias: 'BUY', nowStrength: 'MEDIUM', scoreDirection: 'BUY', mainDirection: 'BUY', winningScore: 53, grade: 'C' },
   },
 ];
 
 describe('calculateBias — Excel reference cases', () => {
   CASES.forEach((c) => {
     it(c.name, () => {
-      const r = calculateBias(c.inputs, null);
+      const r = calculateBias(c.inputs, c.extraCheck);
       for (const [key, val] of Object.entries(c.expect)) {
         expect(r[key], key).toBe(val);
       }
     });
+  });
+});
+
+describe('calculateBias — per-timeframe direction (±35 dead-zone)', () => {
+  const only = (tf, ind) => {
+    const inputs = getDefaultInputs();
+    inputs[tf] = { close: 0, macd: 0, rsi: 0, boli: 0, ...ind };
+    return calculateBias(inputs, null).timeframes[tf];
+  };
+
+  it('a single indicator below ±35 stays Neutral', () => {
+    // h1 macd weight is 20 → below the 35 threshold → Neutral, not BUY.
+    expect(only('h1', { macd: 1 }).bias).toBe('Neutral');
+    // month rsi weight is 10 → Neutral.
+    expect(only('month', { rsi: 1 }).bias).toBe('Neutral');
+  });
+
+  it('an indicator at or above ±35 sets the direction', () => {
+    // day close weight is 35 → exactly the threshold → BUY.
+    expect(only('day', { close: 1 }).bias).toBe('BUY');
+    expect(only('day', { close: -1 }).bias).toBe('SELL');
+  });
+
+  it('picks the dominant side, not the net sum', () => {
+    // h4: close +25 vs boli -35 → net -10 but dominant side is -35 → SELL.
+    expect(only('h4', { close: 1, boli: -1 }).bias).toBe('SELL');
+    expect(only('h4', { close: 1, boli: -1 }).total).toBe(-35);
+    // month: close +40 vs macd -30 → dominant +40 → BUY.
+    expect(only('month', { close: 1, macd: -1 }).bias).toBe('BUY');
+    expect(only('month', { close: 1, macd: -1 }).total).toBe(40);
   });
 });
 
@@ -122,17 +175,18 @@ describe('calculateBias — Extra Check lights', () => {
   });
 });
 
-describe('calculateBias — grade cap when Deep conflicts', () => {
-  it('caps the grade at C when Deep trend opposes the score direction', () => {
-    // Deep = BULL (all broadstroke BUY) but triggers score is SELL-heavy.
+describe('calculateBias — grade cap when the block trend conflicts', () => {
+  it('forces the grade to C when the block-weighted trend opposes the score', () => {
+    // Month & Week are BUY so DEEP reads BULL and the block-weighted trend is
+    // BUY, but Day alone carries the score (SELL). Trend BUY vs score SELL → C.
     const inputs = {
-      month: { close: 1, macd: 1, rsi: 1, boli: 1 },
-      week:  { close: 1, macd: 1, rsi: 1, boli: 1 },
-      day:   { close: 1, macd: 1, rsi: 1, boli: 1 },
-      h4:    { close: -1, macd: -1, rsi: -1, boli: -1 },
-      h1:    { close: 0, macd: -1, rsi: -1, boli: -1 },
-      m15:   { close: 0, macd: -1, rsi: -1, boli: -1 },
-      m5:    { close: 0, macd: -1, rsi: -1, boli: -1 },
+      month: { close:  1, macd: 1, rsi: 0, boli:  0 },
+      week:  { close:  1, macd: 1, rsi: 0, boli:  0 },
+      day:   { close: -1, macd: 0, rsi: 0, boli: -1 },
+      h4:    { close:  0, macd: 0, rsi: 0, boli:  0 },
+      h1:    { close:  0, macd: 0, rsi: 0, boli:  0 },
+      m15:   { close:  0, macd: 0, rsi: 0, boli:  0 },
+      m5:    { close:  0, macd: 0, rsi: 0, boli:  0 },
     };
     const r = calculateBias(inputs, null);
     expect(r.scoreDirection).toBe('SELL');

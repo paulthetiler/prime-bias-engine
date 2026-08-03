@@ -2,89 +2,103 @@ import React, { useMemo } from 'react';
 import { calculateBias } from '@/lib/biasEngine';
 import { cn } from '@/lib/utils';
 
-// ── 5 Excel test cases ──────────────────────────────────────────────────────
+// ── Excel reference cases ───────────────────────────────────────────────────
+// Case 1 is the all-BUY snapshot saved in every workbook tab (values read from
+// the sheet's own cached results). The rest are derived from the Excel formulas
+// to exercise each rule: the ±35 direction dead-zone, the dominant-side total,
+// MODE block direction, anchor-based block strength, the AC35 grade thresholds,
+// and the Q10 grade cap.
 const TEST_CASES = [
   {
-    name: 'Bias Tool (GBP/USD)',
+    name: 'all-BUY snapshot (verbatim from workbook)',
     inputs: {
-      month: { close: -1, macd: -1, rsi: 0, boli: 0 },
+      month: { close:  1, macd:  1, rsi: 0, boli: 0 },
       week:  { close: -1, macd:  1, rsi: 0, boli: 0 },
-      day:   { close: -1, macd: -1, rsi: 0, boli: 0 },
-      h4:    { close: -1, macd: -1, rsi: 1, boli: 0 },
-      h1:    { close:  0, macd:  0, rsi: 0, boli: 0 },
+      day:   { close:  1, macd: -1, rsi: 0, boli: 0 },
+      h4:    { close: -1, macd:  1, rsi: 1, boli: 0 },
+      h1:    { close:  0, macd:  0, rsi: 1, boli: 0 },
       m15:   { close:  0, macd:  1, rsi: 1, boli: 0 },
-      m5:    { close:  0, macd:  1, rsi: 1, boli: 0 },
-    },
-    expected: { deep: 'BEAR / MEDIUM', dd: 'SELL / WEAK', now: 'BUY / WEAK', direction: 'SELL', score: 42, grade: 'D' },
-  },
-  {
-    name: 'B1 (All BUY)',
-    inputs: {
-      month: { close:  1, macd:  1, rsi: 0, boli:  1 },
-      week:  { close: -1, macd:  1, rsi: 0, boli:  1 },
-      day:   { close:  1, macd: -1, rsi: 0, boli:  1 },
-      h4:    { close:  1, macd:  1, rsi: 1, boli:  1 },
-      h1:    { close:  0, macd:  1, rsi: 1, boli:  0 },
-      m15:   { close:  0, macd:  1, rsi: 1, boli:  1 },
-      m5:    { close:  0, macd:  1, rsi:-1, boli:  1 },
+      m5:    { close:  0, macd:  1, rsi: 1, boli: 1 },
     },
     expected: { deep: 'BULL / STRONG', dd: 'BUY / STRONG', now: 'BUY / STRONG', direction: 'BUY', score: 95, grade: 'F (Ext)' },
   },
   {
-    name: 'B2 (SELL biased)',
+    name: 'all-SELL (mirror of snapshot)',
     inputs: {
-      month: { close: -1, macd: -1, rsi: -1, boli:  1 },
-      week:  { close: -1, macd: -1, rsi:  0, boli:  0 },
-      day:   { close:  1, macd: -1, rsi:  0, boli:  0 },
-      h4:    { close:  1, macd:  1, rsi: -1, boli:  1 },
-      h1:    { close:  0, macd: -1, rsi: -1, boli:  0 },
-      m15:   { close:  0, macd: -1, rsi:  1, boli: -1 },
-      m5:    { close:  0, macd: -1, rsi:  1, boli:  0 },
+      month: { close: -1, macd: -1, rsi:  0, boli:  0 },
+      week:  { close:  1, macd: -1, rsi:  0, boli:  0 },
+      day:   { close: -1, macd:  1, rsi:  0, boli:  0 },
+      h4:    { close:  1, macd: -1, rsi: -1, boli:  0 },
+      h1:    { close:  0, macd:  0, rsi: -1, boli:  0 },
+      m15:   { close:  0, macd: -1, rsi: -1, boli:  0 },
+      m5:    { close:  0, macd: -1, rsi: -1, boli: -1 },
     },
-    expected: { deep: 'BEAR / STRONG', dd: 'SELL / MEDIUM', now: 'SELL / MEDIUM', direction: 'SELL', score: 60, grade: 'B' },
+    expected: { deep: 'BEAR / STRONG', dd: 'SELL / STRONG', now: 'SELL / STRONG', direction: 'SELL', score: 95, grade: 'F (Ext)' },
   },
   {
-    name: 'B3 (Mixed)',
+    name: 'dead-zone neutrals (weak single indicators)',
     inputs: {
-      month: { close: -1, macd:  1, rsi: 0, boli:  1 },
-      week:  { close:  1, macd: -1, rsi: 0, boli: -1 },
-      day:   { close: -1, macd: -1, rsi: 0, boli: -1 },
-      h4:    { close:  1, macd: -1, rsi: 1, boli:  1 },
-      h1:    { close:  0, macd: -1, rsi: 1, boli: -1 },
-      m15:   { close:  0, macd:  1, rsi: 1, boli:  0 },
-      m5:    { close:  0, macd:  1, rsi:-1, boli:  0 },
+      month: { close: 0, macd: 0, rsi: 1, boli: 0 },
+      week:  { close: 0, macd: 0, rsi: 0, boli: 1 },
+      day:   { close: 1, macd: 0, rsi: 0, boli: 0 },
+      h4:    { close: 0, macd: 1, rsi: 0, boli: 0 },
+      h1:    { close: 0, macd: 1, rsi: 0, boli: 0 },
+      m15:   { close: 0, macd: 1, rsi: 0, boli: 0 },
+      m5:    { close: 0, macd: 1, rsi: 0, boli: 0 },
     },
-    expected: { deep: 'BEAR / MEDIUM', dd: 'SELL / MEDIUM', now: 'SELL / MEDIUM', direction: 'SELL', score: 53, grade: 'C' },
+    expected: { deep: 'NEUTRAL / WEAK', dd: 'NEUTRAL / WEAK', now: 'NEUTRAL / WEAK', direction: 'BUY', score: 10, grade: 'C' },
   },
   {
-    name: 'B4 (Strong BUY)',
+    name: 'DEEP anchor conflict (Day opposes M/W)',
     inputs: {
-      month: { close:  1, macd:  0, rsi: 0, boli:  0 },
-      week:  { close: -1, macd:  1, rsi: 1, boli:  1 },
-      day:   { close:  1, macd:  1, rsi: 0, boli:  1 },
-      h4:    { close:  1, macd:  1, rsi:-1, boli:  1 },
-      h1:    { close:  0, macd:  1, rsi:-1, boli:  1 },
-      m15:   { close:  0, macd:  1, rsi: 1, boli:  1 },
-      m5:    { close:  0, macd: -1, rsi: 1, boli:  0 },
+      month: { close:  1, macd: 1, rsi: 0, boli:  0 },
+      week:  { close:  1, macd: 1, rsi: 0, boli:  0 },
+      day:   { close: -1, macd: 0, rsi: 0, boli: -1 },
+      h4:    { close:  0, macd: 0, rsi: 0, boli:  0 },
+      h1:    { close:  0, macd: 0, rsi: 0, boli:  0 },
+      m15:   { close:  0, macd: 0, rsi: 0, boli:  0 },
+      m5:    { close:  0, macd: 0, rsi: 0, boli:  0 },
     },
-    expected: { deep: 'BULL / STRONG', dd: 'BUY / STRONG', now: 'BUY / STRONG', direction: 'BUY', score: 95, grade: 'F (Ext)' },
+    expected: { deep: 'BULL / WEAK', dd: 'NEUTRAL / WEAK', now: 'NEUTRAL / WEAK', direction: 'SELL', score: 10, grade: 'C' },
   },
   {
-    name: 'NOW Regression — H1 conflicts (→ WEAK)',
+    name: 'score 55 → grade B',
     inputs: {
-      // H1=BUY, M15=SELL, M5=SELL → NOW direction=SELL (majority), but H1 conflicts → WEAK
-      month: { close: -1, macd: -1, rsi: 0, boli: 0 },
-      week:  { close: -1, macd: -1, rsi: 0, boli: 0 },
-      day:   { close: -1, macd: -1, rsi: 0, boli: 0 },
-      h4:    { close: -1, macd: -1, rsi: 0, boli: 0 },
-      // H1 → BUY: macd+1, rsi+1 → score = 20+40 = +60 → BUY
-      h1:    { close:  0, macd:  1, rsi: 1, boli: 0 },
-      // M15 → SELL: macd-1, boli-1 → score = -20-40 = -60 → SELL
-      m15:   { close:  0, macd: -1, rsi: 0, boli: -1 },
-      // M5 → SELL: macd-1, boli-1 → score = -10-40 = -50 → SELL
-      m5:    { close:  0, macd: -1, rsi: 0, boli: -1 },
+      month: { close: 0, macd: 0, rsi: 1, boli: 0 },
+      week:  { close: 0, macd: 0, rsi: 1, boli: 0 },
+      day:   { close: 1, macd: 0, rsi: 0, boli: 0 },
+      h4:    { close: 1, macd: 0, rsi: 0, boli: 1 },
+      h1:    { close: 0, macd: 1, rsi: 0, boli: 0 },
+      m15:   { close: 0, macd: 0, rsi: 1, boli: 1 },
+      m5:    { close: 0, macd: 0, rsi: 1, boli: 1 },
     },
-    expected: { deep: 'BEAR / STRONG', dd: 'SELL / MEDIUM', now: 'SELL / WEAK', direction: 'SELL', score: 62, grade: 'B' },
+    expected: { deep: 'NEUTRAL / WEAK', dd: 'BUY / WEAK', now: 'BUY / WEAK', direction: 'BUY', score: 55, grade: 'B' },
+  },
+  {
+    name: 'score 80 → risky grade C',
+    inputs: {
+      month: { close: 1, macd: 1, rsi: 0, boli: 0 },
+      week:  { close: 0, macd: 0, rsi: 0, boli: 0 },
+      day:   { close: 1, macd: 0, rsi: 0, boli: 0 },
+      h4:    { close: 1, macd: 0, rsi: 0, boli: 1 },
+      h1:    { close: 0, macd: 0, rsi: 1, boli: 1 },
+      m15:   { close: 0, macd: 0, rsi: 0, boli: 0 },
+      m5:    { close: 0, macd: 0, rsi: 1, boli: 1 },
+    },
+    expected: { deep: 'BULL / MEDIUM', dd: 'BUY / STRONG', now: 'BUY / MEDIUM', direction: 'BUY', score: 80, grade: 'C' },
+  },
+  {
+    name: 'dominant-side total: H4 close+ vs boli- → SELL',
+    inputs: {
+      month: { close: 0, macd: 0, rsi: 0, boli:  0 },
+      week:  { close: 0, macd: 0, rsi: 0, boli:  0 },
+      day:   { close: 1, macd: 1, rsi: 0, boli:  0 },
+      h4:    { close: 1, macd: 0, rsi: 0, boli: -1 },
+      h1:    { close: 0, macd: 0, rsi: 1, boli:  1 },
+      m15:   { close: 0, macd: 0, rsi: 1, boli:  1 },
+      m5:    { close: 0, macd: 0, rsi: 0, boli:  0 },
+    },
+    expected: { deep: 'NEUTRAL / WEAK', dd: 'BUY / MEDIUM', now: 'BUY / MEDIUM', direction: 'BUY', score: 53, grade: 'C' },
   },
 ];
 
@@ -114,7 +128,7 @@ export default function EngineTest() {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center gap-3 pt-2">
-        <h1 className="text-lg font-bold">Engine Test — 6 Excel Cases</h1>
+        <h1 className="text-lg font-bold">Engine Test — Excel Reference Cases</h1>
         <span className={cn('text-xs font-bold px-2 py-1 rounded', allPass ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400')}>
           {allPass ? '✓ ALL PASS' : '✗ FAILURES DETECTED'}
         </span>

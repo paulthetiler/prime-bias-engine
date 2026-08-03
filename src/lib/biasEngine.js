@@ -1,60 +1,47 @@
-// PrimeBias Engine — verified against Excel workbook (Bias Tool + B1/B2/B3/B4)
+// PrimeBias Engine — ported cell-by-cell from the Excel workbook
+// (tabs: "Bias Tool", B1–B4). Every rule below is transcribed from a specific
+// Excel formula so the app reproduces the spreadsheet exactly.
 //
-// CONFIRMED RULES (cell-by-cell verification):
+// ── TIMEFRAME DIRECTION (Excel J = AE, driven by AD) ─────────────────────────
+//   Each indicator contributes  input(-1/0/+1) × weight  (Excel cols Z..AC).
+//   AD is NOT a net sum — it is the DOMINANT side:
+//       AD = IF( |Σ negatives| > |Σ positives|, Σ negatives, Σ positives )
+//   Direction (AE):  AD ≤ −35 → −1 (SELL) · AD ≥ 35 → +1 (BUY) · else 0 (Neutral)
+//   ⇒ a single weak indicator that never reaches ±35 stays Neutral (dead-zone).
 //
-// TF DIRECTION: weighted sum of indicators → +1 (BUY) / -1 (SELL) / 0 (Neutral)
-//   Weights: Month{close:40,macd:30,rsi:10,boli:20}  Week{close:30,macd:40,rsi:10,boli:20}
-//            Day{close:35,macd:40,rsi:10,boli:15}     H4{close:25,macd:20,rsi:20,boli:35}
-//            H1{close:0,macd:20,rsi:40,boli:40}       M15{close:0,macd:20,rsi:40,boli:40}
-//            M5{close:0,macd:10,rsi:30,boli:40}  ← rsi=30 NOT 50 (confirmed B1 M5 case)
-//   Tiebreaker (sum=0): indicator majority vote
+//   Direction weights (Excel Z13:AC19):
+//     Month{c40 m30 r10 b20}  Week{c30 m40 r10 b20}  Day{c35 m25 r10 b30}
+//     4hr{c25 m20 r20 b35}     1hr{c0 m20 r40 b40}
+//     15m{c0 m15 r40 b45}      5m{c0 m5 r50 b45}
 //
-// BLOCKS:
-//   DEEP = [Month, Week, Day]   → direction = majority; Month anchors
-//   DD   = [Day, H4, H1]        → direction = majority; Day anchors
-//   NOW  = [H1, M15, M5]        → direction = majority; H1 anchors
+// ── BLOCKS ───────────────────────────────────────────────────────────────────
+//   DEEP = [Month, Week, Day]   DD = [Day, 4hr, 1hr]   NOW = [1hr, 15m, 5m]
+//   Block direction  (Excel O = MODE): the result that occurs in ≥2 of the 3
+//     timeframes; if all three differ → Neutral.
+//   Block strength  (Excel Q) anchors on ONE timeframe and counts how many of
+//     the other two share its direction:
+//       DEEP anchor = Day  ·  DD anchor = 1hr  ·  NOW anchor = 1hr
+//       anchor Neutral → WEAK · both others match → STRONG · one → MEDIUM · none → WEAK
 //
-// BLOCK STRENGTH — DEEP/DD (confirmed from all 5 examples):
-//   3 matching                   → STRONG
-//   2 matching + 1 OPPOSITE      → MEDIUM
-//   2 matching + 1 NEUTRAL (0)   → WEAK
+// ── GRADE SCORE (Excel AC33/AD33 → AB35) ─────────────────────────────────────
+//   BUY vs SELL point tally, per-timeframe weights (Excel Z25:Z31):
+//     Month2 Week5 Day10 4hr30 1hr33 15m10 5m5   (Extra-Check green light +5)
+//   Score direction (Excel AC34): higher tally wins; tie broken by 1hr direction.
+//   Winning score = the winning side's tally (Excel AB35).
 //
-// BLOCK STRENGTH — NOW (H1 is the anchor):
-//   H1 does NOT match dir (opposite or neutral) → WEAK  ← key difference
-//   H1 matches + all 3 match                   → STRONG
-//   H1 matches + not all 3                     → MEDIUM
-//   Example: H1=BUY, M15=SELL, M5=SELL → NOW=SELL/WEAK (H1 conflicts)
+// ── GRADE LETTER (Excel AC35, from the winning score) ────────────────────────
+//     >91 → F   ≥80 → C(Risky)   ≥75 → A   ≥55 → B   ≥45 → C   ≥40 → D   <40 → D
+//   (Note: below 40 the sheet returns D, NOT F.)
 //
-// GRADE SCORING (individual TF weights, BUY vs SELL tally):
-//   Month=2, Week=5, Day=10, H4=30, H1=33, M15=10, M5=5  (base total = 95)
-//   ExtraCheck green light adds +5 to matching direction  (max = 100)
+// ── GRADE CAP (Excel Q10 = IF(P9 = Q11, AC35, "C")) ──────────────────────────
+//   P9 is the block-weighted trend (DEEP 10 / DD 49 / NOW 41, BUY vs SELL).
+//   If that trend disagrees with the score direction, the grade is forced to C.
 //
-// GRADE THRESHOLDS:
-//   ≥90 → F (Extended)    ≥85 → C (Risky)    ≥75 → A
-//   ≥60 → B               ≥50 → C             ≥40 → D    <40 → F
+// ── EXTENDED (Excel P10: AB35 > 90 → "Extended") ─────────────────────────────
+//   A winning score above 90 flags the market EXTENDED → no trade.
 //
-// MAIN DIRECTION = score direction (whichever of BUY/SELL wins the weighted tally)
-//
-// GRADE CAP: If Deep direction conflicts with score direction → effective grade capped at C
-//
-// TEST RESULTS vs EXCEL:
-//   Bias Tool: M(-1),W(+1),D(-1),H4(-1),H1(0),M15(+1),M5(+1)
-//     SELL=42(M2+D10+H4 30), BUY=20(W5+M15 10+M5 5) → SELL wins, score=42→grade D ✓
-//     Deep=[−1,+1,−1]→SELL,MEDIUM ✓  DD=[−1,−1,0]→SELL,WEAK ✓  Now=[0,+1,+1]→BUY,WEAK ✓
-//   B1: all BUY (M5: macd+1,rsi−1,boli+1 → 10−30+40=+20 →BUY ✓)
-//     BUY=95,SELL=0 → score=95→F(Extended) ✓
-//   B2: M(−1),W(−1),D(−1),H4(+1),H1(−1),M15(−1),M5(?)
-//     M5: macd−1,rsi+1,boli0 → −10+30=+20→BUY(+1)
-//     SELL=2+5+10+33+10=60, BUY=30+5=35 → SELL wins, score=60→grade B ✓
-//     DD=[−1,+1,−1]→SELL,MEDIUM ✓  Now=[−1,−1,+1]→SELL,MEDIUM ✓
-//   B3: M(+1),W(−1),D(−1),H4(+1),H1(−1),M15(+1),M5(?)
-//     M5: macd+1,rsi−1,boli0 → 10−30=−20→SELL(−1)
-//     SELL=5+10+33+5=53, BUY=2+30+10=42 → SELL wins, score=53→grade C ✓
-//     Deep=[+1,−1,−1]→SELL,MEDIUM ✓  DD=[−1,+1,−1]→SELL,MEDIUM ✓
-//   B4: M(+1),W(+1),D(+1),H4(+1),H1(+1),M15(+1),M5(?)
-//     M5: macd−1,rsi+1,boli0 → −10+30=+20→BUY(+1)
-//     BUY=2+5+10+30+33+10+5=95,SELL=0 → score=95→F(Extended) ✓
-//     Deep=[+1,+1,+1]→BULL,STRONG ✓  DD=[+1,+1,+1]→BUY,STRONG ✓  Now=[+1,+1,+1]→BUY,STRONG ✓
+// Verified: the all-BUY snapshot saved in every workbook tab (Bias Tool, B1–B4)
+// reproduces DEEP BULL/STRONG, DD BUY/STRONG, NOW BUY/STRONG, score 95, grade F.
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -68,22 +55,31 @@ const TIMEFRAMES = [
   { key: 'm5',    label: '5 Min',    shortLabel: '5m',  group: 'trigger' },
 ];
 
-// Per-indicator weights — used ONLY to determine each TF's direction (+1/-1/0)
+// Per-indicator direction weights — Excel "Bias Tool" cols Z13:AC19.
 const WEIGHTS = {
   month: { close: 40, macd: 30, rsi: 10, boli: 20 },
   week:  { close: 30, macd: 40, rsi: 10, boli: 20 },
-  day:   { close: 35, macd: 40, rsi: 10, boli: 15 },
+  day:   { close: 35, macd: 25, rsi: 10, boli: 30 },
   h4:    { close: 25, macd: 20, rsi: 20, boli: 35 },
   h1:    { close: 0,  macd: 20, rsi: 40, boli: 40 },
-  m15:   { close: 0,  macd: 20, rsi: 40, boli: 40 },
-  m5:    { close: 0,  macd: 10, rsi: 30, boli: 40 }, // rsi=30 confirmed
+  m15:   { close: 0,  macd: 15, rsi: 40, boli: 45 },
+  m5:    { close: 0,  macd: 5,  rsi: 50, boli: 45 },
 };
 
-// Grade scoring weights — used for BUY vs SELL point tally
+// The ±35 dead-zone threshold applied to the dominant-side total (Excel AE).
+const DIRECTION_THRESHOLD = 35;
+
+// Grade scoring weights — Excel Z25:Z31 (BUY vs SELL point tally).
 const TF_SCORE_WEIGHTS = {
   month: 2, week: 5, day: 10, h4: 30, h1: 33, m15: 10, m5: 5,
 };
 const LIGHTS_WEIGHT = 5;
+
+// Block-weighted trend weights for the grade cap — Excel AH4:AH6 (P9 / AI8).
+const BLOCK_TREND_WEIGHTS = { deep: 10, dd: 49, now: 41 };
+
+// A winning score above this flags the market EXTENDED — Excel P10 (AB35 > 90).
+const EXTENDED_SCORE = 90;
 
 // ─── Assets ───────────────────────────────────────────────────────────────────
 const ASSETS = [
@@ -123,66 +119,48 @@ function getDefaultInputs() {
 }
 
 // ─── TF direction ─────────────────────────────────────────────────────────────
-// Weighted sum → sign. If sum = 0, tiebreak by indicator majority.
-function calcTFResult(tfKey, ind) {
+// Excel AD (dominant side) + AE (±35 dead-zone). Returns { result, total }
+// where total is the signed dominant-side value (Excel AD).
+function calcTFTotal(tfKey, ind) {
   const w = WEIGHTS[tfKey];
-  const total = (ind.close * w.close) + (ind.macd * w.macd) + (ind.rsi * w.rsi) + (ind.boli * w.boli);
-  if (total > 0) return 1;
-  if (total < 0) return -1;
-  // tiebreak
-  const pos = [ind.close, ind.macd, ind.rsi, ind.boli].filter(v => v > 0).length;
-  const neg = [ind.close, ind.macd, ind.rsi, ind.boli].filter(v => v < 0).length;
-  if (pos > neg) return 1;
-  if (neg > pos) return -1;
+  const contribs = [ind.close * w.close, ind.macd * w.macd, ind.rsi * w.rsi, ind.boli * w.boli];
+  const pos = contribs.reduce((s, v) => (v > 0 ? s + v : s), 0);
+  const neg = contribs.reduce((s, v) => (v < 0 ? s + v : s), 0);
+  return Math.abs(neg) > Math.abs(pos) ? neg : pos; // Excel AD
+}
+
+function calcTFResult(tfKey, ind) {
+  const total = calcTFTotal(tfKey, ind);
+  if (total <= -DIRECTION_THRESHOLD) return -1;
+  if (total >= DIRECTION_THRESHOLD) return 1;
   return 0;
 }
 
-// ─── Block direction ──────────────────────────────────────────────────────────
+// ─── Block direction (Excel O = MODE) ─────────────────────────────────────────
+// The result appearing in ≥2 of the 3 timeframes; all three different → Neutral.
 function calcBlockDir(r0, r1, r2) {
-  const pos = [r0, r1, r2].filter(r => r === 1).length;
-  const neg = [r0, r1, r2].filter(r => r === -1).length;
-  if (pos > neg) return 1;
-  if (neg > pos) return -1;
-  return 0;
+  const arr = [r0, r1, r2];
+  for (const v of [1, -1, 0]) {
+    if (arr.filter(x => x === v).length >= 2) return v;
+  }
+  return 0; // all distinct (Excel MODE → #N/A) → treat as Neutral
 }
 
-// ─── Block strength (DEEP / DD) ───────────────────────────────────────────────
-// Confirmed rule for DEEP and DD blocks:
-//   3 matching                → STRONG
-//   2 matching + 1 opposite   → MEDIUM
-//   2 matching + 1 neutral    → WEAK
-function calcBlockStrength(r0, r1, r2, dir) {
-  if (dir === 0) return 'NO TRADE';
-  const matches  = [r0, r1, r2].filter(r => r === dir).length;
-  const neutrals = [r0, r1, r2].filter(r => r === 0).length;
-  if (matches === 3)                        return 'STRONG';
-  if (matches === 2 && neutrals === 0)      return 'MEDIUM'; // 1 opposite
-  if (matches === 2 && neutrals >= 1)       return 'WEAK';   // 1 neutral
+// ─── Block strength (Excel Q) ─────────────────────────────────────────────────
+// Anchors on one timeframe and counts how many of the other two match it:
+//   anchor Neutral → WEAK · both match → STRONG · one matches → MEDIUM · none → WEAK
+function calcAnchoredStrength(anchor, other1, other2) {
+  if (anchor === 0) return 'WEAK';
+  const matches = [other1, other2].filter(x => x === anchor).length;
+  if (matches === 2) return 'STRONG';
+  if (matches === 1) return 'MEDIUM';
   return 'WEAK';
 }
 
-// ─── NOW block strength (H1, M15, M5) ────────────────────────────────────────
-// NOW uses a different rule from DEEP/DD because H1 is the anchor.
-// If H1 CONFLICTS with the NOW direction (i.e. M15+M5 set the direction but H1
-// is opposite), the result is always WEAK regardless of M15/M5 agreement.
-//
-// Confirmed rules:
-//   H1 matches + M15 matches + M5 matches → STRONG
-//   H1 matches + (M15 or M5 neutral/opposite, 2 total matching) → MEDIUM
-//   H1 does NOT match (opposite or neutral) → WEAK
-function calcNowStrength(rH1, rM15, rM5, dir) {
-  if (dir === 0) return 'NO TRADE';
-  if (rH1 !== dir) return 'WEAK'; // H1 conflicts or neutral → always WEAK
-  const matches = [rH1, rM15, rM5].filter(r => r === dir).length;
-  if (matches === 3) return 'STRONG';
-  return 'MEDIUM'; // H1 matches, not all 3 → MEDIUM
-}
-
-// ─── Grade ────────────────────────────────────────────────────────────────────
-// Default thresholds confirmed from Excel:
-//   ≥90→F(Extended), ≥85→C(Risky), ≥75→A, ≥60→B, ≥50→C, ≥40→D, <40→F
+// ─── Grade (Excel AC35) ───────────────────────────────────────────────────────
+//   >91 → F · ≥80 → C · ≥75 → A · ≥55 → B · ≥45 → C · ≥40 → D · <40 → D
 // Thresholds can be overridden via user settings (Settings → Grade Thresholds).
-const DEFAULT_THRESHOLDS = { extended: 90, risky: 85, A: 75, B: 60, C: 50, D: 40 };
+const DEFAULT_THRESHOLDS = { extended: 92, risky: 80, A: 75, B: 55, C: 45, D: 40 };
 
 function calcGrade(score, thresholds = DEFAULT_THRESHOLDS) {
   const t = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) };
@@ -192,13 +170,11 @@ function calcGrade(score, thresholds = DEFAULT_THRESHOLDS) {
   if (score >= t.B)        return 'B';
   if (score >= t.C)        return 'C';
   if (score >= t.D)        return 'D';
-  return 'F';
+  return 'D'; // Excel floor is D, not F
 }
 
-function calcGradeLabel(grade, score, thresholds = DEFAULT_THRESHOLDS) {
-  const t = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) };
-  if (score >= t.extended) return 'Extended';
-  if (score >= t.risky)    return 'Risky';
+function calcGradeLabel(grade, score, extendedScore = EXTENDED_SCORE) {
+  if (score > extendedScore) return 'Extended';
   if (grade === 'A') return 'Very Good';
   if (grade === 'B') return 'Good';
   if (grade === 'C') return 'Risky';
@@ -208,10 +184,10 @@ function calcGradeLabel(grade, score, thresholds = DEFAULT_THRESHOLDS) {
 
 // ─── Main calculation ─────────────────────────────────────────────────────────
 function calculateBias(inputs, extraCheck = null, options = {}) {
-  // Optional overrides (from user settings). Defaults preserve the verified engine.
+  // Optional overrides (from user settings). Defaults preserve the Excel engine.
   const scoreWeights = options.scoreWeights || TF_SCORE_WEIGHTS;
   const thresholds   = options.thresholds   || DEFAULT_THRESHOLDS;
-  const useM5Override         = !!options.useM5Override;
+  const useM5Override          = !!options.useM5Override;
   const downgradeOnNowWeakness = !!options.downgradeOnNowWeakness;
   const requireAlignmentForA   = !!options.requireAlignmentForA;
 
@@ -219,35 +195,34 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   const tfResults = {};
   TIMEFRAMES.forEach(tf => {
     const ind = inputs[tf.key] || { close: 0, macd: 0, rsi: 0, boli: 0 };
-    const result = calcTFResult(tf.key, ind);
-    const w = WEIGHTS[tf.key];
-    const total = (ind.close * w.close) + (ind.macd * w.macd) + (ind.rsi * w.rsi) + (ind.boli * w.boli);
+    const total = calcTFTotal(tf.key, ind);
+    const result = total <= -DIRECTION_THRESHOLD ? -1 : total >= DIRECTION_THRESHOLD ? 1 : 0;
     tfResults[tf.key] = {
       result,
-      total,
+      total, // Excel AD (dominant-side value)
       indicators: { close: ind.close, macd: ind.macd, rsi: ind.rsi, boli: ind.boli },
       bias: result === 1 ? 'BUY' : result === -1 ? 'SELL' : 'Neutral',
     };
   });
   const r = key => tfResults[key].result;
 
-  // 2. DEEP block [Month, Week, Day]
+  // 2. DEEP block [Month, Week, Day] — anchor = Day
   const deepDir      = calcBlockDir(r('month'), r('week'), r('day'));
   const deepTrend    = deepDir === 1 ? 'BULL' : deepDir === -1 ? 'BEAR' : 'NEUTRAL';
-  const deepStrength = calcBlockStrength(r('month'), r('week'), r('day'), deepDir);
+  const deepStrength = calcAnchoredStrength(r('day'), r('month'), r('week'));
 
-  // 3. DD block [Day, H4, H1]
+  // 3. DD block [Day, 4hr, 1hr] — anchor = 1hr
   const ddDir      = calcBlockDir(r('day'), r('h4'), r('h1'));
   const ddBias     = ddDir === 1 ? 'BUY' : ddDir === -1 ? 'SELL' : 'NEUTRAL';
-  const ddStrength = calcBlockStrength(r('day'), r('h4'), r('h1'), ddDir);
+  const ddStrength = calcAnchoredStrength(r('h1'), r('day'), r('h4'));
 
-  // 4. NOW block [H1, M15, M5]
+  // 4. NOW block [1hr, 15m, 5m] — anchor = 1hr
   // Advanced (opt-in): let M5 dictate the NOW direction when it has a signal.
   const nowDir      = (useM5Override && r('m5') !== 0)
     ? r('m5')
     : calcBlockDir(r('h1'), r('m15'), r('m5'));
   const nowBias     = nowDir === 1 ? 'BUY' : nowDir === -1 ? 'SELL' : 'NEUTRAL';
-  const nowStrength = calcNowStrength(r('h1'), r('m15'), r('m5'), nowDir);
+  const nowStrength = calcAnchoredStrength(r('h1'), r('m15'), r('m5'));
 
   // 5. Grade score — individual TF weights (overridable via settings)
   let buyScore = 0, sellScore = 0;
@@ -267,15 +242,14 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
     else                      sellScore += LIGHTS_WEIGHT;
   }
 
-  // 6. Score direction = main direction
+  // 6. Score direction = main direction (Excel AC34; tie broken by 1hr)
   let scoreDirection;
   if      (buyScore > sellScore)  scoreDirection = 'BUY';
   else if (sellScore > buyScore)  scoreDirection = 'SELL';
   else {
-    // Tie — tiebreak with Monthly
-    if      (r('month') === 1)  scoreDirection = 'BUY';
-    else if (r('month') === -1) scoreDirection = 'SELL';
-    else                         scoreDirection = 'NEUTRAL';
+    if      (r('h1') === 1)  scoreDirection = 'BUY';
+    else if (r('h1') === -1) scoreDirection = 'SELL';
+    else                      scoreDirection = 'NEUTRAL';
   }
 
   const winningScore  = scoreDirection === 'BUY'  ? buyScore
@@ -286,12 +260,23 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   // 7. Raw grade
   const rawGrade = calcGrade(winningScore, thresholds);
 
-  // 8. Effective grade — cap at C if Deep conflicts with score direction
+  // 8. Grade cap (Excel Q10 = IF(P9 = Q11, AC35, "C")).
+  // P9 is the block-weighted trend (DEEP 10 / DD 49 / NOW 41).
+  const blockBuy  = (deepDir === 1 ? BLOCK_TREND_WEIGHTS.deep : 0)
+                  + (ddDir   === 1 ? BLOCK_TREND_WEIGHTS.dd   : 0)
+                  + (nowDir  === 1 ? BLOCK_TREND_WEIGHTS.now  : 0);
+  const blockSell = (deepDir === -1 ? BLOCK_TREND_WEIGHTS.deep : 0)
+                  + (ddDir   === -1 ? BLOCK_TREND_WEIGHTS.dd   : 0)
+                  + (nowDir  === -1 ? BLOCK_TREND_WEIGHTS.now  : 0);
+  const blockTrend = blockBuy > blockSell ? 'BUY' : blockSell > blockBuy ? 'SELL' : 'NEUTRAL';
+  const trendMatchesScore = blockTrend === scoreDirection;
+  let effectiveGrade = trendMatchesScore ? rawGrade : 'C';
+
+  // Deep-vs-score alignment (used by warnings + status heuristics).
   const deepMatchesScore =
     deepDir === 0 ||
     (deepDir === 1  && scoreDirection === 'BUY') ||
     (deepDir === -1 && scoreDirection === 'SELL');
-  let effectiveGrade = deepMatchesScore ? rawGrade : 'C';
 
   // Block alignment vs. the score direction (needed for advanced logic + status)
   const nowMatchesScore = nowDir === dir;
@@ -311,10 +296,12 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
     effectiveGrade = capGrade(effectiveGrade, 'B');
   }
 
+  const isExtended = winningScore > EXTENDED_SCORE;
+
   // 9. Status / action
   let status, tradeAction, targetNote;
 
-  if (effectiveGrade === 'F' && winningScore >= 90) {
+  if (isExtended) {
     status = 'Extended'; tradeAction = 'NO_TRADE'; targetNote = 'EXTENDED';
   } else if (effectiveGrade === 'F') {
     status = 'No Trade'; tradeAction = 'NO_TRADE'; targetNote = 'NO TRADE';
@@ -341,23 +328,23 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
 
   // 10. Warnings
   const warnings = [];
-  if (deepDir !== 0 && !deepMatchesScore)
-    warnings.push('Deep Trend conflicts with score direction — grade capped at C');
+  if (!trendMatchesScore && (deepDir !== 0 || ddDir !== 0 || nowDir !== 0))
+    warnings.push('Block trend conflicts with score direction — grade capped at C');
   if (ddDir !== 0 && nowDir !== 0 && ddDir !== nowDir)
     warnings.push('NOW momentum is OPPOSITE to DD — momentum conflict');
   if (ddDir === 0)
     warnings.push('DD block is NEUTRAL — execution zone has no clear trend');
   if (deepDir === 0)
     warnings.push('Deep Trend is NEUTRAL — no macro direction confirmed');
-  if (winningScore >= 90)
-    warnings.push('Score ≥90 — market EXTENDED, high reversal risk');
-  else if (winningScore >= 85)
-    warnings.push('Score 85-89 — approaching extended territory, use caution');
+  if (isExtended)
+    warnings.push('Score >90 — market EXTENDED, high reversal risk');
+  else if (winningScore >= 80)
+    warnings.push('Score 80-90 — approaching extended territory, use caution');
 
   const plusMinusScore  = r('h1') + r('m15') + r('m5');
   const alignedCount    = TIMEFRAMES.filter(tf => r(tf.key) === dir).length;
   const confidenceScore = Math.round((alignedCount / TIMEFRAMES.length) * 100);
-  const gradeLabel      = calcGradeLabel(effectiveGrade, winningScore, thresholds);
+  const gradeLabel      = calcGradeLabel(effectiveGrade, winningScore);
 
   return {
     timeframes: tfResults,
@@ -387,7 +374,7 @@ function calculateTarget(atr, grade) {
 }
 
 // Build engine options from a user-settings object (see lib/userSettings.js).
-// Missing/invalid values fall back to the verified defaults.
+// Missing/invalid values fall back to the Excel defaults.
 function engineOptionsFromSettings(settings) {
   if (!settings) return {};
   return {
