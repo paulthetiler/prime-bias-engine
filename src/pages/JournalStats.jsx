@@ -13,6 +13,7 @@ import {
   periodRoi, buildEquitySeries, accountBalance, balanceBefore,
 } from '@/lib/accounts';
 import { ensureDefaultAccount } from '@/lib/accountData';
+import { normalizeTrade } from '@/lib/tradeCompat';
 import PerformanceSummary from '@/components/journal/PerformanceSummary';
 import GradeAssetBreakdown from '@/components/journal/GradeAssetBreakdown';
 
@@ -35,8 +36,13 @@ export default function JournalStats() {
     queryFn: () => base44.entities.AccountTransaction.list('occurred_at', 500),
   });
 
-  // Read-time shim: legacy detailed-mode trades stored their result in `pnl`.
-  const trades = useMemo(() => rawTrades.map(withDerivedFinancials), [rawTrades]);
+  // Read-time shims: legacy detailed-mode trades stored their result in `pnl`,
+  // and pre-snapshot trades carry no engine_version. Both are non-destructive and
+  // never recompute a stored grade.
+  const trades = useMemo(
+    () => rawTrades.map(t => normalizeTrade(withDerivedFinancials(t))),
+    [rawTrades]
+  );
   const active = useMemo(() => activeAccounts(accounts), [accounts]);
   const soleAccountId = active.length === 1 ? active[0].id : null;
 

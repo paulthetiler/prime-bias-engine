@@ -186,3 +186,97 @@ describe('completeTrade financial persistence', () => {
     expect(payload.pnl).toBe(-84); // legacy column mirrors net_pnl
   });
 });
+
+// ── Immutable engine snapshot persistence (issue #14, phase 2) ─────────────────
+import { calculateBias, ENGINE_VERSION } from './biasEngine';
+
+const STRONG_BUY_INPUTS = {
+  month: { close: 1, macd: 1, rsi: 1, boli: 1 },
+  week:  { close: 1, macd: 1, rsi: 1, boli: 1 },
+  day:   { close: 1, macd: 1, rsi: 1, boli: 1 },
+  h4:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+  h1:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+  m15:   { close: 1, macd: 1, rsi: 1, boli: 1 },
+  m5:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+};
+const EC = { h1: 1, m15: 1 };
+const SNAPSHOT_KEYS = [
+  'engine_version', 'engine_settings', 'raw_grade',
+  'buy_score', 'sell_score', 'timeframes_snapshot', 'lights_result',
+];
+
+const analysisWith = (options, over = {}) => {
+  const results = calculateBias(STRONG_BUY_INPUTS, EC, options);
+  return {
+    instrument: 'EUR/USD',
+    analysisId: 'EUR/USD-2026-08-03-100000-x',
+    results,
+    inputs: STRONG_BUY_INPUTS,
+    extraCheck: EC,
+    timestamp: '2026-08-03T10:00:00.000Z',
+    ...over,
+  };
+};
+
+describe('completeTrade — engine snapshot persistence', () => {
+  it('stores the entire engine snapshot on a newly completed trade', async () => {
+    await completeTrade(analysisWith(), 'win', { amount: 100 });
+    const payload = createCompleted.mock.calls.at(-1)[0];
+
+    for (const k of SNAPSHOT_KEYS) expect(payload, k).toHaveProperty(k);
+    expect(payload.engine_version).toBe(ENGINE_VERSION);
+    expect(typeof payload.buy_score).toBe('number');
+    expect(typeof payload.sell_score).toBe('number');
+    expect(payload.buy_score).toBeGreaterThan(payload.sell_score);
+    expect(payload.lights_result).toBe('buy');
+    // engine_settings freezes the resolved options as concrete values.
+    expect(payload.engine_settings.score_weights).toMatchObject({ h1: expect.any(Number) });
+    expect(payload.engine_settings.grade_thresholds).toMatchObject({ A: expect.any(Number) });
+    // per-timeframe results are stored, not left to be recomputed.
+    expect(Object.keys(payload.timeframes_snapshot)).toEqual(
+      ['month', 'week', 'day', 'h4', 'h1', 'm15', 'm5']
+    );
+    expect(payload.timeframes_snapshot.h1).toMatchObject({
+      result: expect.any(Number), bias: expect.any(String),
+    });
+  });
+
+  it('persists raw grade and effective grade separately', async () => {
+    await completeTrade(analysisWith(), 'win', { amount: 100 });
+    const payload = createCompleted.mock.calls.at(-1)[0];
+    // `grade` is the effective/capped grade; `raw_grade` is pre-cap.
+    expect(payload).toHaveProperty('raw_grade');
+    expect(payload).toHaveProperty('grade');
+    expect(payload.raw_grade).toBeTruthy();
+  });
+
+  it('quick and detailed completion store an identical snapshot structure', async () => {
+    // Quick mode: money only. Detailed mode: adds entry/exit/notes.
+    await completeTrade(analysisWith(), 'win', { amount: 100 });
+    const quick = createCompleted.mock.calls.at(-1)[0];
+    await completeTrade(analysisWith(), 'win', {
+      amount: 100, fees: 2, entry: '1.25', exit: '1.26', notes: 'clean break',
+    });
+    const detailed = createCompleted.mock.calls.at(-1)[0];
+
+    const pick = (o) => Object.fromEntries(SNAPSHOT_KEYS.map(k => [k, o[k]]));
+    expect(Object.keys(pick(quick))).toEqual(Object.keys(pick(detailed)));
+    expect(pick(quick)).toEqual(pick(detailed));
+  });
+
+  it('freezes each trade under its own settings — a later settings change never re-grades it', async () => {
+    // Trade taken under threshold A=70.
+    await completeTrade(analysisWith({ thresholds: { A: 70 } }), 'win', { amount: 100 });
+    const first = createCompleted.mock.calls.at(-1)[0];
+    // User later changes the engine (A=99) and takes another trade.
+    await completeTrade(analysisWith({ thresholds: { A: 99 } }), 'win', { amount: 100 });
+    const second = createCompleted.mock.calls.at(-1)[0];
+
+    expect(first.engine_settings.grade_thresholds.A).toBe(70);
+    expect(second.engine_settings.grade_thresholds.A).toBe(99);
+    // The first trade's frozen settings are untouched by the second completion.
+    expect(first.engine_settings.grade_thresholds.A).not.toBe(
+      second.engine_settings.grade_thresholds.A
+    );
+  });
+});

@@ -43,6 +43,17 @@
 // Verified: the all-BUY snapshot saved in every workbook tab (Bias Tool, B1–B4)
 // reproduces DEEP BULL/STRONG, DD BUY/STRONG, NOW BUY/STRONG, score 95, grade F.
 
+import { calcAlignment } from './alignmentUtils';
+
+// Stable identifier of the engine implementation. Bump this whenever the engine
+// maths — weights, thresholds, grade caps or block rules — changes, so every
+// completed trade keeps an honest record of which ruleset produced it. This is
+// deliberately NOT a build timestamp. It is named "current" (not
+// "excel-verified") because the engine may still need correcting against the
+// Prime Bias workbook; only rename it once the formulas have been corrected and
+// independently verified.
+export const ENGINE_VERSION = 'prime-bias-current-v1';
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const TIMEFRAMES = [
@@ -346,16 +357,40 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   const confidenceScore = Math.round((alignedCount / TIMEFRAMES.length) * 100);
   const gradeLabel      = calcGradeLabel(effectiveGrade, winningScore);
 
+  // Resolved options ACTUALLY applied to this analysis, captured as concrete
+  // values (never references to the user's mutable settings) so a completed trade
+  // can freeze exactly what produced it. This mirrors, per-key, the same
+  // fallbacks the scoring/grading above used — it does not change any maths.
+  const resolvedScoreWeights = {};
+  TIMEFRAMES.forEach(tf => {
+    resolvedScoreWeights[tf.key] = scoreWeights[tf.key] ?? TF_SCORE_WEIGHTS[tf.key];
+  });
+  const resolvedThresholds = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) };
+  const resolvedOptions = {
+    scoreWeights: resolvedScoreWeights,
+    thresholds: resolvedThresholds,
+    useM5Override,
+    downgradeOnNowWeakness,
+    requireAlignmentForA,
+  };
+
+  // Extra-check (red-light/green-light) outcome as a concrete result.
+  const lightsResult = lightsActive
+    ? (extraCheck && extraCheck.h1 === 1 ? 'buy' : 'sell')
+    : 'none';
+
   return {
     timeframes: tfResults,
     deepTrend, deepResult: deepDir, deepStrength,
     ddBias, ddResult: ddDir, ddStrength,
     nowBias, nowResult: nowDir, nowStrength,
-    buyScore, sellScore, winningScore, plusMinusScore, lightsActive,
+    buyScore, sellScore, winningScore, plusMinusScore, lightsActive, lightsResult,
     mainDirection, scoreDirection,
-    grade: effectiveGrade, gradeLabel, strength: ddStrength,
+    rawGrade, effectiveGrade, grade: effectiveGrade, gradeLabel, strength: ddStrength,
     tradeAction, status, targetNote,
     confidenceScore, warnings,
+    engineVersion: ENGINE_VERSION,
+    resolvedOptions,
   };
 }
 
@@ -386,6 +421,73 @@ function engineOptionsFromSettings(settings) {
   };
 }
 
+/**
+ * Build the immutable engine snapshot persisted with a completed trade.
+ *
+ * Pure and JSON-serialisable: it copies RESOLVED values out of a calculateBias()
+ * result (and the resolved options that produced it) so the trade can be
+ * reproduced later no matter how the user's live settings change afterwards. It
+ * NEVER reads global settings and NEVER recomputes the grade — it only records
+ * what the engine already decided.
+ *
+ * @param {any} results  a calculateBias() result object.
+ * @param {any} [resolvedOptions]  the resolved options used; defaults to
+ *   `results.resolvedOptions`, then to engine defaults when neither is present.
+ * @param {{ extraCheck?: any, timestamp?: string|null }} [context]  extra-check
+ *   inputs and the analysis timestamp, which live on the analysis rather than the
+ *   engine result.
+ * @returns {object} a plain, serialisable snapshot of resolved values.
+ */
+function createEngineSnapshot(results = {}, resolvedOptions = null, context = {}) {
+  const opts = resolvedOptions || results.resolvedOptions || {};
+  const scoreWeights = { ...(opts.scoreWeights || TF_SCORE_WEIGHTS) };
+  const thresholds = { ...DEFAULT_THRESHOLDS, ...(opts.thresholds || {}) };
+
+  // Per-timeframe calculated results + the raw indicator inputs already on them,
+  // so a breakdown never has to be recomputed under later settings.
+  const timeframes = {};
+  const src = results.timeframes || {};
+  for (const tf of TIMEFRAMES) {
+    const t = src[tf.key];
+    if (!t) continue;
+    timeframes[tf.key] = {
+      result: t.result ?? null,
+      total: t.total ?? null,
+      bias: t.bias ?? null,
+      indicators: t.indicators ? { ...t.indicators } : null,
+    };
+  }
+
+  const extraCheck = context.extraCheck ?? null;
+  const lightsResult = results.lightsResult
+    ?? (results.lightsActive ? (extraCheck && extraCheck.h1 === 1 ? 'buy' : 'sell') : 'none');
+
+  return {
+    engine_version: results.engineVersion || ENGINE_VERSION,
+    engine_settings: {
+      score_weights: scoreWeights,
+      grade_thresholds: thresholds,
+      use_m5_override: !!opts.useM5Override,
+      downgrade_on_now_weakness: !!opts.downgradeOnNowWeakness,
+      require_alignment_for_a: !!opts.requireAlignmentForA,
+    },
+    direction: results.mainDirection ?? null,
+    raw_grade: results.rawGrade ?? null,
+    effective_grade: results.effectiveGrade ?? results.grade ?? null,
+    winning_score: results.winningScore ?? null,
+    buy_score: results.buyScore ?? null,
+    sell_score: results.sellScore ?? null,
+    deep: { direction: results.deepTrend ?? null, strength: results.deepStrength ?? null },
+    dd: { direction: results.ddBias ?? null, strength: results.ddStrength ?? null },
+    now: { direction: results.nowBias ?? null, strength: results.nowStrength ?? null },
+    alignment: calcAlignment(results).label,
+    timeframes,
+    extra_check: extraCheck ? { h1: extraCheck.h1 ?? null, m15: extraCheck.m15 ?? null } : null,
+    lights_result: lightsResult,
+    analysis_timestamp: context.timestamp ?? null,
+  };
+}
+
 // Legacy compat — kept as aliases so older imports keep working.
 const GRADE_THRESHOLDS = DEFAULT_THRESHOLDS;
 const TF_GRADE_WEIGHTS = TF_SCORE_WEIGHTS;
@@ -394,5 +496,5 @@ export {
   TIMEFRAMES, WEIGHTS, TF_SCORE_WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS,
   ASSETS, BASE_ATR, TARGET_WEIGHTS,
   getDefaultInputs, calculateBias, getATRForAsset, calculateTarget,
-  engineOptionsFromSettings,
+  engineOptionsFromSettings, createEngineSnapshot,
 };

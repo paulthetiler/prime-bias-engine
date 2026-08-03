@@ -5,6 +5,8 @@ import {
   getATRForAsset,
   getDefaultInputs,
   engineOptionsFromSettings,
+  createEngineSnapshot,
+  ENGINE_VERSION,
   BASE_ATR,
 } from './biasEngine';
 
@@ -237,5 +239,158 @@ describe('engineOptionsFromSettings', () => {
 
   it('returns an empty object for no settings', () => {
     expect(engineOptionsFromSettings(null)).toEqual({});
+  });
+});
+
+// ── Immutable engine snapshot & versioning (issue #14, phase 2) ────────────────
+
+// A strong, unambiguous BUY setup — every timeframe leans buy so the engine
+// returns concrete scores/grades to snapshot.
+const STRONG_BUY = {
+  month: { close: 1, macd: 1, rsi: 1, boli: 1 },
+  week:  { close: 1, macd: 1, rsi: 1, boli: 1 },
+  day:   { close: 1, macd: 1, rsi: 1, boli: 1 },
+  h4:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+  h1:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+  m15:   { close: 1, macd: 1, rsi: 1, boli: 1 },
+  m5:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+};
+
+describe('ENGINE_VERSION', () => {
+  it('is a stable, human-readable identifier (not a build timestamp)', () => {
+    expect(typeof ENGINE_VERSION).toBe('string');
+    expect(ENGINE_VERSION.length).toBeGreaterThan(0);
+    expect(ENGINE_VERSION).toBe('prime-bias-current-v1');
+    // A timestamp version would contain digits for a date/epoch — this must not.
+    expect(/\d{4}-\d{2}-\d{2}/.test(ENGINE_VERSION)).toBe(false);
+    expect(/^\d+$/.test(ENGINE_VERSION)).toBe(false);
+  });
+
+  it('does NOT claim Excel verification (engine may still need correcting)', () => {
+    expect(ENGINE_VERSION.toLowerCase()).not.toContain('excel');
+    expect(ENGINE_VERSION.toLowerCase()).not.toContain('verified');
+  });
+});
+
+describe('calculateBias surfaces the full calculation result', () => {
+  const res = calculateBias(STRONG_BUY, { h1: 1, m15: 1 });
+
+  it('exposes raw vs effective grade separately', () => {
+    expect(res).toHaveProperty('rawGrade');
+    expect(res).toHaveProperty('effectiveGrade');
+    expect(res.grade).toBe(res.effectiveGrade);
+  });
+
+  it('exposes buy/sell tallies, lights and the engine version', () => {
+    expect(typeof res.buyScore).toBe('number');
+    expect(typeof res.sellScore).toBe('number');
+    expect(res.buyScore).toBeGreaterThan(res.sellScore); // strong buy
+    expect(res.lightsActive).toBe(true);
+    expect(res.lightsResult).toBe('buy');
+    expect(res.engineVersion).toBe(ENGINE_VERSION);
+  });
+
+  it('exposes the RESOLVED options actually used (concrete values)', () => {
+    expect(res.resolvedOptions).toBeTruthy();
+    // Every timeframe weight resolved to a concrete number.
+    for (const k of ['month', 'week', 'day', 'h4', 'h1', 'm15', 'm5']) {
+      expect(typeof res.resolvedOptions.scoreWeights[k]).toBe('number');
+    }
+    expect(typeof res.resolvedOptions.thresholds.A).toBe('number');
+    expect(res.resolvedOptions).toMatchObject({
+      useM5Override: false,
+      downgradeOnNowWeakness: false,
+      requireAlignmentForA: false,
+    });
+  });
+
+  it('keeps per-timeframe calculated results on the object', () => {
+    for (const k of ['month', 'week', 'day', 'h4', 'h1', 'm15', 'm5']) {
+      expect(res.timeframes[k]).toMatchObject({ result: expect.any(Number), bias: expect.any(String) });
+    }
+  });
+});
+
+describe('createEngineSnapshot', () => {
+  const context = { extraCheck: { h1: 1, m15: 1 }, timestamp: '2026-08-03T10:00:00.000Z' };
+  const snapshotOf = (over = {}) => {
+    const res = calculateBias(STRONG_BUY, context.extraCheck, over.options);
+    return createEngineSnapshot(res, res.resolvedOptions, context);
+  };
+
+  it('captures the full snapshot as concrete, serialisable values', () => {
+    const snap = snapshotOf();
+    // Round-trips through JSON without loss (no functions/refs).
+    expect(JSON.parse(JSON.stringify(snap))).toEqual(snap);
+
+    expect(snap.engine_version).toBe(ENGINE_VERSION);
+    expect(snap.engine_settings.score_weights).toMatchObject({ h1: expect.any(Number) });
+    expect(snap.engine_settings.grade_thresholds).toMatchObject({ A: expect.any(Number) });
+    expect(snap.engine_settings).toMatchObject({
+      use_m5_override: false,
+      downgrade_on_now_weakness: false,
+      require_alignment_for_a: false,
+    });
+    expect(snap.direction).toBe('BUY');
+    expect(snap).toHaveProperty('raw_grade');
+    expect(snap).toHaveProperty('effective_grade');
+    expect(typeof snap.buy_score).toBe('number');
+    expect(typeof snap.sell_score).toBe('number');
+    expect(snap.deep).toMatchObject({ direction: expect.any(String), strength: expect.any(String) });
+    expect(snap.dd).toMatchObject({ direction: expect.any(String), strength: expect.any(String) });
+    expect(snap.now).toMatchObject({ direction: expect.any(String), strength: expect.any(String) });
+    expect(snap.alignment).toBeTruthy();
+    expect(snap.extra_check).toEqual({ h1: 1, m15: 1 });
+    expect(snap.lights_result).toBe('buy');
+    expect(snap.analysis_timestamp).toBe(context.timestamp);
+  });
+
+  it('stores raw grade and effective grade under separate keys', () => {
+    // Synthetic capped result: raw A but effective forced to C.
+    const snap = createEngineSnapshot({
+      rawGrade: 'A', effectiveGrade: 'C', grade: 'C',
+      buyScore: 80, sellScore: 10, winningScore: 80, mainDirection: 'BUY',
+    });
+    expect(snap.raw_grade).toBe('A');
+    expect(snap.effective_grade).toBe('C');
+    expect(snap.raw_grade).not.toBe(snap.effective_grade);
+  });
+
+  it('persists per-timeframe results verbatim (does not recompute them)', () => {
+    const res = calculateBias(STRONG_BUY, context.extraCheck);
+    const snap = createEngineSnapshot(res, res.resolvedOptions, context);
+    for (const k of ['month', 'week', 'day', 'h4', 'h1', 'm15', 'm5']) {
+      expect(snap.timeframes[k]).toEqual({
+        result: res.timeframes[k].result,
+        total: res.timeframes[k].total,
+        bias: res.timeframes[k].bias,
+        indicators: res.timeframes[k].indicators,
+      });
+    }
+  });
+
+  it('freezes the resolved settings — changing them afterwards cannot mutate a past snapshot', () => {
+    const resA = calculateBias(STRONG_BUY, context.extraCheck, { thresholds: { A: 70 } });
+    const snapA = createEngineSnapshot(resA, resA.resolvedOptions, context);
+    const beforeJson = JSON.stringify(snapA);
+
+    // "User changes settings later" — a completely different engine run.
+    const resB = calculateBias(STRONG_BUY, context.extraCheck, { thresholds: { A: 99 } });
+    createEngineSnapshot(resB, resB.resolvedOptions, context);
+    // Mutating the source options object must not reach the earlier snapshot.
+    resA.resolvedOptions.thresholds.A = 12345;
+
+    expect(JSON.stringify(snapA)).toBe(beforeJson);
+    expect(snapA.engine_settings.grade_thresholds.A).toBe(70);
+  });
+
+  it('never reads global settings — resolvedOptions come from the passed result only', () => {
+    const snap = createEngineSnapshot(
+      { mainDirection: 'SELL', grade: 'B', resolvedOptions: { scoreWeights: { h1: 99 }, thresholds: { A: 60 }, useM5Override: true } },
+    );
+    expect(snap.engine_settings.score_weights.h1).toBe(99);
+    expect(snap.engine_settings.grade_thresholds.A).toBe(60);
+    expect(snap.engine_settings.use_m5_override).toBe(true);
+    expect(snap.direction).toBe('SELL');
   });
 });
