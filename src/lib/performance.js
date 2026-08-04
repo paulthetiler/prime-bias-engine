@@ -6,10 +6,16 @@
 // `withDerivedFinancials` so legacy `pnl`-only rows contribute correctly.
 //
 // Conventions (documented once, applied everywhere):
-//   * winRate / lossRate are FRACTIONS in [0,1] (not percentages).
+//   * winRate / lossRate are FRACTIONS in [0,1] (not percentages). They are the
+//     OUTCOME rates over all win/loss trades (may include outcome-only trades
+//     with no money) — an outcome statistic.
+//   * moneyWinRate / moneyLossRate are the rates over FINANCIALLY-COMPLETE
+//     directional trades only, and are the basis for monetary expectancy. An
+//     outcome-only loss (net_pnl null) is NEVER treated as a £0 loss.
 //   * averageLoss and largestLoss are POSITIVE MAGNITUDES.
 //   * a trade "counts financially" only when net_pnl is a real number.
 //   * expectancy in R === average realised R (mean net_pnl/amount_risked).
+//   * expectancyMoney === mean(net_pnl) over complete directional trades.
 
 import {
   withDerivedFinancials, hasFinancialResult, realisedPnl,
@@ -130,9 +136,19 @@ export function tradeSummary(rawTrades = []) {
   const rValues = complete.map(t => realisedR(t.net_pnl, t.amount_risked)).filter(v => v != null);
   const avgR = rValues.length ? round2(rValues.reduce((a, b) => a + b, 0) / rValues.length) : null;
 
-  // Expectancy in money = winRate*avgWin − lossRate*avgLoss (directional complete).
-  const expectancyMoney = denom > 0 && (averageWin != null || averageLoss != null)
-    ? round2(winRate * (averageWin ?? 0) - lossRate * (averageLoss ?? 0))
+  // Monetary expectancy MUST use the financially-complete directional population,
+  // NOT the outcome win rate — an outcome-only loss (net_pnl null) has no known
+  // amount and must never be treated as a £0 loss. winAmts/lossAmts already hold
+  // only complete directional wins/losses (break-even net 0 is excluded).
+  const moneyWins = winAmts.length;
+  const moneyLosses = lossAmts.length;
+  const moneyDenom = moneyWins + moneyLosses;
+  const moneyWinRate = moneyDenom ? moneyWins / moneyDenom : null;
+  const moneyLossRate = moneyDenom ? moneyLosses / moneyDenom : null;
+  // expectancyMoney = moneyWinRate*avgWin − moneyLossRate*avgLoss. By construction
+  // this equals the direct mean net_pnl of complete directional trades.
+  const expectancyMoney = moneyDenom
+    ? round2(moneyWinRate * (averageWin ?? 0) - moneyLossRate * (averageLoss ?? 0))
     : null;
 
   // Streaks over directional trades, chronological.
@@ -158,6 +174,9 @@ export function tradeSummary(rawTrades = []) {
   return {
     totalTrades, directionalCount, completeCount, outcomeOnlyCount,
     wins, losses, breakevens, winRate, lossRate,
+    // Money population (financially-complete directional trades) — the basis for
+    // monetary expectancy; distinct from the outcome-based winRate above.
+    moneyWins, moneyLosses, moneyWinRate, moneyLossRate,
     grossProfit: round2(grossProfit), grossLoss: round2(grossLoss),
     grossPnl: round2(grossPnlSum), totalFees: round2(totalFees), netPnl,
     averageWin, averageLoss, largestWin, largestLoss, profitFactor,
@@ -283,10 +302,11 @@ function summaryRow(key, label, groupTrades) {
     directionalCount: s.directionalCount,
     completeCount: s.completeCount,
     wins: s.wins, losses: s.losses, breakevens: s.breakevens,
-    winRate: s.winRate,
+    winRate: s.winRate,           // outcome-based (all win/loss)
+    moneyWinRate: s.moneyWinRate, // financially-complete directional only
     netPnl: s.hasPnl ? s.netPnl : null,
     avgR: s.avgR,
-    expectancy: s.expectancyMoney,
+    expectancy: s.expectancyMoney, // uses moneyWinRate (corrected)
     profitFactor: s.profitFactor,
     sampleStatus: s.sampleStatus,
   };

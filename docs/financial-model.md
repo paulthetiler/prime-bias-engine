@@ -416,8 +416,18 @@ All in `lib/performance.js` — pure, tested, realised-data only.
 - **Realised R** = `net_pnl / amount_risked` (only where `amount_risked > 0` and
   net exists — never inferred from grade/target/planned risk).
 - **Expectancy in R** = mean realised R (`expectancyR === avgR`).
-- **Expectancy in money** = `winRate × averageWin − lossRate × averageLoss` over
-  directional complete trades.
+- **Two win-rate populations (deliberately distinct):**
+  - `winRate` = `wins / (wins + losses)` — an **outcome** statistic over all
+    directional trades, which may include outcome-only trades with no money.
+  - `moneyWinRate` = `completeDirectionalWins / (completeDirectionalWins +
+    completeDirectionalLosses)` — over **financially-complete** directional trades
+    only (`net_pnl > 0` vs `net_pnl < 0`; break-even net 0 excluded).
+- **Expectancy in money** = `moneyWinRate × averageWin − moneyLossRate ×
+  averageLoss`. It uses the **money population only**, so an outcome-only loss
+  (`net_pnl` null) is never treated as a £0 loss. By construction this equals the
+  direct **mean `net_pnl` of complete directional trades** (a regression-tested
+  invariant). `moneyWins/moneyLosses/moneyWinRate/moneyLossRate` are exposed for
+  audit, and every breakdown row carries both `winRate` and `moneyWinRate`.
 - **Streaks** — best win / worst loss / current, over directional trades in
   deterministic chronological order (time, then id).
 - **Pips/points** — **explicit `points_pips` only**; estimates are never counted.

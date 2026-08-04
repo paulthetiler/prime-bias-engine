@@ -382,3 +382,73 @@ describe('computePerformance', () => {
     expect(p.netPnl).toBe(50); // old trade excluded from the period summary
   });
 });
+
+// ── Monetary expectancy uses the financially-complete directional population ─────
+// (review blocker on PR #20). An outcome-only loss must NOT be treated as £0.
+describe('expectancyMoney — correct population', () => {
+  it('1) complete +100 win + outcome-only loss → win rate 50%, money win rate 100%, expectancy 100', () => {
+    const s = tradeSummary([
+      trade({ id: 'w', result: 'win', net_pnl: 100 }),
+      trade({ id: 'l', result: 'loss', net_pnl: null }), // outcome-only, no amount
+    ]);
+    expect(s.winRate).toBe(0.5);        // outcome rate
+    expect(s.moneyWinRate).toBe(1);     // complete directional only
+    expect(s.expectancyMoney).toBe(100);
+  });
+
+  it('2) outcome-only win + complete -50 loss → win rate 50%, money win rate 0%, expectancy -50', () => {
+    const s = tradeSummary([
+      trade({ id: 'w', result: 'win', net_pnl: null }),
+      trade({ id: 'l', result: 'loss', net_pnl: -50 }),
+    ]);
+    expect(s.winRate).toBe(0.5);
+    expect(s.moneyWinRate).toBe(0);
+    expect(s.expectancyMoney).toBe(-50);
+  });
+
+  it('3) no financially-complete directional trades → money win rate & expectancy null', () => {
+    const s = tradeSummary([
+      trade({ id: 'w', result: 'win', net_pnl: null }),
+      trade({ id: 'l', result: 'loss', net_pnl: null }),
+    ]);
+    expect(s.winRate).toBe(0.5);        // headline still computed
+    expect(s.moneyWinRate).toBeNull();
+    expect(s.moneyLossRate).toBeNull();
+    expect(s.expectancyMoney).toBeNull();
+  });
+
+  it('4) complete breakevens are excluded from the expectancy denominator', () => {
+    const s = tradeSummary([
+      trade({ id: 'w', result: 'win', net_pnl: 100 }),
+      trade({ id: 'b', result: 'breakeven', net_pnl: 0 }),
+      trade({ id: 'l', result: 'loss', net_pnl: -100 }),
+    ]);
+    expect(s.moneyWins + s.moneyLosses).toBe(2); // breakeven not counted
+    expect(s.expectancyMoney).toBe(0);
+  });
+
+  it('5) mixed complete → expectancy equals the direct mean net P&L', () => {
+    const nets = [200, 100, -150];
+    const s = tradeSummary(nets.map((v, i) => trade({ id: `t${i}`, result: v >= 0 ? 'win' : 'loss', net_pnl: v })));
+    const mean = nets.reduce((a, b) => a + b, 0) / nets.length; // 50
+    expect(s.expectancyMoney).toBeCloseTo(mean, 6);
+  });
+
+  it('direct-mean invariant: expectancyMoney === mean(net_pnl) of complete directional trades', () => {
+    const nets = [37.5, -12.25, 88, -40, 5, -3.3];
+    const s = tradeSummary(nets.map((v, i) => trade({ id: `x${i}`, result: v >= 0 ? 'win' : 'loss', net_pnl: v })));
+    const mean = Math.round((nets.reduce((a, b) => a + b, 0) / nets.length) * 100) / 100;
+    expect(s.expectancyMoney).toBe(mean);
+  });
+
+  it('6) breakdown rows use the corrected expectancy population', () => {
+    const rows = breakdown([
+      trade({ id: 'w', grade: 'A', result: 'win', net_pnl: 100 }),
+      trade({ id: 'l', grade: 'A', result: 'loss', net_pnl: null }), // outcome-only
+    ], KEYERS.effectiveGrade);
+    const a = rows.find(r => r.key === 'A');
+    expect(a.winRate).toBe(0.5);       // outcome
+    expect(a.moneyWinRate).toBe(1);    // money population
+    expect(a.expectancy).toBe(100);    // not 50
+  });
+});
