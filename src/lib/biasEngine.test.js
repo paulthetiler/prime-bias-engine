@@ -198,7 +198,7 @@ describe('calculateBias — grade cap when the block trend conflicts', () => {
   });
 });
 
-describe('trade permission is the Extra Check gate — separate from status/grade', () => {
+describe('Extended/F defer their Action to the Extra Check (not forced NO_TRADE)', () => {
   // The all-BUY workbook snapshot: score 95, grade F, status Extended, dir BUY.
   const EXTENDED_F = CASES[0].inputs;
 
@@ -260,6 +260,44 @@ describe('trade permission is the Extra Check gate — separate from status/grad
     const r = calculateBias(CASES[4].inputs, null);
     expect(r.grade).toBe('B');
     expect(r.targetNote).toBe('MED BUY');
+  });
+});
+
+describe('A/B/C/D keep the grade+alignment readiness Action (do NOT defer)', () => {
+  it('grade B with NOW aligned → Ready / TRADE', () => {
+    // CASES[4]: grade B, NOW BUY matches BUY score.
+    const r = calculateBias(CASES[4].inputs, null);
+    expect(r.grade).toBe('B');
+    expect(r.status).toBe('Ready');
+    expect(r.tradeAction).toBe('TRADE');
+  });
+
+  it('grade C with DEEP misaligned → Wait / WAIT', () => {
+    // CASES[3]: grade C, DEEP BULL but score SELL → not aligned.
+    const r = calculateBias(CASES[3].inputs, null);
+    expect(r.grade).toBe('C');
+    expect(r.status).toBe('Wait');
+    expect(r.tradeAction).toBe('WAIT');
+  });
+
+  it('grade C fully aligned → Scalp / TRADE', () => {
+    // CASES[5]: grade C, DEEP/DD aligned with the BUY score.
+    const r = calculateBias(CASES[5].inputs, null);
+    expect(r.grade).toBe('C');
+    expect(r.status).toBe('Scalp');
+    expect(r.tradeAction).toBe('TRADE');
+  });
+
+  it('a B grade does NOT defer to the Extra Check — its Action ignores 1H/15M', () => {
+    // Setting the extra check must not flip a graded readiness verdict to BUY/SELL.
+    const base = calculateBias(CASES[4].inputs, null);
+    const sell = calculateBias(CASES[4].inputs, { h1: -1, m15: -1 });
+    const buy  = calculateBias(CASES[4].inputs, { h1: 1, m15: 1 });
+    expect(base.tradeAction).toBe('TRADE');
+    expect(sell.tradeAction).toBe('TRADE'); // still TRADE, not SELL
+    expect(buy.tradeAction).toBe('TRADE');
+    // A/B/C/D Action is never PENDING/BUY/SELL/NO_TRADE — those are Extended/F only.
+    expect(['TRADE', 'WAIT']).toContain(base.tradeAction);
   });
 });
 

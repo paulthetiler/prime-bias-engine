@@ -20,11 +20,11 @@ import { InstallBanner } from '@/components/InstallApp';
 
 
 
-// A "wait-like" readiness status — the market isn't ready to act on yet. This is
-// the DESCRIPTIVE status (from the engine), kept separate from the Extra-Check
-// trade permission (tradeAction). Used by the "Hide WAIT" filter.
-const WAIT_STATUSES = ['Wait', 'Trend Off', 'Monitor', 'Dangerous'];
-const isWaitStatus = (status) => WAIT_STATUSES.includes(status);
+// Action buckets. A/B/C/D grades give TRADE / WAIT; Extended/F defer to the
+// Extra Check (PENDING → BUY / SELL / NO_TRADE). "Actionable" = an aligned A–D
+// trade or an Extra-Check-confirmed BUY/SELL; "waiting" = WAIT or PENDING.
+const ACTIONABLE = ['TRADE', 'BUY', 'SELL'];
+const WAITING = ['WAIT', 'PENDING'];
 
 function TrendPill({ label, dir, strength }) {
   return (
@@ -312,7 +312,7 @@ export default function Dashboard() {
   let analyses = Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId));
 
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
-  if (filters.filterHideWait) analyses = analyses.filter(a => !isWaitStatus(a.results?.status));
+  if (filters.filterHideWait) analyses = analyses.filter(a => !WAITING.includes(a.results?.tradeAction));
   if (filters.filterHideExtended) analyses = analyses.filter(a => !(a.results?.winningScore >= 90));
   if (filters.filterAlignedOnly) {
     analyses = analyses.filter(a => {
@@ -435,10 +435,10 @@ export default function Dashboard() {
         <span>{analyses.length} assets</span>
         {activeFilterCount > 0 && <span className="text-primary">(filtered)</span>}
         <span className="ml-auto text-emerald-600 dark:text-emerald-400 font-semibold">
-          {analyses.filter(a => ['BUY', 'SELL'].includes(a.results?.tradeAction)).length} CONFIRMED
+          {analyses.filter(a => ACTIONABLE.includes(a.results?.tradeAction)).length} TRADE
         </span>
         <span className="text-yellow-700 dark:text-yellow-400 font-semibold">
-          {analyses.filter(a => a.results?.tradeAction === 'PENDING').length} PENDING
+          {analyses.filter(a => WAITING.includes(a.results?.tradeAction)).length} WAIT
         </span>
       </div>
 
