@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
@@ -17,12 +17,13 @@ import { normalizeTrade } from '@/lib/tradeCompat';
 import {
   computePerformance, engineVersionsInScope, filterByEngineVersion,
   breakdown, breakdownByReasonTags, reconcile, tradeSummary,
-  tradingDrawdown, tradingEquityCurve, KEYERS,
+  tradingDrawdown, tradingEquityCurve, resolveFilterValue, KEYERS,
 } from '@/lib/performance';
 import PerformanceSummary from '@/components/journal/PerformanceSummary';
 import GradeAssetBreakdown from '@/components/journal/GradeAssetBreakdown';
 import BreakdownGroup from '@/components/journal/BreakdownGroup';
 import TradingEquityCurve from '@/components/journal/TradingEquityCurve';
+import EquityCurve from '@/components/journal/EquityCurve';
 
 const LEGACY = 'legacy-pre-snapshot';
 const engineVersionLabel = (v) => (v === LEGACY ? 'Legacy — pre-snapshot' : v);
@@ -99,6 +100,12 @@ export default function JournalStats() {
     () => [...new Set(windowTrades.map(t => t.instrument).filter(Boolean))].sort(),
     [windowTrades]
   );
+
+  // Never keep an invisible filter: when the account/date scope changes and the
+  // selected engine version / instrument no longer exists, reset it to 'all'. A
+  // still-valid selection is left untouched (functional setState bails out).
+  useEffect(() => { setEngineVersion(v => resolveFilterValue(v, versionsInScope)); }, [versionsInScope]);
+  useEffect(() => { setInstrument(v => resolveFilterValue(v, instrumentsInScope)); }, [instrumentsInScope]);
 
   // Analysis scope — the trade-quality set the Overview + all breakdowns use.
   const analysisTrades = useMemo(() => {
@@ -234,13 +241,12 @@ export default function JournalStats() {
             <Banner>This view combines {versionsInScope.length} engine versions ({versionsInScope.map(engineVersionLabel).join(', ')}). Grade/score comparisons mix different engine logic — pick one version above for valid engine analysis.</Banner>
           )}
 
-          {/* ── Overview ── */}
-          <SectionTitle>Overview</SectionTitle>
+          {/* ── Overview (trade analysis) ── */}
+          <SectionTitle sub="Trade analysis: selected account, period, engine version and instrument.">Overview</SectionTitle>
           <PerformanceSummary
-            stats={stats} perf={overview} series={series}
+            stats={stats} perf={overview}
             timeframe={timeframe} onTimeframe={setTimeframe}
-            roiPct={roi?.roiPct ?? null} openingBalance={openingBalance}
-            currentBalance={currentBalance} currency={scope.currency} monetaryEnabled={monetaryEnabled}
+            currency={scope.currency} monetaryEnabled={monetaryEnabled}
           />
           {monetaryEnabled && <TradingEquityCurve values={tradingCurve} currency={scope.currency} />}
           <GradeAssetBreakdown grades={grades} assets={assets} />
@@ -272,23 +278,27 @@ export default function JournalStats() {
             <BreakdownGroup title="Month" rows={behaviourBreakdowns.month} {...bgProps} />
           </div>
 
-          {/* ── Account & cashflow ── */}
-          <SectionTitle sub="Real account movement in this period. External cash (deposits/withdrawals/wages) is kept separate from trading P&L, and analysis filters above do not apply here.">Account &amp; cashflow</SectionTitle>
+          {/* ── Account & cashflow (account ledger) ── */}
+          <SectionTitle sub="Account ledger: selected account and period only. Engine-version and instrument filters do not apply here — cash movement is not per-engine. External cash (deposits/withdrawals/wages) is kept separate from trading P&L.">Account &amp; cashflow</SectionTitle>
           {monetaryEnabled && perf ? (
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-1.5 text-sm">
               <CashRow label="Opening balance" value={fmtMoney(perf.openingBalance, scope.currency)} />
               <CashRow label="Trading net P&L" value={fmtMoney(perf.netPnl, scope.currency)} tone={perf.netPnl > 0 ? 'up' : perf.netPnl < 0 ? 'down' : ''} />
+              <CashRow label="ROI (period)" value={roi?.roiPct == null ? '—' : `${roi.roiPct >= 0 ? '+' : '−'}${Math.abs(roi.roiPct).toFixed(1)}%`} tone={roi?.roiPct == null ? '' : roi.roiPct >= 0 ? 'up' : 'down'} />
               <CashRow label="Deposits" value={fmtMoney(perf.deposits, scope.currency)} />
               <CashRow label="Withdrawals" value={fmtMoney(perf.withdrawals ? -perf.withdrawals : 0, scope.currency)} />
               <CashRow label="Wage withdrawals" value={fmtMoney(perf.wages ? -perf.wages : 0, scope.currency)} />
               <CashRow label="Adjustments" value={fmtMoney(perf.adjustments, scope.currency)} />
               <div className="border-t border-border my-1" />
-              <CashRow label="Closing balance" value={fmtMoney(perf.closingBalance, scope.currency)} strong />
+              <CashRow label="Current balance" value={fmtMoney(currentBalance, scope.currency)} strong />
             </div>
           ) : (
             <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
               Money totals are unavailable for a mixed-currency scope. Pick a single account to see the ledger.
             </div>
+          )}
+          {monetaryEnabled && (
+            <EquityCurve series={series} hasPnl={stats.hasPnl} currentBalance={currentBalance} currency={scope.currency} />
           )}
 
           {/* Reconciliation */}

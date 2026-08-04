@@ -492,3 +492,22 @@ describe('sortBreakdownRows', () => {
     expect(input.map(r => r.key)).toEqual(['tiny', 'big', 'mid']);
   });
 });
+
+// ── Invalid-filter reset (phase 7 review) ───────────────────────────────────────
+import { resolveFilterValue } from './performance';
+
+describe('resolveFilterValue', () => {
+  it("keeps 'all' always", () => {
+    expect(resolveFilterValue('all', [])).toBe('all');
+    expect(resolveFilterValue('all', ['EUR/USD'])).toBe('all');
+  });
+  it('keeps a still-available selection', () => {
+    expect(resolveFilterValue('EUR/USD', ['EUR/USD', 'GOLD'])).toBe('EUR/USD');
+    expect(resolveFilterValue('prime-bias-current-v1', ['prime-bias-current-v1', 'legacy-pre-snapshot'])).toBe('prime-bias-current-v1');
+  });
+  it("falls back to 'all' when the selection is no longer available", () => {
+    expect(resolveFilterValue('GOLD', ['EUR/USD'])).toBe('all');
+    expect(resolveFilterValue('exp-v2', ['prime-bias-current-v1'])).toBe('all');
+    expect(resolveFilterValue('GOLD', [])).toBe('all');
+  });
+});

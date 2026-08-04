@@ -292,6 +292,20 @@ export function filterByEngineVersion(trades = [], version) {
   return trades.filter(t => engineVersionOf(t) === version);
 }
 
+/**
+ * Resolve a UI filter value against the currently-available options: 'all' always
+ * stays; a specific value stays only if it is still present, otherwise it falls
+ * back to 'all'. This lets the UI drop a filter that no longer exists after the
+ * account/date scope changes, so no invisible filter can remain active.
+ * @param {string} value  the current selection
+ * @param {string[]} available  the options currently offered
+ * @returns {string}
+ */
+export function resolveFilterValue(value, available = []) {
+  if (value === 'all') return 'all';
+  return available.includes(value) ? value : 'all';
+}
+
 // ── Breakdowns (generic grouping — no bespoke per-dimension maths) ──────────────
 
 function summaryRow(key, label, groupTrades) {

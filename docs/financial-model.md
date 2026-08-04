@@ -486,22 +486,30 @@ a view combines multiple engine versions, so `legacy-pre-snapshot` and
 The Performance page (`pages/JournalStats.jsx`) is organised into sections that
 consume `lib/performance.js` — **no metric is computed in a component**.
 
-### Sections
-- **Overview** — headline tiles (net P&L, ROI, win rate, profit factor, Avg R,
-  streaks via `computeStats`; Avg Win/Loss, expectancy, trading max drawdown,
-  wages, total pips, worst-loss streak via `computePerformance`/`tradeSummary`),
-  the **trading-equity curve** (`tradingEquityCurve`, excludes cashflows), the
-  cash **Account Balance** curve (clearly labelled as including deposits/
-  withdrawals), and the win-rate-by-grade chart.
+Each section carries an explicit **scope label** so no two adjacent tiles refer
+to different populations:
+
+- **Overview** — *trade-analysis scope* (selected account, period, engine
+  version and instrument). **Trade-performance tiles only**: net P&L, win rate,
+  profit factor, Avg R, streaks via `computeStats`; Avg Win/Loss, expectancy,
+  trading max drawdown, total pips, worst-loss streak via
+  `computePerformance`/`tradeSummary`. Followed by the **trading-equity curve**
+  (`tradingEquityCurve`, excludes cashflows) and the win-rate-by-grade chart.
+  ROI, opening/current balance, wages and the cash **Account Balance** curve are
+  **not** rendered here — they are account-wide (they ignore engine-version and
+  instrument filters), so they live in Account & cashflow instead.
 - **Engine performance** — `BreakdownGroup` for effective grade, raw grade, score
   band, engine version, Deep/DD/Now strength, alignment, engine direction, and
   traded-with/against-engine.
 - **Trade behaviour** — executed direction, instrument, mood, reason tags, hour,
   day, month.
-- **Account & cashflow** — opening/closing balance, trading net P&L, deposits,
-  ordinary withdrawals, wage withdrawals, adjustments, and a **reconciliation
-  panel** (expected vs rebuilt closing, difference, balanced/discrepancy; links
-  admins to `/admin/integrity` when it doesn't reconcile — no auto-repair).
+- **Account & cashflow** — *account-ledger scope* (selected account and period
+  only). Opening balance, trading net P&L, **ROI (period)**, deposits, ordinary
+  withdrawals, wage withdrawals, adjustments, **current balance**, the cash
+  **Account Balance** curve, and a **reconciliation panel** (expected vs rebuilt
+  closing, difference, balanced/discrepancy; links admins to `/admin/integrity`
+  when it doesn't reconcile — no auto-repair). The engine-version and instrument
+  filters deliberately do not apply here.
 
 ### Filters
 Account (chips), date period (chips: today/7/30/90/all), **engine version** and
@@ -528,6 +536,11 @@ default never promotes tiny samples; insufficient rows are muted and badged
   instrument filter, because point values aren't comparable across assets.
 - **Missing data** → `—`/empty-state hints, never a fake `0` (no trades,
   outcome-only, no risk, no account, no snapshot, no pips all handled).
+- **Stale filters can't hide data** → when an account or date change removes the
+  selected engine version or instrument from scope, the filter resets to *All*
+  (`resolveFilterValue` + `useEffect` on the in-scope lists). The selector also
+  disappears once only one value remains, so no invisible filter can silently
+  narrow the population.
 
 ### Mobile
 Single-column, `max-w-2xl`; metric cards in a 2/4 responsive grid; breakdown rows
