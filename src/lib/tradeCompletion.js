@@ -4,6 +4,7 @@
  */
 import { base44 } from '@/api/base44Client';
 import { calcAlignment } from '@/lib/alignmentUtils';
+import { createEngineSnapshot } from '@/lib/biasEngine';
 
 const ACTIVE_KEY = 'primebias_active';
 const LOCKS_KEY  = 'primebias_completed_locks'; // set of completed analysisIds
@@ -137,6 +138,16 @@ export async function completeTrade(analysis, result, details = {}) {
 
   // Save to DB
   const alignment = calcAlignment(results || {});
+
+  // Immutable engine snapshot. Built once here so BOTH the quick and detailed
+  // completion modals (which both route through completeTrade) persist an
+  // identical snapshot structure. Uses the resolved options the analysis was
+  // computed with — never the user's current settings — so this record is frozen.
+  const snapshot = createEngineSnapshot(results || {}, results?.resolvedOptions, {
+    extraCheck: extraCheck || null,
+    timestamp: timestamp || null,
+  });
+
   const record = await base44.entities.CompletedTrade.create({
     instrument,
     // Link back to the analysis session so other devices hide this analysis on
@@ -161,6 +172,15 @@ export async function completeTrade(analysis, result, details = {}) {
     extra_check_h1:   extraCheck?.h1 ?? null,
     extra_check_m15:  extraCheck?.m15 ?? null,
     inputs_snapshot:  inputs || {},
+    // Immutable engine snapshot (migration 0005). These freeze the exact ruleset
+    // and settings used, so this trade is never re-graded by later settings.
+    engine_version:      snapshot.engine_version,
+    engine_settings:     snapshot.engine_settings,
+    raw_grade:           snapshot.raw_grade,
+    buy_score:           snapshot.buy_score,
+    sell_score:          snapshot.sell_score,
+    timeframes_snapshot: snapshot.timeframes,
+    lights_result:       snapshot.lights_result,
     created_at:       timestamp || new Date().toISOString(),
     completed_at:     new Date().toISOString(),
     entry_price:      details.entry   ? parseFloat(details.entry)   : null,
