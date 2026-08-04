@@ -11,8 +11,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { gradeText } from '@/lib/gradeStyles';
-import { buildRestoredAnalysis, computeTradeFinancials } from '@/lib/tradeCompletion';
-import { withDerivedFinancials, hasFinancialResult } from '@/lib/accounts';
+import { buildRestoredAnalysis, updateCompletedTrade } from '@/lib/tradeCompletion';
+import { withDerivedFinancials, hasFinancialResult, activeAccounts } from '@/lib/accounts';
+import { ensureDefaultAccount } from '@/lib/accountData';
+import { computeNetPnl, financialCompletenessState, COMPLETENESS_LABEL, MOODS } from '@/lib/tradeFinancials';
+import { normalizeTrade } from '@/lib/tradeCompat';
 import { safeHttpUrl } from '@/lib/safeUrl';
 
 const resultColors = {
@@ -23,7 +26,7 @@ const resultColors = {
 };
 const resultLabels = { win: 'Win', loss: 'Loss', breakeven: 'B/E', not_taken: 'Not Taken' };
 
-function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onAddResult }) {
+function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onEdit }) {
   if (!trade) return null;
   const complete = hasFinancialResult(trade);
   const directional = trade.result === 'win' || trade.result === 'loss';
@@ -53,7 +56,8 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onAd
           {/* Key metrics */}
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             {[
-              { label: 'Direction', value: trade.direction, cls: trade.direction === 'BUY' ? 'text-emerald-400' : 'text-red-400' },
+              { label: 'Engine', value: trade.direction, cls: trade.direction === 'BUY' ? 'text-emerald-400' : 'text-red-400' },
+              { label: 'Taken', value: trade.trade_direction ? trade.trade_direction : '—', cls: 'capitalize' },
               { label: 'Grade', value: trade.grade, cls: gradeText(trade.grade) },
               { label: 'Score', value: trade.score, cls: 'text-foreground font-mono' },
               { label: 'Deep', value: trade.deep_trend, cls: '' },
@@ -85,9 +89,15 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onAd
           ) : directional && (
             <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3 flex items-center justify-between gap-2">
               <div className="text-xs text-muted-foreground">No monetary result recorded yet.</div>
-              <Button size="sm" className="gap-1.5 shrink-0" onClick={() => onAddResult(trade)}>Add result</Button>
+              <Button size="sm" className="gap-1.5 shrink-0" onClick={() => onEdit(trade)}>Add result</Button>
             </div>
           )}
+
+          {/* Completeness badge */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">{COMPLETENESS_LABEL[financialCompletenessState(trade)]}</span>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => onEdit(trade)}>Edit trade</Button>
+          </div>
 
           {trade.exit_reason && (
             <div><div className="text-xs text-muted-foreground mb-1">Exit Reason</div><p className="text-sm">{trade.exit_reason}</p></div>
@@ -121,55 +131,159 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onAd
   );
 }
 
-// Backfill the monetary result for a historic trade that was logged as a
-// win/loss before amounts were tracked. Positive input only — the outcome sets
-// the sign (see computeTradeFinancials).
-function AddResultModal({ trade, saving, onClose, onSave }) {
-  const [amount, setAmount] = useState('');
-  const [fees, setFees] = useState('');
-  const [risk, setRisk] = useState('');
+const EDIT_RESULTS = ['win', 'loss', 'breakeven', 'not_taken'];
+const editNum = 'w-full h-9 rounded-lg border border-input bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring';
+
+// Convert an ISO timestamp to the value a datetime-local input expects.
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Full journal edit of a completed trade's REALISED fields. The immutable engine
+// snapshot (grade, scores, timeframes, settings) is never shown or written here.
+function EditTradeModal({ trade, saving, onClose, onSave }) {
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['tradingAccounts'],
+    queryFn: () => ensureDefaultAccount(),
+    staleTime: 60_000,
+  });
+  const active = activeAccounts(accounts);
+
+  const [result, setResult] = useState(trade?.result || '');
+  const [grossPnl, setGrossPnl] = useState(trade?.gross_pnl ?? trade?.net_pnl ?? '');
+  const [fees, setFees] = useState(trade?.fees ?? '');
+  const [risk, setRisk] = useState(trade?.amount_risked ?? '');
+  const [accountId, setAccountId] = useState(trade?.account_id ?? '');
+  const [tradeDir, setTradeDir] = useState(trade?.trade_direction ?? '');
+  const [positionSize, setPositionSize] = useState(trade?.position_size ?? '');
+  const [pointsPips, setPointsPips] = useState(trade?.points_pips ?? '');
+  const [splitCount, setSplitCount] = useState(trade?.split_count ?? 1);
+  const [mood, setMood] = useState(trade?.mood ?? '');
+  const [notes, setNotes] = useState(trade?.notes ?? '');
+  const [entry, setEntry] = useState(trade?.entry_price ?? '');
+  const [exit, setExit] = useState(trade?.exit_price ?? '');
+  const [screenshotUrl, setScreenshotUrl] = useState(trade?.screenshot_url ?? '');
+  const [brokerEvidence, setBrokerEvidence] = useState(trade?.broker_evidence ?? '');
+  const [completedAt, setCompletedAt] = useState(toLocalInput(trade?.completed_at));
+
   if (!trade) return null;
-  const amountLabel = trade.result === 'loss' ? 'Amount lost' : 'Amount made';
+  const net = result === 'not_taken' ? null : computeNetPnl(grossPnl, fees);
+
+  const submit = () => onSave({
+    result,
+    grossPnl: result === 'not_taken' ? undefined : grossPnl,
+    fees, amountRisked: risk, accountId,
+    tradeDirection: result === 'not_taken' ? undefined : tradeDir,
+    positionSize, pointsPips, splitCount, mood, notes, entry, exit,
+    screenshotUrl, brokerEvidence,
+    completedAt: completedAt ? new Date(completedAt).toISOString() : undefined,
+  });
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="w-full max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl"
-        style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+      <div className="w-full max-w-md bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl overflow-y-auto"
+        style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))', maxHeight: 'calc(100vh - 120px)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-card px-4 py-3 border-b border-border flex items-center justify-between z-10">
           <div>
-            <div className="text-base font-bold">Add result</div>
-            <div className="text-xs text-muted-foreground font-mono">{trade.instrument} · {resultLabels[trade.result]}</div>
+            <div className="text-base font-bold">Edit trade</div>
+            <div className="text-xs text-muted-foreground font-mono">{trade.instrument} · engine {trade.direction} · grade {trade.grade}</div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3 text-sm">
           <div>
-            <label className="text-xs font-semibold block mb-1">
-              {amountLabel}
-              {trade.result === 'loss' && <span className="text-muted-foreground font-normal"> — enter a positive number</span>}
-            </label>
-            <input type="number" inputMode="decimal" min="0" step="any" value={amount} onChange={e => setAmount(e.target.value)}
-              placeholder="0.00" autoFocus
-              className="w-full h-11 rounded-lg border border-input bg-background px-3 text-base font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
+            <div className="text-xs text-muted-foreground mb-1">Result</div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {EDIT_RESULTS.map(r => (
+                <button key={r} onClick={() => setResult(r)}
+                  className={cn('rounded-lg border py-1.5 text-[11px] font-bold', result === r ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground')}>
+                  {resultLabels[r]}
+                </button>
+              ))}
+            </div>
           </div>
+
           <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Fees (optional)</label>
-              <input type="number" inputMode="decimal" min="0" step="any" value={fees} onChange={e => setFees(e.target.value)} placeholder="0.00"
-                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Risked (optional)</label>
-              <input type="number" inputMode="decimal" min="0" step="any" value={risk} onChange={e => setRisk(e.target.value)} placeholder="0.00"
-                className="w-full h-9 rounded-lg border border-input bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
+            <div><div className="text-xs text-muted-foreground mb-1">Gross P&L (loss = negative)</div>
+              <input type="number" step="any" value={grossPnl} onChange={e => setGrossPnl(e.target.value)} className={editNum} /></div>
+            <div><div className="text-xs text-muted-foreground mb-1">Fees / costs</div>
+              <input type="number" min="0" step="any" value={fees} onChange={e => setFees(e.target.value)} className={editNum} /></div>
+          </div>
+          <div className="rounded-lg border border-border bg-secondary/40 px-3 py-2 flex justify-between text-xs">
+            <span className="text-muted-foreground">Net P&L</span>
+            <span className={cn('font-mono font-bold', net == null ? 'text-muted-foreground' : net > 0 ? 'text-emerald-500' : net < 0 ? 'text-red-500' : '')}>{net == null ? '—' : net}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div><div className="text-xs text-muted-foreground mb-1">Amount risked</div>
+              <input type="number" min="0" step="any" value={risk} onChange={e => setRisk(e.target.value)} className={editNum} /></div>
+            <div><div className="text-xs text-muted-foreground mb-1">Account</div>
+              <select value={accountId} onChange={e => setAccountId(e.target.value)} className={editNum}>
+                <option value="">Unassigned</option>
+                {active.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}
+              </select></div>
+          </div>
+
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Trade taken (engine bias: {trade.direction})</div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {['long', 'short', ''].map(d => (
+                <button key={d || 'none'} onClick={() => setTradeDir(d)}
+                  className={cn('rounded-lg border py-1.5 text-xs font-semibold capitalize', tradeDir === d ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground')}>
+                  {d || '—'}
+                </button>
+              ))}
             </div>
           </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div><div className="text-xs text-muted-foreground mb-1">Position size</div>
+              <input type="number" min="0" step="any" value={positionSize} onChange={e => setPositionSize(e.target.value)} className={editNum} /></div>
+            <div><div className="text-xs text-muted-foreground mb-1">Points / pips</div>
+              <input type="number" step="any" value={pointsPips} onChange={e => setPointsPips(e.target.value)} className={editNum} /></div>
+            <div><div className="text-xs text-muted-foreground mb-1">Split count</div>
+              <input type="number" min="1" step="1" value={splitCount} onChange={e => setSplitCount(e.target.value)} className={editNum} /></div>
+          </div>
+
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Mood</div>
+            <div className="flex flex-wrap gap-1.5">
+              {MOODS.map(m => (
+                <button key={m} onClick={() => setMood(mood === m ? '' : m)}
+                  className={cn('px-2.5 py-1 rounded-full border text-xs font-semibold capitalize', mood === m ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-secondary text-muted-foreground')}>
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div><div className="text-xs text-muted-foreground mb-1">Entry price</div>
+              <input type="number" step="any" value={entry} onChange={e => setEntry(e.target.value)} className={editNum} /></div>
+            <div><div className="text-xs text-muted-foreground mb-1">Exit price</div>
+              <input type="number" step="any" value={exit} onChange={e => setExit(e.target.value)} className={editNum} /></div>
+          </div>
+
+          <div><div className="text-xs text-muted-foreground mb-1">Completed at</div>
+            <input type="datetime-local" value={completedAt} onChange={e => setCompletedAt(e.target.value)} className={editNum} /></div>
+
+          <div><div className="text-xs text-muted-foreground mb-1">Why / notes</div>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none" /></div>
+
+          <div><div className="text-xs text-muted-foreground mb-1">Evidence</div>
+            <input type="url" value={screenshotUrl} onChange={e => setScreenshotUrl(e.target.value)} placeholder="Screenshot URL" className={cn(editNum, 'mb-2')} />
+            <textarea value={brokerEvidence} onChange={e => setBrokerEvidence(e.target.value)} rows={2} placeholder="Paste broker history text (evidence only — never auto-imported)"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none" /></div>
+
           <div className="flex gap-3 pt-1">
             <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button className="flex-1" disabled={saving || amount === ''} onClick={() => onSave({ amount, fees, risk })}>Save result</Button>
+            <Button className="flex-1" disabled={saving} onClick={submit}>{saving ? 'Saving…' : 'Save changes'}</Button>
           </div>
         </div>
       </div>
@@ -188,13 +302,13 @@ export default function TradeHistory() {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ result: '', grade: '', direction: '', asset: '' });
 
-  const [addResultFor, setAddResultFor] = useState(null);
+  const [editing, setEditing] = useState(null);
 
   const { data: rawTrades = [], isLoading } = useQuery({
     queryKey: ['completedTrades'],
     queryFn: () => base44.entities.CompletedTrade.filter({ status: 'completed' }, '-completed_at', 200),
   });
-  const trades = rawTrades.map(withDerivedFinancials);
+  const trades = rawTrades.map(t => normalizeTrade(withDerivedFinancials(t)));
 
 
 
@@ -243,22 +357,27 @@ export default function TradeHistory() {
     toast.success('Trade deleted');
   };
 
-  const handleAddResult = (trade) => {
+  const handleEdit = (trade) => {
     setSelected(null);
-    setAddResultFor(trade);
+    setEditing(trade);
   };
 
-  const saveResult = async ({ amount, fees, risk }) => {
-    if (!addResultFor) return;
-    const { grossPnl, fees: feeVal, netPnl, amountRisked } = computeTradeFinancials({
-      result: addResultFor.result, amount, fees, amountRisked: risk,
-    });
-    await updateMutation.mutateAsync({
-      id: addResultFor.id,
-      data: { gross_pnl: grossPnl, fees: feeVal, net_pnl: netPnl, amount_risked: amountRisked, pnl: netPnl },
-    });
-    setAddResultFor(null);
-    toast.success('Result added');
+  // Journal edit: updates the intended row via the shared realised-fields model.
+  // The immutable engine snapshot is never included, so it cannot be overwritten.
+  const editMutation = useMutation({
+    mutationFn: /** @param {{ id: string, details: any }} vars */ ({ id, details }) => updateCompletedTrade(id, details),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['completedTrades'] });
+      queryClient.invalidateQueries({ queryKey: ['tradingAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['accountTransactions'] });
+    },
+  });
+
+  const saveEdit = async (details) => {
+    if (!editing) return;
+    await editMutation.mutateAsync({ id: editing.id, details });
+    setEditing(null);
+    toast.success('Trade updated');
   };
 
   const assets = [...new Set(trades.map(t => t.instrument))].sort();
@@ -418,16 +537,16 @@ export default function TradeHistory() {
           onRestore={handleRestore}
           onArchive={handleArchive}
           onDelete={handleDelete}
-          onAddResult={handleAddResult}
+          onEdit={handleEdit}
         />
       )}
 
-      {addResultFor && (
-        <AddResultModal
-          trade={addResultFor}
-          saving={updateMutation.isPending}
-          onClose={() => setAddResultFor(null)}
-          onSave={saveResult}
+      {editing && (
+        <EditTradeModal
+          trade={editing}
+          saving={editMutation.isPending}
+          onClose={() => setEditing(null)}
+          onSave={saveEdit}
         />
       )}
 

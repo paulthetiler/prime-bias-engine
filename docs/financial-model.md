@@ -219,3 +219,76 @@ predate these columns — `position_size: null`, `points_pips: null`,
 `engine_version: 'legacy-pre-snapshot'` — **without writing them back**. Invalid
 values normalise to `null`/safe defaults, never to `0`. `isWageWithdrawal`
 identifies wages solely by the explicit new type.
+
+## 8. Trade-capture semantics (Wage Maker integration, phase 4)
+
+All completion/edit maths funnels through `lib/tradeFinancials.js`; all writes
+funnel through `lib/tradeCompletion.js` (`buildRealisedFields` → `completeTrade` /
+`updateCompletedTrade`), so quick completion, detailed completion, "Add result"
+and journal editing can never store different financial meanings.
+
+### Gross / fees / net
+- **Gross P&L** is entered **directly and signed** — a loss is a negative number.
+- **Fees / costs** are a positive cost.
+- **Net P&L = gross − fees.** A loss with fees becomes *more* negative
+  (e.g. gross −£100, fees £5 → net −£105).
+- The user never enters both gross and net; net is always derived.
+- A trade fee is **never** written as an account adjustment.
+- A win/loss with no gross stays financially incomplete (`net_pnl` null, not
+  invented); break-even is complete (`net_pnl = 0`, or `−fees`).
+
+### Result consistency
+When a net P&L exists it is **authoritative**: the persisted `result` is set to
+match it (`reconcileResult`) and the UI shows a message if it differs from the
+user's selection (auto-correct policy, chosen over blocking). With no financial
+data, the user's selected outcome stands.
+
+### Executed direction
+The completion/edit UI distinguishes **engine bias** (`direction`, BUY/SELL) from
+**trade taken** (`trade_direction`, long/short). Trading against the engine is
+saved truthfully. `direction` is never overwritten.
+
+### Previews (never persisted unless entered)
+- Projected balance = balance before + net P&L (balance before = the selected
+  account's current calculated balance).
+- Risk % = amount risked / balance before × 100.
+- Realised R = net P&L / amount risked (true R, not the workbook's P&L/invested).
+- Estimated points = net P&L / position size — shown **clearly labelled**; only
+  persisted if the user taps "Use" (or types points explicitly).
+
+### Split count
+`split_count` is the number of entries grouped into one completed trade
+(default 1, positive integers). P&L, risk and pips are the **total** realised
+result for the group — the app never multiplies them by the split count.
+
+### Financial-completeness state (derived, no DB column)
+`financialCompletenessState`: `outcome_only` → `account_unassigned` →
+`risk_incomplete` → `complete`. Surfaced as a badge in Trade History.
+
+### Duplicate protection
+Completion is keyed on the **stable `analysis_id`**, not instrument+date. Before
+inserting, `completeTrade` looks for a non-archived completed trade with the same
+`analysis_id`; if found it **updates** that row (realised fields only — the
+engine snapshot is never part of the update) instead of inserting a duplicate.
+Journal edits go through `updateCompletedTrade(id, …)`, always updating the
+intended row by id, so an edit can never create a new trade. Restoring an
+analysis mints a fresh `analysis_id`, so re-completing a restored card is the
+explicit "new trade" path.
+
+> **Deferred (needs a decision):** a hard, DB-level guarantee would be a unique
+> index on `completed_trade(user_id, analysis_id)`. It is **not** added here
+> because creating it can fail if any pre-existing duplicate rows exist, so it
+> needs a de-duplication pass first. The current app-level guard is the durable
+> protection for the single-user model until that decision is made.
+
+### Evidence capture
+Screenshots use `screenshot_url`; pasted broker-history text uses
+`broker_evidence` (migration `0008`). Evidence is stored **raw** — no value is
+auto-extracted into the financial ledger, and any future extraction must pass
+through explicit user confirmation before populating money fields.
+
+### Immutable engine snapshot
+Editing realised/journal fields never writes the engine-snapshot columns
+(`engine_version`, `engine_settings`, `raw_grade`, `buy_score`, `sell_score`,
+`timeframes_snapshot`, `grade`, `score`, `inputs_snapshot`, …), so the original
+analysis is preserved byte-for-byte across edits.
