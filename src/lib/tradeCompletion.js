@@ -5,6 +5,10 @@
 import { base44 } from '@/api/base44Client';
 import { calcAlignment } from '@/lib/alignmentUtils';
 import { createEngineSnapshot } from '@/lib/biasEngine';
+import {
+  computeNetPnl, nonNegMoney, reconcileResult, normalizeMood,
+  normalizeSplitCount, normalizeReasonTags, normalizeTradeDirection, finiteOrNull,
+} from '@/lib/tradeFinancials';
 
 const ACTIVE_KEY = 'primebias_active';
 const LOCKS_KEY  = 'primebias_completed_locks'; // set of completed analysisIds
@@ -67,46 +71,103 @@ export function unlockAnalysis(analysisId) {
 
 // ── Financial result ─────────────────────────────────────────────────────────
 
-function toNonNegNumber(v) {
-  if (v == null || v === '') return null;
-  const n = Math.abs(parseFloat(v));
-  return Number.isFinite(n) ? n : null;
-}
-
 function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
 /**
- * Turn the quick-entry inputs into stored money columns. The user always enters
- * a POSITIVE magnitude; the sign comes from the outcome, so nobody types a minus:
- *   - win        → gross = +amount
- *   - loss       → gross = −amount
- *   - breakeven  → gross = 0 (amount ignored)
- * net = gross − fees. When a win/loss has no amount entered the result is left
- * financially INCOMPLETE (net_pnl = null) rather than invented. `not_taken` and
- * unknown outcomes carry no financials.
- * @param {{ result?: string, amount?: any, fees?: any, amountRisked?: any }} input
+ * Turn the money inputs into stored columns using the authoritative gross/fees
+ * model: gross P&L is entered DIRECTLY and signed (a loss is negative), fees are
+ * a positive cost, and net = gross − fees. Net P&L is authoritative, so the
+ * caller reconciles the stored result from it:
+ *   net > 0 → win · net < 0 → loss · net === 0 → breakeven · net == null → keep outcome.
+ *
+ * A win/loss with no gross stays financially INCOMPLETE (net null, not invented).
+ * Break-even asserts a FLAT market (gross 0): with no money entered at all it
+ * stays outcome-only (net null); but once fees are present, a scratch-at-entry
+ * trade is a small realised LOSS (net = −fees) — it does NOT remain breakeven.
+ * @param {{ result?: string, grossPnl?: any, fees?: any, amountRisked?: any }} input
  * @returns {{ grossPnl: number|null, fees: number|null, netPnl: number|null, amountRisked: number|null }}
  */
-export function computeTradeFinancials({ result, amount, fees, amountRisked } = {}) {
-  const feeNum = toNonNegNumber(fees);
-  const riskNum = toNonNegNumber(amountRisked);
-  const amtNum = toNonNegNumber(amount);
+export function computeTradeFinancials({ result, grossPnl, fees, amountRisked } = {}) {
+  const feeNum = nonNegMoney(fees);
+  const riskNum = nonNegMoney(amountRisked);
+  const grossNum = finiteOrNull(grossPnl);
 
   if (result === 'breakeven') {
-    const gross = 0;
-    return { grossPnl: gross, fees: feeNum, netPnl: round2(gross - (feeNum ?? 0)), amountRisked: riskNum };
-  }
-  if (result === 'win' || result === 'loss') {
-    if (amtNum == null) {
-      // No monetary amount → financially incomplete (do not invent a value).
-      return { grossPnl: null, fees: feeNum, netPnl: null, amountRisked: riskNum };
+    // No money at all → outcome-only breakeven (do not invent a 0 result).
+    if (grossNum == null && feeNum == null) {
+      return { grossPnl: null, fees: null, netPnl: null, amountRisked: riskNum };
     }
-    const gross = result === 'loss' ? -amtNum : amtNum;
-    return { grossPnl: round2(gross), fees: feeNum, netPnl: round2(gross - (feeNum ?? 0)), amountRisked: riskNum };
+    // Flat market: gross defaults to 0, so fees make the net negative (a loss).
+    const gross = grossNum ?? 0;
+    return { grossPnl: gross, fees: feeNum, netPnl: computeNetPnl(gross, feeNum), amountRisked: riskNum };
   }
-  return { grossPnl: null, fees: null, netPnl: null, amountRisked: riskNum };
+  if (grossNum == null) {
+    // No gross P&L entered → financially incomplete (do not invent a value).
+    return { grossPnl: null, fees: feeNum, netPnl: null, amountRisked: riskNum };
+  }
+  return { grossPnl: round2(grossNum), fees: feeNum, netPnl: computeNetPnl(grossNum, feeNum), amountRisked: riskNum };
+}
+
+/**
+ * Build the REALISED-trade DB columns shared by every write path (quick/detailed
+ * completion, "Add result", journal edit) so no two paths can store different
+ * financial meanings. Produces only realised fields — never engine-snapshot
+ * columns — so callers that edit an existing trade cannot touch its frozen
+ * analysis. The persisted `result` is reconciled against net P&L (net is
+ * authoritative when present; otherwise the selected outcome stands).
+ * @param {any} details
+ * @returns {Record<string, any>}
+ */
+export function buildRealisedFields(details = {}) {
+  const { grossPnl, fees, netPnl, amountRisked } = computeTradeFinancials({
+    result: details.result,
+    grossPnl: details.grossPnl,
+    fees: details.fees,
+    amountRisked: details.amountRisked,
+  });
+  const result = reconcileResult(details.result, netPnl).result;
+  return {
+    result,
+    gross_pnl:       grossPnl,
+    fees,
+    net_pnl:         netPnl,
+    amount_risked:   amountRisked,
+    pnl:             netPnl, // legacy mirror kept in sync on every write
+    account_id:      details.accountId || null,
+    trade_direction: normalizeTradeDirection(details.tradeDirection),
+    position_size:   nonNegMoney(details.positionSize),
+    points_pips:     finiteOrNull(details.pointsPips),
+    split_count:     normalizeSplitCount(details.splitCount),
+    mood:            normalizeMood(details.mood),
+    reason_tags:     details.reasonTags == null ? null : normalizeReasonTags(details.reasonTags),
+    notes:           details.notes || null,
+    exit_reason:     details.exitReason || null,
+    entry_price:     details.entry ? parseFloat(details.entry) : null,
+    exit_price:      details.exit ? parseFloat(details.exit) : null,
+    screenshot_url:  details.screenshotUrl || null,
+    broker_evidence: details.brokerEvidence || null,
+  };
+}
+
+/**
+ * Find an existing NON-archived completed trade for an analysis session. Used for
+ * duplicate protection keyed on the stable analysis_id. Tolerant of a data layer
+ * without `filter` (returns null → caller inserts).
+ * @param {string} analysisId
+ * @returns {Promise<any|null>}
+ */
+async function findCompletedByAnalysisId(analysisId) {
+  if (!analysisId) return null;
+  try {
+    const rows = await base44.entities.CompletedTrade.filter(
+      { analysis_id: analysisId, status: 'completed' }, '-completed_at', 1
+    );
+    return rows && rows.length ? rows[0] : null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Main completion function ──────────────────────────────────────────────────
@@ -127,35 +188,28 @@ export async function completeTrade(analysis, result, details = {}) {
 
   const id = analysisId || generateAnalysisId(instrument);
 
-  // Realised money result. The user enters positive magnitudes; sign + net are
-  // derived here so no minus symbols are ever required in the UI.
-  const { grossPnl, fees, netPnl, amountRisked } = computeTradeFinancials({
-    result,
-    amount: details.amount,
-    fees: details.fees,
-    amountRisked: details.amountRisked,
-  });
+  // Realised-trade columns, built via the SHARED model so quick and detailed
+  // completion (and later edits) always store identical financial meanings.
+  const realised = buildRealisedFields({ ...details, result });
 
-  // Save to DB
   const alignment = calcAlignment(results || {});
 
-  // Immutable engine snapshot. Built once here so BOTH the quick and detailed
-  // completion modals (which both route through completeTrade) persist an
-  // identical snapshot structure. Uses the resolved options the analysis was
+  // Immutable engine snapshot. Built once here so every completion route persists
+  // an identical snapshot structure. Uses the resolved options the analysis was
   // computed with — never the user's current settings — so this record is frozen.
   const snapshot = createEngineSnapshot(results || {}, results?.resolvedOptions, {
     extraCheck: extraCheck || null,
     timestamp: timestamp || null,
   });
 
-  const record = await base44.entities.CompletedTrade.create({
+  // Engine-analysis fields — written ONLY on insert, never on the duplicate-guard
+  // update path, so an already-recorded analysis is never re-graded.
+  const engineFields = {
     instrument,
     // Link back to the analysis session so other devices hide this analysis on
     // the Summary instead of resurrecting it during hydration (see biasSync).
-    // Requires migration 0003 (completed_trade.analysis_id).
-    analysis_id: id,
-    status: 'completed',
-    result,
+    analysis_id:      id,
+    status:           'completed',
     direction:        results?.mainDirection,
     grade:            results?.grade,
     trade_status:     results?.status,
@@ -172,8 +226,7 @@ export async function completeTrade(analysis, result, details = {}) {
     extra_check_h1:   extraCheck?.h1 ?? null,
     extra_check_m15:  extraCheck?.m15 ?? null,
     inputs_snapshot:  inputs || {},
-    // Immutable engine snapshot (migration 0005). These freeze the exact ruleset
-    // and settings used, so this trade is never re-graded by later settings.
+    // Immutable engine snapshot (migration 0005).
     engine_version:      snapshot.engine_version,
     engine_settings:     snapshot.engine_settings,
     raw_grade:           snapshot.raw_grade,
@@ -181,27 +234,46 @@ export async function completeTrade(analysis, result, details = {}) {
     sell_score:          snapshot.sell_score,
     timeframes_snapshot: snapshot.timeframes,
     lights_result:       snapshot.lights_result,
-    created_at:       timestamp || new Date().toISOString(),
-    completed_at:     new Date().toISOString(),
-    entry_price:      details.entry   ? parseFloat(details.entry)   : null,
-    exit_price:       details.exit    ? parseFloat(details.exit)    : null,
-    // Account-led financial result. `net_pnl` is authoritative; `pnl` is kept in
-    // sync so any legacy reader still sees the same number.
-    account_id:       details.accountId || null,
-    gross_pnl:        grossPnl,
-    fees,
-    net_pnl:          netPnl,
-    amount_risked:    amountRisked,
-    pnl:              netPnl,
-    exit_reason:      details.exitReason || null,
-    notes:            details.notes       || null,
-    screenshot_url:   details.screenshotUrl || null,
-  });
+    created_at:          timestamp || new Date().toISOString(),
+  };
+
+  // Duplicate protection: an analysis session maps to at most one completed
+  // trade. If this stable analysis_id already has a non-archived completed row,
+  // UPDATE its realised fields instead of inserting a second row — completing the
+  // same analysis twice must never silently create a duplicate. The engine
+  // snapshot is deliberately not part of the update, so it stays frozen.
+  const existing = await findCompletedByAnalysisId(id);
+  const record = existing
+    ? await base44.entities.CompletedTrade.update(existing.id, {
+        ...realised,
+        completed_at: existing.completed_at || new Date().toISOString(),
+      })
+    : await base44.entities.CompletedTrade.create({
+        ...engineFields,
+        ...realised,
+        completed_at: new Date().toISOString(),
+      });
 
   // Lock this analysisId
   lockAnalysis(id);
 
   return record;
+}
+
+/**
+ * Update the REALISED fields of an existing completed trade (journal edit / "Add
+ * result"). Writes only realised columns via the shared model, so the immutable
+ * engine snapshot is never recalculated or overwritten, and always updates the
+ * intended row by id — an edit can never create a new trade.
+ * @param {string} id  the completed_trade id
+ * @param {any} details  realised-field inputs (see buildRealisedFields)
+ * @returns {Promise<any>} the updated record
+ */
+export async function updateCompletedTrade(id, details = {}) {
+  if (!id) throw new Error('No trade id');
+  const patch = buildRealisedFields(details);
+  if (details.completedAt) patch.completed_at = details.completedAt;
+  return base44.entities.CompletedTrade.update(id, patch);
 }
 
 /**

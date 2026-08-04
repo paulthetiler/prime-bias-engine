@@ -9,6 +9,7 @@
 // `lib/accounts.js`, which understands deposits/withdrawals.
 
 import { hasFinancialResult } from './accounts';
+import { realisedR } from './tradeFinancials';
 
 /** @typedef {{ id: string, label: string, days: number|null }} TimeFilter */
 
@@ -82,10 +83,8 @@ export function filterByTimeframe(records, filterId, now = Date.now()) {
  * @returns {number|null}
  */
 export function rMultiple(trade) {
-  const risk = Number(trade?.amount_risked);
-  if (!Number.isFinite(risk) || risk <= 0) return null;
   if (!hasFinancialResult(trade)) return null;
-  return Number(trade.net_pnl) / risk;
+  return realisedR(trade?.net_pnl, trade?.amount_risked);
 }
 
 const isDirectional = (t) => t?.result === 'win' || t?.result === 'loss';

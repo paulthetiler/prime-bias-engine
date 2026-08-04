@@ -1,11 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const createCompleted = vi.fn();
+const updateCompleted = vi.fn();
+const filterCompleted = vi.fn();
 
 vi.mock('@/api/base44Client', () => ({
   base44: {
     entities: {
-      CompletedTrade: { create: (...a) => createCompleted(...a), delete: vi.fn() },
+      CompletedTrade: {
+        create: (...a) => createCompleted(...a),
+        update: (...a) => updateCompleted(...a),
+        filter: (...a) => filterCompleted(...a),
+        delete: vi.fn(),
+      },
     },
   },
 }));
@@ -13,7 +20,9 @@ vi.mock('@/api/base44Client', () => ({
 const {
   buildRestoredAnalysis,
   completeTrade,
+  updateCompletedTrade,
   computeTradeFinancials,
+  buildRealisedFields,
   isAnalysisLocked,
   lockAnalysis,
   resolveAnalysisIdForEdit,
@@ -36,7 +45,13 @@ const dashboardVisible = (analyses) => analyses.filter((a) => !isAnalysisLocked(
 beforeEach(() => {
   localStorage.clear();
   createCompleted.mockReset();
-  createCompleted.mockResolvedValue({ id: 'ct-new' });
+  updateCompleted.mockReset();
+  filterCompleted.mockReset();
+  // Echo the written payload back so callers can read the saved record.
+  createCompleted.mockImplementation(async (payload) => ({ id: 'ct-new', ...payload }));
+  updateCompleted.mockImplementation(async (id, payload) => ({ id, ...payload }));
+  // Default: no existing completed trade for this analysis (no duplicate).
+  filterCompleted.mockResolvedValue([]);
 });
 
 describe('buildRestoredAnalysis', () => {
@@ -138,45 +153,116 @@ describe('restore → complete workflow', () => {
   });
 });
 
-describe('computeTradeFinancials', () => {
-  it('a win banks the amount as a positive net (minus fees)', () => {
-    expect(computeTradeFinancials({ result: 'win', amount: 200, fees: 5 }))
+describe('computeTradeFinancials (gross/fees model)', () => {
+  it('a positive gross minus fees gives a positive net', () => {
+    expect(computeTradeFinancials({ result: 'win', grossPnl: 200, fees: 5 }))
       .toEqual({ grossPnl: 200, fees: 5, netPnl: 195, amountRisked: null });
   });
 
-  it('a loss stores a negative net from a POSITIVE input (no minus typed)', () => {
-    expect(computeTradeFinancials({ result: 'loss', amount: 150 }))
+  it('a signed negative gross deepens with fees', () => {
+    expect(computeTradeFinancials({ result: 'loss', grossPnl: -150 }))
       .toEqual({ grossPnl: -150, fees: null, netPnl: -150, amountRisked: null });
-    // fees deepen the loss
-    expect(computeTradeFinancials({ result: 'loss', amount: 150, fees: 10 }).netPnl).toBe(-160);
-    // a stray minus in the input is ignored — magnitude is used
-    expect(computeTradeFinancials({ result: 'loss', amount: -150 }).netPnl).toBe(-150);
+    // gross -100, fees 5 → net -105 (the documented example)
+    expect(computeTradeFinancials({ result: 'loss', grossPnl: -100, fees: 5 }).netPnl).toBe(-105);
   });
 
-  it('break-even is net 0 (or -fees) regardless of amount', () => {
-    expect(computeTradeFinancials({ result: 'breakeven', amount: 999 }).netPnl).toBe(0);
+  it('break-even with no money is outcome-only (net null); fees make it a loss', () => {
+    // No gross, no fees → a pure scratch, financially incomplete.
+    expect(computeTradeFinancials({ result: 'breakeven' }).netPnl).toBeNull();
+    // gross 0, fees 0 → a genuine flat, complete break-even.
+    expect(computeTradeFinancials({ result: 'breakeven', grossPnl: 0, fees: 0 }).netPnl).toBe(0);
+    // fees on a flat market → negative net (a loss).
+    expect(computeTradeFinancials({ result: 'breakeven', grossPnl: 0, fees: 5 }).netPnl).toBe(-5);
     expect(computeTradeFinancials({ result: 'breakeven', fees: 3 }).netPnl).toBe(-3);
   });
 
-  it('a win/loss with no amount stays financially incomplete (net_pnl null)', () => {
+  it('a win/loss with no gross entered stays financially incomplete (net null)', () => {
     expect(computeTradeFinancials({ result: 'win' }).netPnl).toBeNull();
-    expect(computeTradeFinancials({ result: 'loss', amount: '' }).netPnl).toBeNull();
+    expect(computeTradeFinancials({ result: 'loss', grossPnl: '' }).netPnl).toBeNull();
   });
 
-  it('carries amount risked through when provided', () => {
-    expect(computeTradeFinancials({ result: 'win', amount: 100, amountRisked: 50 }).amountRisked).toBe(50);
+  it('carries amount risked through, as a non-negative magnitude', () => {
+    expect(computeTradeFinancials({ result: 'win', grossPnl: 100, amountRisked: 50 }).amountRisked).toBe(50);
+  });
+});
+
+describe('buildRealisedFields — shared write model', () => {
+  it('maps every realised column and mirrors pnl to net', () => {
+    const f = buildRealisedFields({
+      result: 'win', grossPnl: 200, fees: 5, amountRisked: 100, accountId: 'acc-1',
+      tradeDirection: 'long', positionSize: 0.5, pointsPips: 12, splitCount: 2,
+      mood: 'calm', notes: 'clean', reasonTags: ['trend'],
+    });
+    expect(f).toMatchObject({
+      result: 'win', gross_pnl: 200, fees: 5, net_pnl: 195, pnl: 195,
+      amount_risked: 100, account_id: 'acc-1', trade_direction: 'long',
+      position_size: 0.5, points_pips: 12, split_count: 2, mood: 'calm',
+      notes: 'clean', reason_tags: ['trend'],
+    });
   });
 
-  it('not_taken carries no financials', () => {
-    expect(computeTradeFinancials({ result: 'not_taken', amount: 100 }))
-      .toEqual({ grossPnl: null, fees: null, netPnl: null, amountRisked: null });
+  it('reconciles the result to match net P&L (net is authoritative)', () => {
+    // Selected WIN but the money says a loss → stored as loss.
+    expect(buildRealisedFields({ result: 'win', grossPnl: -50 }).result).toBe('loss');
+    // Selected LOSS but the money says a win → stored as win.
+    expect(buildRealisedFields({ result: 'loss', grossPnl: 80, fees: 5 }).result).toBe('win');
+    // Zero net → breakeven.
+    expect(buildRealisedFields({ result: 'win', grossPnl: 0 }).result).toBe('breakeven');
+  });
+
+  it('keeps the selected result when there is no financial data', () => {
+    expect(buildRealisedFields({ result: 'loss' }).result).toBe('loss');
+    expect(buildRealisedFields({ result: 'win' }).net_pnl).toBeNull();
+  });
+
+  // Authoritative reconciliation rule (review of PR #18):
+  //   net>0→win · net<0→loss · net===0→breakeven · net==null→keep selected.
+  it('1) gross 0, fees 0 → breakeven (net 0)', () => {
+    const f = buildRealisedFields({ result: 'breakeven', grossPnl: 0, fees: 0 });
+    expect(f.net_pnl).toBe(0);
+    expect(f.result).toBe('breakeven');
+  });
+
+  it('2) gross 0, fees 5 → loss (net -5)', () => {
+    const f = buildRealisedFields({ result: 'breakeven', grossPnl: 0, fees: 5 });
+    expect(f.net_pnl).toBe(-5);
+    expect(f.result).toBe('loss');
+  });
+
+  it('3) selected breakeven + gross 0 + fees 5 → auto-corrected to loss (changed)', () => {
+    // The stored result differs from the selection, which is what drives the
+    // visible "saved as LOSS" message in the UI.
+    expect(reconcileResult('breakeven', -5)).toEqual({ result: 'loss', changed: true });
+    expect(buildRealisedFields({ result: 'breakeven', grossPnl: 0, fees: 5 }).result).toBe('loss');
+  });
+
+  it('4) selected breakeven with no financial values → stays outcome-only breakeven', () => {
+    const f = buildRealisedFields({ result: 'breakeven' });
+    expect(f.net_pnl).toBeNull();
+    expect(f.result).toBe('breakeven');
+  });
+
+  it('5) selected win with net 0 → corrected to breakeven', () => {
+    expect(buildRealisedFields({ result: 'win', grossPnl: 0 }).result).toBe('breakeven');
+  });
+
+  it('6) selected loss with positive net → corrected to win', () => {
+    expect(buildRealisedFields({ result: 'loss', grossPnl: 80, fees: 5 }).result).toBe('win');
+  });
+
+  it('normalises invalid detail values to null/safe defaults (never 0)', () => {
+    const f = buildRealisedFields({ result: 'win', grossPnl: 10, splitCount: 0, mood: 'zen', tradeDirection: 'sideways' });
+    expect(f.split_count).toBe(1);      // invalid → safe default 1
+    expect(f.mood).toBeNull();          // unknown mood → null
+    expect(f.trade_direction).toBeNull(); // unknown direction → null
+    expect(f.position_size).toBeNull(); // absent → null, not 0
   });
 });
 
 describe('completeTrade financial persistence', () => {
   it('writes account_id, gross/net/fees/risk and keeps legacy pnl in sync', async () => {
     const analysis = { instrument: 'EUR/USD', results: {}, analysisId: 'EUR/USD-2026-01-01-000000-x' };
-    await completeTrade(analysis, 'loss', { amount: 80, fees: 4, amountRisked: 40, accountId: 'acc-9' });
+    await completeTrade(analysis, 'loss', { grossPnl: -80, fees: 4, amountRisked: 40, accountId: 'acc-9' });
     const payload = createCompleted.mock.calls.at(-1)[0];
     expect(payload.account_id).toBe('acc-9');
     expect(payload.gross_pnl).toBe(-80);
@@ -185,10 +271,93 @@ describe('completeTrade financial persistence', () => {
     expect(payload.amount_risked).toBe(40);
     expect(payload.pnl).toBe(-84); // legacy column mirrors net_pnl
   });
+
+  it('persists executed direction, size, pips, split, mood distinct from the engine snapshot', async () => {
+    const analysis = { instrument: 'EUR/USD', results: { mainDirection: 'BUY', grade: 'A' }, analysisId: 'EUR/USD-x-1' };
+    await completeTrade(analysis, 'win', {
+      grossPnl: 120, tradeDirection: 'short', positionSize: 1.5, pointsPips: 30, splitCount: 3, mood: 'confident',
+    });
+    const p = createCompleted.mock.calls.at(-1)[0];
+    expect(p.direction).toBe('BUY');        // engine recommendation
+    expect(p.trade_direction).toBe('short'); // truthfully traded against it
+    expect(p.position_size).toBe(1.5);
+    expect(p.points_pips).toBe(30);
+    expect(p.split_count).toBe(3);
+    expect(p.mood).toBe('confident');
+  });
+});
+
+describe('completeTrade duplicate protection', () => {
+  it('updates the existing row when the same analysis is completed twice (no duplicate)', async () => {
+    const analysis = { instrument: 'EUR/USD', results: { mainDirection: 'BUY' }, analysisId: 'DUP-1' };
+    // First completion: no existing row → insert.
+    await completeTrade(analysis, 'win', { grossPnl: 100 });
+    expect(createCompleted).toHaveBeenCalledTimes(1);
+    expect(updateCompleted).not.toHaveBeenCalled();
+
+    // Now that row exists — the guard finds it on the second completion.
+    filterCompleted.mockResolvedValue([{ id: 'ct-existing', completed_at: '2026-01-01T00:00:00.000Z' }]);
+    await completeTrade(analysis, 'loss', { grossPnl: -40 });
+
+    expect(createCompleted).toHaveBeenCalledTimes(1); // NOT a second insert
+    expect(updateCompleted).toHaveBeenCalledTimes(1);
+    const [id, patch] = updateCompleted.mock.calls.at(-1);
+    expect(id).toBe('ct-existing');
+    expect(patch.net_pnl).toBe(-40);
+    // The duplicate-guard update must NOT touch the frozen engine snapshot.
+    expect(patch).not.toHaveProperty('engine_version');
+    expect(patch).not.toHaveProperty('timeframes_snapshot');
+    expect(patch).not.toHaveProperty('grade');
+  });
+});
+
+describe('updateCompletedTrade — journal edit', () => {
+  it('updates the intended row with realised fields only and never the snapshot', async () => {
+    await updateCompletedTrade('ct-42', {
+      result: 'win', grossPnl: 300, fees: 10, amountRisked: 150, accountId: 'acc-2',
+      tradeDirection: 'long', positionSize: 2, pointsPips: 40, splitCount: 1, mood: 'calm',
+      notes: 'edited', completedAt: '2026-05-01T09:00:00.000Z',
+    });
+    const [id, patch] = updateCompleted.mock.calls.at(-1);
+    expect(id).toBe('ct-42');
+    expect(patch.net_pnl).toBe(290);
+    expect(patch.pnl).toBe(290);
+    expect(patch.account_id).toBe('acc-2');
+    expect(patch.trade_direction).toBe('long');
+    expect(patch.completed_at).toBe('2026-05-01T09:00:00.000Z');
+    // Engine snapshot columns are never part of an edit patch.
+    for (const k of ['engine_version', 'engine_settings', 'raw_grade', 'buy_score', 'sell_score', 'timeframes_snapshot', 'grade', 'score', 'inputs_snapshot']) {
+      expect(patch, k).not.toHaveProperty(k);
+    }
+  });
+
+  it('throws without an id (an edit can never fall through to a create)', async () => {
+    await expect(updateCompletedTrade(undefined, { result: 'win', grossPnl: 1 })).rejects.toThrow();
+    expect(createCompleted).not.toHaveBeenCalled();
+  });
 });
 
 // ── Immutable engine snapshot persistence (issue #14, phase 2) ─────────────────
 import { calculateBias, ENGINE_VERSION } from './biasEngine';
+import { reconcileResult } from './tradeFinancials';
+import { computeStats } from './journalStats';
+
+describe('reconciled result flows into performance stats', () => {
+  it('a fee-bearing scratch counts as a loss in win rate / streaks', () => {
+    // Build trades through the SAME write model the app uses.
+    const scratch = buildRealisedFields({ result: 'breakeven', grossPnl: 0, fees: 5 }); // → loss
+    const win = buildRealisedFields({ result: 'win', grossPnl: 100 });
+    const stats = computeStats([
+      { ...scratch, completed_at: '2026-01-01T00:00:00.000Z' },
+      { ...win, completed_at: '2026-01-02T00:00:00.000Z' },
+    ]);
+    expect(scratch.result).toBe('loss');
+    expect(stats.wins).toBe(1);
+    expect(stats.losses).toBe(1);
+    expect(stats.directionalCount).toBe(2); // the scratch is a directional loss
+    expect(Math.round(stats.winRate)).toBe(50);
+  });
+});
 
 const STRONG_BUY_INPUTS = {
   month: { close: 1, macd: 1, rsi: 1, boli: 1 },
@@ -220,7 +389,7 @@ const analysisWith = (options, over = {}) => {
 
 describe('completeTrade — engine snapshot persistence', () => {
   it('stores the entire engine snapshot on a newly completed trade', async () => {
-    await completeTrade(analysisWith(), 'win', { amount: 100 });
+    await completeTrade(analysisWith(), 'win', { grossPnl: 100 });
     const payload = createCompleted.mock.calls.at(-1)[0];
 
     for (const k of SNAPSHOT_KEYS) expect(payload, k).toHaveProperty(k);
@@ -242,7 +411,7 @@ describe('completeTrade — engine snapshot persistence', () => {
   });
 
   it('persists raw grade and effective grade separately', async () => {
-    await completeTrade(analysisWith(), 'win', { amount: 100 });
+    await completeTrade(analysisWith(), 'win', { grossPnl: 100 });
     const payload = createCompleted.mock.calls.at(-1)[0];
     // `grade` is the effective/capped grade; `raw_grade` is pre-cap.
     expect(payload).toHaveProperty('raw_grade');
@@ -252,10 +421,10 @@ describe('completeTrade — engine snapshot persistence', () => {
 
   it('quick and detailed completion store an identical snapshot structure', async () => {
     // Quick mode: money only. Detailed mode: adds entry/exit/notes.
-    await completeTrade(analysisWith(), 'win', { amount: 100 });
+    await completeTrade(analysisWith(), 'win', { grossPnl: 100 });
     const quick = createCompleted.mock.calls.at(-1)[0];
     await completeTrade(analysisWith(), 'win', {
-      amount: 100, fees: 2, entry: '1.25', exit: '1.26', notes: 'clean break',
+      grossPnl: 100, fees: 2, entry: '1.25', exit: '1.26', notes: 'clean break',
     });
     const detailed = createCompleted.mock.calls.at(-1)[0];
 
@@ -266,10 +435,10 @@ describe('completeTrade — engine snapshot persistence', () => {
 
   it('freezes each trade under its own settings — a later settings change never re-grades it', async () => {
     // Trade taken under threshold A=70.
-    await completeTrade(analysisWith({ thresholds: { A: 70 } }), 'win', { amount: 100 });
+    await completeTrade(analysisWith({ thresholds: { A: 70 } }), 'win', { grossPnl: 100 });
     const first = createCompleted.mock.calls.at(-1)[0];
     // User later changes the engine (A=99) and takes another trade.
-    await completeTrade(analysisWith({ thresholds: { A: 99 } }), 'win', { amount: 100 });
+    await completeTrade(analysisWith({ thresholds: { A: 99 } }), 'win', { grossPnl: 100 });
     const second = createCompleted.mock.calls.at(-1)[0];
 
     expect(first.engine_settings.grade_thresholds.A).toBe(70);
