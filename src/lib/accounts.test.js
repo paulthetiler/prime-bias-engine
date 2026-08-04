@@ -204,3 +204,84 @@ describe('grouping / active', () => {
     expect(activeAccounts([account({ id: 'a' }), account({ id: 'b', archived_at: '2026-01-01' })]).map(a => a.id)).toEqual(['a']);
   });
 });
+
+// ── Wage withdrawals & cross-type combinations (phase 3) ───────────────────────
+import { wagesWithdrawn } from './accounts';
+
+describe('wage_withdrawal — cash treatment', () => {
+  it('txnDelta subtracts a wage withdrawal by magnitude, like a withdrawal', () => {
+    expect(txnDelta({ type: 'wage_withdrawal', amount: 500 })).toBe(-500);
+    expect(txnDelta({ type: 'wage_withdrawal', amount: -500 })).toBe(-500);
+  });
+
+  it('reduces account balance', () => {
+    expect(
+      accountBalance(account({ starting_balance: 1000 }), [txn({ type: 'wage_withdrawal', amount: 300 })], [])
+    ).toBe(700);
+  });
+
+  it('does not reduce trading P/L (transactions never touch realisedPnl)', () => {
+    const trades = [trade({ net_pnl: 200 }), trade({ net_pnl: -50 })];
+    expect(realisedPnl(trades)).toBe(150);
+    // Balance folds the wage in, but P/L is unchanged.
+    const bal = accountBalance(account({ starting_balance: 0 }), [txn({ type: 'wage_withdrawal', amount: 100 })], trades);
+    expect(bal).toBe(50); // 0 + 150 P/L - 100 wage
+    expect(realisedPnl(trades)).toBe(150);
+  });
+
+  it('wagesWithdrawn sums ONLY wages, separate from ordinary withdrawals', () => {
+    const txns = [
+      txn({ type: 'withdrawal', amount: 400 }),
+      txn({ type: 'wage_withdrawal', amount: 250 }),
+      txn({ type: 'wage_withdrawal', amount: 150 }),
+      txn({ type: 'deposit', amount: 1000 }),
+    ];
+    expect(wagesWithdrawn(txns)).toBe(400); // 250 + 150 only
+    expect(wagesWithdrawn([])).toBe(0);
+  });
+
+  it('deposit, withdrawal, adjustment and wage combine correctly', () => {
+    const txns = [
+      txn({ type: 'deposit', amount: 1000 }),
+      txn({ type: 'withdrawal', amount: 200 }),
+      txn({ type: 'adjustment', amount: -50 }),
+      txn({ type: 'wage_withdrawal', amount: 300 }),
+    ];
+    expect(netCashFlow(txns)).toBe(450); // 1000 - 200 - 50 - 300
+    expect(accountBalance(account(), txns, [])).toBe(10450); // 10000 + 450
+  });
+});
+
+describe('periodRoi treats wages as external cashflow', () => {
+  it('a wage before the period lowers opening balance but never the numerator', () => {
+    const start = T('2026-03-01T00:00:00.000Z');
+    const txns = [
+      txn({ type: 'deposit', amount: 5000, occurred_at: '2026-01-01T00:00:00.000Z' }),
+      txn({ type: 'wage_withdrawal', amount: 2000, occurred_at: '2026-02-01T00:00:00.000Z' }),
+    ];
+    const trades = [
+      trade({ net_pnl: 200, completed_at: '2026-01-10T00:00:00.000Z' }),
+      trade({ net_pnl: 300, completed_at: '2026-03-10T00:00:00.000Z' }),
+    ];
+    const { openingBalance, periodPnl } = periodRoi(account(), txns, trades, start);
+    expect(openingBalance).toBe(13200); // 10000 + 5000 - 2000 + 200
+    expect(periodPnl).toBe(300);        // wage excluded from performance
+  });
+
+  it('a wage inside the period does not move periodPnl', () => {
+    const start = T('2026-03-01T00:00:00.000Z');
+    const txns = [txn({ type: 'wage_withdrawal', amount: 9999, occurred_at: '2026-03-05T00:00:00.000Z' })];
+    const trades = [trade({ net_pnl: 300, completed_at: '2026-03-10T00:00:00.000Z' })];
+    expect(periodRoi(account(), txns, trades, start).periodPnl).toBe(300);
+  });
+});
+
+describe('fee + adjustment follow the documented rule (no double count)', () => {
+  it('a per-trade fee lives in net_pnl; a separate adjustment is counted once', () => {
+    // gross 200 - fee 5 = net_pnl 195 (computeTradeFinancials bakes the fee in).
+    const trades = [trade({ net_pnl: 195 })];
+    const txns = [txn({ type: 'adjustment', amount: -20 })]; // unrelated account correction
+    // 0 + 195 (net, incl. fee) - 20 (adjustment) = 175; the fee is NOT subtracted twice.
+    expect(accountBalance(account({ starting_balance: 0 }), txns, trades)).toBe(175);
+  });
+});
