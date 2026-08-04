@@ -4,7 +4,7 @@ import { X, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhyThisTrade from './WhyThisTrade';
 import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
-import { blockBg, blockText } from '@/lib/gradeStyles';
+import { blockBg, blockText, actionBadge, actionLabel, actionHint } from '@/lib/gradeStyles';
 
 const gradeColors = {
   A: 'text-primary bg-primary/15 border-primary/30',
@@ -12,12 +12,6 @@ const gradeColors = {
   C: 'text-yellow-700 dark:text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
   D: 'text-orange-700 dark:text-orange-400 bg-orange-500/15 border-orange-500/30',
   F: 'text-destructive bg-destructive/15 border-destructive/30',
-};
-
-const actionColors = {
-  TRADE: 'bg-primary text-white',
-  WAIT: 'bg-yellow-500 text-black',
-  NO_TRADE: 'bg-destructive text-white',
 };
 
 function Row({ label, value, valueClass }) {
@@ -87,9 +81,9 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Direction</div>
               <div className={cn('text-3xl font-bold', dirColor)}>{mainDirection}</div>
             </div>
-            <div className={cn('rounded-xl p-4 text-center flex flex-col items-center justify-center', actionColors[tradeAction])}>
-              <div className="text-lg font-bold leading-tight">{tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}</div>
-              <div className="text-[10px] uppercase tracking-wider opacity-80 mt-0.5">{status}</div>
+            <div className={cn('rounded-xl p-4 text-center flex flex-col items-center justify-center', actionBadge(tradeAction))}>
+              <div className="text-lg font-bold leading-tight">{actionLabel(tradeAction)}</div>
+              <div className="text-[10px] uppercase tracking-wider opacity-80 mt-0.5">{actionHint(tradeAction) || status}</div>
             </div>
           </div>
 

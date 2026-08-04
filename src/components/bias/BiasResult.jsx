@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
-import { blockBg, blockText } from '@/lib/gradeStyles';
+import { blockBg, blockText, actionBadge, actionLabel, actionHint } from '@/lib/gradeStyles';
 
 export default function BiasResult({ results, settings }) {
   if (!results) return null;
@@ -16,12 +16,6 @@ export default function BiasResult({ results, settings }) {
     C: 'text-yellow-700 dark:text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
     D: 'text-orange-600 dark:text-orange-400 bg-orange-500/15 border-orange-500/30',
     F: 'text-destructive bg-destructive/15 border-destructive/30',
-  };
-
-  const actionColors = {
-    TRADE: 'bg-primary text-white',
-    WAIT: 'bg-yellow-500 text-black',
-    NO_TRADE: 'bg-destructive text-white',
   };
 
   const statusBadge = status === 'Ready' || status === 'Scalp'
@@ -56,8 +50,13 @@ export default function BiasResult({ results, settings }) {
               <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
 
               <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Action</span>
-              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit', actionColors[tradeAction])}>
-                {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
+              <span className="flex flex-col items-start gap-0.5">
+                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>
+                  {actionLabel(tradeAction)}
+                </span>
+                {actionHint(tradeAction) && (
+                  <span className="text-[8px] uppercase tracking-wider text-muted-foreground">{actionHint(tradeAction)}</span>
+                )}
               </span>
 
               <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Target</span>

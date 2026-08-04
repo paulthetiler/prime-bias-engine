@@ -41,6 +41,27 @@ export const directionText = (dir) =>
   : dir === 'SELL' ? 'text-red-600 dark:text-red-400'
   : 'text-muted-foreground';
 
+// Final trade permission (Extra Check gate) → badge colour + human label.
+// The engine's `tradeAction` is the Extra-Check verdict, kept separate from
+// status/grade: PENDING (extra check unset), BUY, SELL, or NO_TRADE.
+const ACTION_BADGE = {
+  BUY:      'bg-emerald-500 text-white',
+  SELL:     'bg-red-500 text-white',
+  NO_TRADE: 'bg-destructive text-white',
+  PENDING:  'bg-secondary text-muted-foreground border border-border',
+};
+export const actionBadge = (action) => ACTION_BADGE[action] || ACTION_BADGE.PENDING;
+
+// Short label shown inside the Action badge.
+export const actionLabel = (action) =>
+  action === 'NO_TRADE' ? 'NO TRADE'
+  : action === 'PENDING' ? 'PENDING'
+  : action || 'PENDING';
+
+// Longer hint for the PENDING state (e.g. shown under the badge on detail views).
+export const actionHint = (action) =>
+  action === 'PENDING' ? 'Set 1H & 15M extra checks' : '';
+
 // Block direction (BUY/BULL, SELL/BEAR, NEUTRAL) → shaded card bg + border,
 // matching the engine's indicator buttons: green buy, red sell, amber neutral.
 const isBull = (d) => d === 'BUY' || d === 'BULL';

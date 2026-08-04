@@ -11,7 +11,9 @@ It scores indicators across 7 timeframes grouped into three blocks:
 • DD (Daily Driver) — The medium-term execution bias
 • Now (Momentum) — What the market is doing right now
 
-The result is a directional bias (BUY / SELL), a grade (A–F), a trade action (TRADE / WAIT / NO TRADE), and a block alignment indicator (HIGH / MEDIUM / LOW).`
+The result is a directional bias (BUY / SELL), a grade (A–F), a status (e.g. Ready / Extended), a target quality, and a block alignment indicator (HIGH / MEDIUM / LOW).
+
+The final Trade / No Trade permission is a separate step — it comes only from the Extra Check (1H + 15M), never from the grade or "Extended" status on their own.`
   },
   {
     title: '📋 Step 1 — Add an Instrument',
@@ -55,13 +57,14 @@ The decision is always visible as you work — no need to scroll down.`
   },
   {
     title: '🚦 Extra Check (Red / Green Light)',
-    content: `Below the timeframe rows is the Extra Check — a quick standalone confirmation using H1 and M15.
+    content: `Below the timeframe rows is the Extra Check — the final gate that decides Trade vs No Trade, using H1 and M15.
 
 Set each to +1 or −1:
-• Both match → Green Light ✅ (aligned — adds +5 pts to the winning side)
-• They conflict → Red Light 🔴 (caution — no bonus added)
+• Both +1 → Green Light ✅ BUY confirmed (and adds +5 pts to the winning side)
+• Both −1 → Red Light 🔴 SELL confirmed (and adds +5 pts to the winning side)
+• They conflict → No Trade (no bonus added)
 
-This is optional but recommended as a final filter before entry.`
+Until BOTH 1H and 15M are set, the Action shows PENDING — not No Trade. The grade and "Extended" status describe the market; only this Extra Check grants permission to enter.`
   },
   {
     title: '📁 Summary Dashboard',
@@ -127,31 +130,34 @@ Example bullets:
 Enable or disable this in Settings → Display → Why this trade?`
   },
   {
-    title: '🎓 Grades & Trade Actions',
+    title: '🎓 Grades, Status & Trade Actions',
     content: `Grade (A–F) reflects how well the bias is confirmed across blocks and weighted score:
 
   A = Very Good — strong alignment, high score
   B = Good — minor conflict, well-weighted
   C = Risky — some mixed signals
   D = Dangerous — significant conflict
-  F = No Trade — conflicting or flat
+  F = Extended — top score band (>91), extremely one-sided
 
-  Extended = Score >90 — extremely one-sided. Market may be overextended. Do not trade.
+  Status "Extended" = Score >90 — extremely one-sided; a timing-risk flag, not a No-Trade verdict.
   C (Risky) = Score 80–90 — approaching extended territory. Use caution.
 
   Note: If the block trend conflicts with the score direction, the grade is capped at C regardless of score.
 
-Trade Action:
-  TRADE = High confidence, aligned setup
-  WAIT = Signals present but not fully aligned yet
-  NO TRADE = Conflicting, flat, or extended — stay out`
+Grade, status and target quality describe the MARKET. They never say No Trade on their own — even an Extended / grade-F setup keeps its direction and a GOOD target.
+
+Action (the final trade permission) comes ONLY from the Extra Check:
+  PENDING = 1H / 15M not both set yet — enter them to decide
+  BUY = 1H and 15M both +1
+  SELL = 1H and 15M both −1
+  NO TRADE = 1H and 15M mismatch or neutral`
   },
   {
     title: '🔧 Filters',
     content: `Use the filter button (top-right of Summary) to narrow your card list:
 
 • A/B Only — hide C, D, F grades
-• Hide WAIT — show only TRADE and NO TRADE actions
+• Hide WAIT — hide setups whose status isn't ready (Wait / Trend Off / Monitor / Dangerous)
 • Hide Extended — remove overextended setups
 • Aligned Only — show only HIGH or MEDIUM alignment
 

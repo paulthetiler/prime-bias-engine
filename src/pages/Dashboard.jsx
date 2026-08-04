@@ -10,7 +10,7 @@ import {
 import { toast } from 'sonner';
 import { calculateBias, engineOptionsFromSettings } from '@/lib/biasEngine';
 import { calcAlignment } from '@/lib/alignmentUtils';
-import { gradeText, blockBg, blockText } from '@/lib/gradeStyles';
+import { gradeText, blockBg, blockText, actionBadge, actionLabel } from '@/lib/gradeStyles';
 import { getSettings } from '@/lib/userSettings';
 import { isAnalysisLocked } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
@@ -20,11 +20,11 @@ import { InstallBanner } from '@/components/InstallApp';
 
 
 
-const actionColors = {
-  TRADE: 'bg-primary text-white',
-  WAIT: 'bg-yellow-500 text-black',
-  NO_TRADE: 'bg-destructive text-white',
-};
+// A "wait-like" readiness status — the market isn't ready to act on yet. This is
+// the DESCRIPTIVE status (from the engine), kept separate from the Extra-Check
+// trade permission (tradeAction). Used by the "Hide WAIT" filter.
+const WAIT_STATUSES = ['Wait', 'Trend Off', 'Monitor', 'Dangerous'];
+const isWaitStatus = (status) => WAIT_STATUSES.includes(status);
 
 function TrendPill({ label, dir, strength }) {
   return (
@@ -101,8 +101,8 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
             <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
 
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Action</span>
-            <span className={cn('text-xs font-bold px-1.5 py-0.5 rounded self-start w-fit', actionColors[tradeAction])}>
-              {tradeAction === 'NO_TRADE' ? 'NO TRADE' : tradeAction}
+            <span className={cn('text-xs font-bold px-1.5 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>
+              {actionLabel(tradeAction)}
             </span>
 
             {settings.showTarget && (
@@ -312,7 +312,7 @@ export default function Dashboard() {
   let analyses = Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId));
 
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
-  if (filters.filterHideWait) analyses = analyses.filter(a => a.results?.tradeAction !== 'WAIT');
+  if (filters.filterHideWait) analyses = analyses.filter(a => !isWaitStatus(a.results?.status));
   if (filters.filterHideExtended) analyses = analyses.filter(a => !(a.results?.winningScore >= 90));
   if (filters.filterAlignedOnly) {
     analyses = analyses.filter(a => {
@@ -435,10 +435,10 @@ export default function Dashboard() {
         <span>{analyses.length} assets</span>
         {activeFilterCount > 0 && <span className="text-primary">(filtered)</span>}
         <span className="ml-auto text-emerald-600 dark:text-emerald-400 font-semibold">
-          {analyses.filter(a => a.results?.tradeAction === 'TRADE').length} TRADE
+          {analyses.filter(a => ['BUY', 'SELL'].includes(a.results?.tradeAction)).length} CONFIRMED
         </span>
         <span className="text-yellow-700 dark:text-yellow-400 font-semibold">
-          {analyses.filter(a => a.results?.tradeAction === 'WAIT').length} WAIT
+          {analyses.filter(a => a.results?.tradeAction === 'PENDING').length} PENDING
         </span>
       </div>
 

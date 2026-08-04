@@ -25,7 +25,10 @@ export function buildBiasAnalysisPayload({ analysisId, instrument, inputs, extra
   const direction = res.mainDirection;
   const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
   const grade = ['A', 'B', 'C', 'D', 'F'].includes(res.grade) ? res.grade : 'F';
-  const tradeAction = ['TRADE', 'WAIT', 'NO_TRADE'].includes(res.tradeAction) ? res.tradeAction : 'NO_TRADE';
+  // tradeAction is the Extra-Check trade permission (Excel Extra Check gate):
+  // PENDING until 1H & 15M are set, then BUY / SELL / NO_TRADE. It is NOT derived
+  // from grade or "Extended" status. Default to PENDING when absent/invalid.
+  const tradeAction = ['PENDING', 'BUY', 'SELL', 'NO_TRADE'].includes(res.tradeAction) ? res.tradeAction : 'PENDING';
   return {
     analysis_id: analysisId,
     instrument,
