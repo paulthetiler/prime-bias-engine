@@ -396,3 +396,77 @@ active account when exactly one exists (`tradeInAccount` / ledger `soleId`), so
 they never drop out of totals. With multiple accounts they surface under "All
 accounts" and the integrity checker flags them (`orphan_trade`, warning) for
 explicit assignment — they are never silently dropped or reassigned.
+
+## 10. Performance metrics & engine-quality breakdowns (phase 6)
+
+All in `lib/performance.js` — pure, tested, realised-data only.
+
+### Formulas
+- **Win rate** = `wins / (wins + losses)` (a **fraction** 0–1; breakevens &
+  outcome-only excluded from the denominator).
+- **Average win** = mean `net_pnl` of complete trades with `net_pnl > 0`.
+- **Average loss** = mean `|net_pnl|` where `net_pnl < 0` — a **positive
+  magnitude** (documented convention; also `largestLoss`).
+- **Gross profit / loss** = `Σ net_pnl>0` / `Σ |net_pnl<0|`;
+  **net P&L** = gross profit − gross loss; **gross P&L** = `Σ gross_pnl`;
+  **total fees** = `Σ fees`.
+- **Profit factor** = `gross profit / gross loss` → number; `Infinity` when there
+  are winning dollars and no losses; `0` when there are losses and no winning
+  dollars; `null` when there is no money data at all.
+- **Realised R** = `net_pnl / amount_risked` (only where `amount_risked > 0` and
+  net exists — never inferred from grade/target/planned risk).
+- **Expectancy in R** = mean realised R (`expectancyR === avgR`).
+- **Expectancy in money** = `winRate × averageWin − lossRate × averageLoss` over
+  directional complete trades.
+- **Streaks** — best win / worst loss / current, over directional trades in
+  deterministic chronological order (time, then id).
+- **Pips/points** — **explicit `points_pips` only**; estimates are never counted.
+  Reports `pipsCount`, `totalPips`, `avgPips`. Cross-asset totals are informational.
+
+### Drawdown — external cashflows are separated
+The existing equity curve (`buildEquitySeries`) is a **cash-balance** curve: it
+folds deposits/withdrawals/wages into the running balance. Presenting that as
+"trading drawdown" would count a cash withdrawal as a loss, so phase 6 defines
+**two** concepts:
+
+- **Trading-equity drawdown** (`tradingDrawdown`) — the headline max drawdown.
+  Built from opening balance + cumulative trade `net_pnl` only; **excludes** all
+  external cashflows. This is trading performance.
+- **Cash-balance drawdown** (`cashDrawdown`) — over the real account balance
+  incl. deposits/withdrawals/wages (via `buildLedger`, which carries a running
+  balance at every movement). Informational, clearly labelled — never shown as
+  trading performance.
+
+`maxDrawdown(values)` returns positive magnitudes; money and % are read at the
+same worst-by-money trough; a non-positive running peak contributes 0% (guarded).
+
+### Cashflow reporting
+`cashflowSummary` splits **deposits / ordinary withdrawals / wage withdrawals /
+signed adjustments** and reports `netExternalCashflow`. Wages never touch trading
+P&L. `reconcile` proves the identity for a scope:
+`closing = opening + net trading P&L + deposits + adjustments − withdrawals − wages`
+(opening = starting balance for all-time, else balance before the window), and
+returns expected vs actual closing, the difference and a `reconciled` flag. No
+auto-correction.
+
+### Breakdown architecture
+One shared `tradeSummary` powers every breakdown, so no maths is duplicated.
+`breakdown(trades, keyFn)` groups by a key and summarises each group;
+`breakdownByReasonTags` handles multi-valued tags (a trade contributes to each
+tag; empty → `untagged`). Supported dimensions (`KEYERS`): effective grade, raw
+grade, score band, asset, executed direction, engine direction, with/against
+engine, Deep/DD/Now strength, alignment, engine version, mood, hour/day/month.
+Missing values bucket under `unknown` (executed direction is `unknown`, never
+guessed). Every row carries a **sample status**: `<5 insufficient · 5–19 early ·
+20+ usable` (thresholds owned by the stats layer, not the UI).
+
+### Score bands
+Non-overlapping bands on the **saved** score (authoritative; not derived from
+grade, since thresholds vary by engine version): `90–100 · 85–89 · 75–84 · 60–74
+· 50–59 · 40–49 · <40`; no score → `unknown`.
+
+### Engine-version separation
+`engineVersionsInScope`, `combinesEngineVersions`, `filterByEngineVersion` and a
+`breakdown(…, KEYERS.engineVersion)`. The Performance page shows a **warning** when
+a view combines multiple engine versions, so `legacy-pre-snapshot` and
+`prime-bias-current-v1` are never silently compared as identical logic.
