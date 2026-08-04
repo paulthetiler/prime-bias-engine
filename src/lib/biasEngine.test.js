@@ -198,6 +198,71 @@ describe('calculateBias — grade cap when the block trend conflicts', () => {
   });
 });
 
+describe('trade permission is the Extra Check gate — separate from status/grade', () => {
+  // The all-BUY workbook snapshot: score 95, grade F, status Extended, dir BUY.
+  const EXTENDED_F = CASES[0].inputs;
+
+  it('Extended / grade-F does NOT force NO_TRADE while the extra check is unset', () => {
+    const r = calculateBias(EXTENDED_F, null);
+    expect(r.grade).toBe('F');
+    expect(r.status).toBe('Extended');
+    // The old engine returned NO_TRADE here purely from Extended/F — it must not.
+    expect(r.tradeAction).toBe('PENDING');
+  });
+
+  it('keeps a GOOD, directional target for an Extended/F setup (not "NO TRADE")', () => {
+    const r = calculateBias(EXTENDED_F, null);
+    expect(r.targetNote).toBe('GOOD BUY');
+    expect(r.targetNote).not.toMatch(/NO TRADE|EXTENDED|WAIT/);
+  });
+
+  it('matches the requested UI: Status Extended, Grade F, Direction BUY, Target GOOD, Action PENDING', () => {
+    const r = calculateBias(EXTENDED_F, { h1: null, m15: null });
+    expect(r.status).toBe('Extended');
+    expect(r.grade).toBe('F');
+    expect(r.mainDirection).toBe('BUY');
+    expect(r.targetNote).toBe('GOOD BUY');
+    expect(r.tradeAction).toBe('PENDING');
+  });
+
+  it('grade F never maps to a "No Trade" status or gradeLabel', () => {
+    const r = calculateBias(EXTENDED_F, { h1: 1, m15: -1 });
+    expect(r.status).not.toBe('No Trade');
+    expect(r.gradeLabel).not.toBe('No Trade');
+  });
+
+  describe('Extra Check formula: IF(1H=-1 & 15M=-1,"SELL", IF(1H=1 & 15M=1,"BUY","No Trade"))', () => {
+    it('both -1 → SELL', () => {
+      expect(calculateBias(EXTENDED_F, { h1: -1, m15: -1 }).tradeAction).toBe('SELL');
+    });
+    it('both +1 → BUY', () => {
+      expect(calculateBias(EXTENDED_F, { h1: 1, m15: 1 }).tradeAction).toBe('BUY');
+    });
+    it('mismatch → NO_TRADE', () => {
+      expect(calculateBias(EXTENDED_F, { h1: 1, m15: -1 }).tradeAction).toBe('NO_TRADE');
+      expect(calculateBias(EXTENDED_F, { h1: -1, m15: 1 }).tradeAction).toBe('NO_TRADE');
+    });
+    it('either check unset → PENDING (never NO_TRADE)', () => {
+      expect(calculateBias(EXTENDED_F, { h1: 1, m15: null }).tradeAction).toBe('PENDING');
+      expect(calculateBias(EXTENDED_F, { h1: null, m15: -1 }).tradeAction).toBe('PENDING');
+      expect(calculateBias(EXTENDED_F, null).tradeAction).toBe('PENDING');
+    });
+    it('the permission is independent of the analysis direction (follows the check)', () => {
+      // Score direction is BUY, but the manual extra check both-SELL → SELL permission.
+      const r = calculateBias(EXTENDED_F, { h1: -1, m15: -1 });
+      expect(r.mainDirection).toBe('BUY');
+      expect(r.tradeAction).toBe('SELL');
+    });
+  });
+
+  it('target quality tracks the grade, not block alignment', () => {
+    // Grade B setup (score 55) → MED target, regardless of the extra-check gate.
+    const r = calculateBias(CASES[4].inputs, null);
+    expect(r.grade).toBe('B');
+    expect(r.targetNote).toBe('MED BUY');
+  });
+});
+
 describe('calculateTarget & ATR', () => {
   it('computes target = (ATR / 9) * grade weight', () => {
     expect(calculateTarget(90, 'A')).toEqual({ target: 12.5, targetType: 'A' }); // 90/9*1.25

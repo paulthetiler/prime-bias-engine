@@ -38,7 +38,20 @@
 //   If that trend disagrees with the score direction, the grade is forced to C.
 //
 // ── EXTENDED (Excel P10: AB35 > 90 → "Extended") ─────────────────────────────
-//   A winning score above 90 flags the market EXTENDED → no trade.
+//   A winning score above 90 flags the market EXTENDED. This is a DESCRIPTIVE
+//   market state (Status), NOT a trade verdict — it does not by itself mean
+//   "No Trade". The target can still be GOOD because target quality is derived
+//   from the winning grade, separately from Deep/DD/Now block alignment.
+//
+// ── FINAL TRADE PERMISSION (Excel Extra Check) ───────────────────────────────
+//   The one gate that decides Trade vs No Trade is the manual Extra Check on the
+//   1H and 15M timeframes:
+//     =IF(AND(1H=-1,15M=-1),"SELL",IF(AND(1H=1,15M=1),"BUY","No Trade"))
+//   Until BOTH the 1H and 15M checks are entered the permission is PENDING
+//   (awaiting the check) — never "No Trade". Once both are set: both -1 → SELL,
+//   both +1 → BUY, any mismatch or neutral → No Trade. Status "Extended" and
+//   grade "F" must never be mapped to NO_TRADE; they describe the market, not
+//   the trade permission.
 //
 // Verified: the all-BUY snapshot saved in every workbook tab (Bias Tool, B1–B4)
 // reproduces DEEP BULL/STRONG, DD BUY/STRONG, NOW BUY/STRONG, score 95, grade F.
@@ -190,7 +203,43 @@ function calcGradeLabel(grade, score, extendedScore = EXTENDED_SCORE) {
   if (grade === 'B') return 'Good';
   if (grade === 'C') return 'Risky';
   if (grade === 'D') return 'Dangerous';
-  return 'No Trade';
+  // Grade F is the top score band (a very high, "extended" score) — it is a
+  // market state, never a "No Trade" verdict (that is the Extra Check's job).
+  return 'Extended';
+}
+
+// ─── Target quality (Excel target-quality label) ──────────────────────────────
+// The quality of the target depends on the winning GRADE only. It is deliberately
+// INDEPENDENT of Deep/DD/Now block alignment and of the Extra-Check trade gate:
+// a very high score (grade F / Extended) still has a strong, GOOD target — being
+// "extended" is a timing risk, not a downgrade of the target itself.
+function targetQuality(grade) {
+  switch (grade) {
+    case 'F': return 'GOOD';   // top score band — strong, reliable target
+    case 'A': return 'GOOD';
+    case 'B': return 'MED';
+    case 'C': return 'SCALP';
+    case 'D': return 'SMALL';
+    default:  return 'SMALL';
+  }
+}
+
+// ─── Final trade permission (Excel Extra Check) ───────────────────────────────
+// =IF(AND(1H=-1,15M=-1),"SELL",IF(AND(1H=1,15M=1),"BUY","No Trade"))
+// The SOLE gate for Trade vs No Trade. It reads the manual 1H/15M Extra Check
+// inputs, NOT the computed timeframe directions, and is completely independent of
+// status/grade. Returns:
+//   'PENDING'  — 1H or 15M not yet set (awaiting the check; NOT a No-Trade)
+//   'SELL'     — both -1
+//   'BUY'      — both +1
+//   'NO_TRADE' — both set but mismatched or neutral
+function calcTradePermission(extraCheck) {
+  const h1  = extraCheck ? extraCheck.h1  : null;
+  const m15 = extraCheck ? extraCheck.m15 : null;
+  if (h1 == null || m15 == null) return 'PENDING';
+  if (h1 === -1 && m15 === -1)   return 'SELL';
+  if (h1 === 1  && m15 === 1)    return 'BUY';
+  return 'NO_TRADE';
 }
 
 // ─── Main calculation ─────────────────────────────────────────────────────────
@@ -309,33 +358,33 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
 
   const isExtended = winningScore > EXTENDED_SCORE;
 
-  // 9. Status / action
-  let status, tradeAction, targetNote;
-
-  if (isExtended) {
-    status = 'Extended'; tradeAction = 'NO_TRADE'; targetNote = 'EXTENDED';
-  } else if (effectiveGrade === 'F') {
-    status = 'No Trade'; tradeAction = 'NO_TRADE'; targetNote = 'NO TRADE';
+  // 9. Status — a DESCRIPTIVE read of the market/readiness state. It must never
+  // encode trade permission: "Extended" and grade "F" are market states, not a
+  // "No Trade" verdict. Permission is decided solely by the Extra Check (below).
+  let status;
+  if (isExtended || effectiveGrade === 'F') {
+    status = 'Extended';
   } else if (effectiveGrade === 'D') {
-    status = 'Dangerous'; tradeAction = 'WAIT'; targetNote = 'WAIT';
-  } else if (effectiveGrade === 'C' && !deepMatchesScore) {
-    status = 'Wait'; tradeAction = 'WAIT'; targetNote = 'WAIT';
+    status = 'Dangerous';
   } else if (effectiveGrade === 'A') {
-    status      = nowMatchesScore ? 'Ready'    : 'Trend Off';
-    tradeAction = nowMatchesScore ? 'TRADE'    : 'WAIT';
-    targetNote  = nowMatchesScore ? `GOOD ${mainDirection}` : 'WAIT';
+    status = nowMatchesScore ? 'Ready' : 'Trend Off';
   } else if (effectiveGrade === 'B') {
-    status      = nowMatchesScore ? 'Ready'    : 'Monitor';
-    tradeAction = nowMatchesScore ? 'TRADE'    : 'WAIT';
-    targetNote  = nowMatchesScore ? `MED ${mainDirection}` : 'WAIT';
+    status = nowMatchesScore ? 'Ready' : 'Monitor';
   } else {
     // C
-    if (!ddMatchesScore) {
-      status = 'Trend Off'; tradeAction = 'WAIT';  targetNote = 'WAIT';
-    } else {
-      status = 'Scalp';     tradeAction = 'TRADE'; targetNote = `SCALP ${mainDirection}`;
-    }
+    if (!deepMatchesScore)    status = 'Wait';
+    else if (!ddMatchesScore) status = 'Trend Off';
+    else                      status = 'Scalp';
   }
+
+  // Target quality — derived from the winning grade only, INDEPENDENT of block
+  // alignment and of the trade gate. An Extended/F setup keeps a GOOD target.
+  const targetNote = `${targetQuality(effectiveGrade)} ${mainDirection}`;
+
+  // Final trade permission — the Excel Extra Check gate, kept strictly separate
+  // from status/grade. PENDING until both 1H and 15M are set; then BUY/SELL/
+  // NO_TRADE per the Extra Check. Extended/F never force NO_TRADE here.
+  const tradeAction = calcTradePermission(extraCheck);
 
   // 10. Warnings
   const warnings = [];
