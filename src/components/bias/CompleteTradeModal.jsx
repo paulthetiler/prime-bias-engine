@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getSettings } from '@/lib/userSettings';
 import { base44 } from '@/api/base44Client';
-import { completeTrade } from '@/lib/tradeCompletion';
+import { completeTrade, computeTradeFinancials } from '@/lib/tradeCompletion';
 import { ensureDefaultAccount } from '@/lib/accountData';
 import {
   activeAccounts, withDerivedFinancials, tradeInAccount, accountBalance,
 } from '@/lib/accounts';
 import {
-  computeNetPnl, projectedBalance, riskPct, realisedR, estimatedPoints,
+  projectedBalance, riskPct, realisedR, estimatedPoints,
   reconcileResult, MOODS,
 } from '@/lib/tradeFinancials';
 import { celebrateWin } from '@/lib/celebrate';
@@ -152,7 +152,9 @@ export default function CompleteTradeModal({ analysis, onClose, onCompleted }) {
   // Default the executed direction to the engine bias (user can override truthfully).
   const effectiveDir = tradeDir || (engineBias === 'BUY' ? 'long' : engineBias === 'SELL' ? 'short' : '');
 
-  const netPnl = result === 'not_taken' ? null : computeNetPnl(grossPnl, fees);
+  // Derive net via the same combiner the write path uses, so the preview and the
+  // reconciled result exactly match what will be stored (incl. scratch + fees → loss).
+  const netPnl = result === 'not_taken' ? null : computeTradeFinancials({ result, grossPnl, fees }).netPnl;
   const reconciled = reconcileResult(result, netPnl);
   const resultConflict = netPnl != null && reconciled.changed;
   const projected = balanceBefore != null ? projectedBalance(balanceBefore, netPnl) : null;

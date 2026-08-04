@@ -166,8 +166,13 @@ describe('computeTradeFinancials (gross/fees model)', () => {
     expect(computeTradeFinancials({ result: 'loss', grossPnl: -100, fees: 5 }).netPnl).toBe(-105);
   });
 
-  it('break-even is net 0 (or -fees); gross defaults to 0', () => {
-    expect(computeTradeFinancials({ result: 'breakeven' }).netPnl).toBe(0);
+  it('break-even with no money is outcome-only (net null); fees make it a loss', () => {
+    // No gross, no fees → a pure scratch, financially incomplete.
+    expect(computeTradeFinancials({ result: 'breakeven' }).netPnl).toBeNull();
+    // gross 0, fees 0 → a genuine flat, complete break-even.
+    expect(computeTradeFinancials({ result: 'breakeven', grossPnl: 0, fees: 0 }).netPnl).toBe(0);
+    // fees on a flat market → negative net (a loss).
+    expect(computeTradeFinancials({ result: 'breakeven', grossPnl: 0, fees: 5 }).netPnl).toBe(-5);
     expect(computeTradeFinancials({ result: 'breakeven', fees: 3 }).netPnl).toBe(-3);
   });
 
@@ -208,6 +213,41 @@ describe('buildRealisedFields — shared write model', () => {
   it('keeps the selected result when there is no financial data', () => {
     expect(buildRealisedFields({ result: 'loss' }).result).toBe('loss');
     expect(buildRealisedFields({ result: 'win' }).net_pnl).toBeNull();
+  });
+
+  // Authoritative reconciliation rule (review of PR #18):
+  //   net>0→win · net<0→loss · net===0→breakeven · net==null→keep selected.
+  it('1) gross 0, fees 0 → breakeven (net 0)', () => {
+    const f = buildRealisedFields({ result: 'breakeven', grossPnl: 0, fees: 0 });
+    expect(f.net_pnl).toBe(0);
+    expect(f.result).toBe('breakeven');
+  });
+
+  it('2) gross 0, fees 5 → loss (net -5)', () => {
+    const f = buildRealisedFields({ result: 'breakeven', grossPnl: 0, fees: 5 });
+    expect(f.net_pnl).toBe(-5);
+    expect(f.result).toBe('loss');
+  });
+
+  it('3) selected breakeven + gross 0 + fees 5 → auto-corrected to loss (changed)', () => {
+    // The stored result differs from the selection, which is what drives the
+    // visible "saved as LOSS" message in the UI.
+    expect(reconcileResult('breakeven', -5)).toEqual({ result: 'loss', changed: true });
+    expect(buildRealisedFields({ result: 'breakeven', grossPnl: 0, fees: 5 }).result).toBe('loss');
+  });
+
+  it('4) selected breakeven with no financial values → stays outcome-only breakeven', () => {
+    const f = buildRealisedFields({ result: 'breakeven' });
+    expect(f.net_pnl).toBeNull();
+    expect(f.result).toBe('breakeven');
+  });
+
+  it('5) selected win with net 0 → corrected to breakeven', () => {
+    expect(buildRealisedFields({ result: 'win', grossPnl: 0 }).result).toBe('breakeven');
+  });
+
+  it('6) selected loss with positive net → corrected to win', () => {
+    expect(buildRealisedFields({ result: 'loss', grossPnl: 80, fees: 5 }).result).toBe('win');
   });
 
   it('normalises invalid detail values to null/safe defaults (never 0)', () => {
@@ -299,6 +339,25 @@ describe('updateCompletedTrade — journal edit', () => {
 
 // ── Immutable engine snapshot persistence (issue #14, phase 2) ─────────────────
 import { calculateBias, ENGINE_VERSION } from './biasEngine';
+import { reconcileResult } from './tradeFinancials';
+import { computeStats } from './journalStats';
+
+describe('reconciled result flows into performance stats', () => {
+  it('a fee-bearing scratch counts as a loss in win rate / streaks', () => {
+    // Build trades through the SAME write model the app uses.
+    const scratch = buildRealisedFields({ result: 'breakeven', grossPnl: 0, fees: 5 }); // → loss
+    const win = buildRealisedFields({ result: 'win', grossPnl: 100 });
+    const stats = computeStats([
+      { ...scratch, completed_at: '2026-01-01T00:00:00.000Z' },
+      { ...win, completed_at: '2026-01-02T00:00:00.000Z' },
+    ]);
+    expect(scratch.result).toBe('loss');
+    expect(stats.wins).toBe(1);
+    expect(stats.losses).toBe(1);
+    expect(stats.directionalCount).toBe(2); // the scratch is a directional loss
+    expect(Math.round(stats.winRate)).toBe(50);
+  });
+});
 
 const STRONG_BUY_INPUTS = {
   month: { close: 1, macd: 1, rsi: 1, boli: 1 },

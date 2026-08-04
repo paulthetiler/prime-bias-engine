@@ -53,6 +53,8 @@ describe('reconcileResult', () => {
     expect(reconcileResult('loss', 5)).toEqual({ result: 'win', changed: true });
     expect(reconcileResult('win', 5)).toEqual({ result: 'win', changed: false });
     expect(reconcileResult('win', 0)).toEqual({ result: 'breakeven', changed: true });
+    // Scratch-at-entry with fees (net −5) is a loss, never a breakeven.
+    expect(reconcileResult('breakeven', -5)).toEqual({ result: 'loss', changed: true });
   });
   it('keeps the selected outcome when there is no net P&L', () => {
     expect(reconcileResult('loss', null)).toEqual({ result: 'loss', changed: false });

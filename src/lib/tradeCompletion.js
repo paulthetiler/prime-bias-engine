@@ -78,9 +78,14 @@ function round2(n) {
 /**
  * Turn the money inputs into stored columns using the authoritative gross/fees
  * model: gross P&L is entered DIRECTLY and signed (a loss is negative), fees are
- * a positive cost, and net = gross − fees. Break-even is a complete result even
- * with no gross entered (gross defaults to 0, net = −fees). A win/loss with no
- * gross entered stays financially INCOMPLETE (net null) rather than invented.
+ * a positive cost, and net = gross − fees. Net P&L is authoritative, so the
+ * caller reconciles the stored result from it:
+ *   net > 0 → win · net < 0 → loss · net === 0 → breakeven · net == null → keep outcome.
+ *
+ * A win/loss with no gross stays financially INCOMPLETE (net null, not invented).
+ * Break-even asserts a FLAT market (gross 0): with no money entered at all it
+ * stays outcome-only (net null); but once fees are present, a scratch-at-entry
+ * trade is a small realised LOSS (net = −fees) — it does NOT remain breakeven.
  * @param {{ result?: string, grossPnl?: any, fees?: any, amountRisked?: any }} input
  * @returns {{ grossPnl: number|null, fees: number|null, netPnl: number|null, amountRisked: number|null }}
  */
@@ -90,6 +95,11 @@ export function computeTradeFinancials({ result, grossPnl, fees, amountRisked } 
   const grossNum = finiteOrNull(grossPnl);
 
   if (result === 'breakeven') {
+    // No money at all → outcome-only breakeven (do not invent a 0 result).
+    if (grossNum == null && feeNum == null) {
+      return { grossPnl: null, fees: null, netPnl: null, amountRisked: riskNum };
+    }
+    // Flat market: gross defaults to 0, so fees make the net negative (a loss).
     const gross = grossNum ?? 0;
     return { grossPnl: gross, fees: feeNum, netPnl: computeNetPnl(gross, feeNum), amountRisked: riskNum };
   }

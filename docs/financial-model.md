@@ -235,13 +235,26 @@ and journal editing can never store different financial meanings.
 - The user never enters both gross and net; net is always derived.
 - A trade fee is **never** written as an account adjustment.
 - A win/loss with no gross stays financially incomplete (`net_pnl` null, not
-  invented); break-even is complete (`net_pnl = 0`, or `−fees`).
+  invented).
+- **Break-even asserts a flat market (gross 0).** With no money entered at all it
+  stays **outcome-only** (`net_pnl` null). Once fees are present it is a small
+  realised **loss** (`net_pnl = −fees`) — a scratch-at-entry trade with fees is a
+  loss, **not** a breakeven.
 
-### Result consistency
-When a net P&L exists it is **authoritative**: the persisted `result` is set to
-match it (`reconcileResult`) and the UI shows a message if it differs from the
-user's selection (auto-correct policy, chosen over blocking). With no financial
-data, the user's selected outcome stands.
+### Result consistency (authoritative rule)
+Net P&L is **authoritative** whenever it exists — the persisted `result` is
+derived from it (`reconcileResult`), and the UI shows a message when that differs
+from the user's selection (auto-correct policy, chosen over blocking):
+
+| net_pnl | stored result |
+|---|---|
+| `> 0` | `win` |
+| `< 0` | `loss` (includes scratch-with-fees, net `−fees`) |
+| `=== 0` | `breakeven` |
+| `== null` | preserve the manually selected outcome |
+
+Downstream stats (win rate, streaks, grade/asset breakdowns) read this **stored,
+reconciled `result`**, so a fee-bearing scratch counts as a loss everywhere.
 
 ### Executed direction
 The completion/edit UI distinguishes **engine bias** (`direction`, BUY/SELL) from

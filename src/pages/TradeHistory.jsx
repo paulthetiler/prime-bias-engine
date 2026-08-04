@@ -11,10 +11,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { gradeText } from '@/lib/gradeStyles';
-import { buildRestoredAnalysis, updateCompletedTrade } from '@/lib/tradeCompletion';
+import { buildRestoredAnalysis, updateCompletedTrade, computeTradeFinancials } from '@/lib/tradeCompletion';
 import { withDerivedFinancials, hasFinancialResult, activeAccounts } from '@/lib/accounts';
 import { ensureDefaultAccount } from '@/lib/accountData';
-import { computeNetPnl, financialCompletenessState, COMPLETENESS_LABEL, MOODS } from '@/lib/tradeFinancials';
+import { financialCompletenessState, COMPLETENESS_LABEL, MOODS } from '@/lib/tradeFinancials';
 import { normalizeTrade } from '@/lib/tradeCompat';
 import { safeHttpUrl } from '@/lib/safeUrl';
 
@@ -171,7 +171,7 @@ function EditTradeModal({ trade, saving, onClose, onSave }) {
   const [completedAt, setCompletedAt] = useState(toLocalInput(trade?.completed_at));
 
   if (!trade) return null;
-  const net = result === 'not_taken' ? null : computeNetPnl(grossPnl, fees);
+  const net = result === 'not_taken' ? null : computeTradeFinancials({ result, grossPnl, fees }).netPnl;
 
   const submit = () => onSave({
     result,

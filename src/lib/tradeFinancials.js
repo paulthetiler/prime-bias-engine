@@ -73,10 +73,11 @@ export function resultFromNet(net) {
 }
 
 /**
- * Reconcile a user-selected result against the entered financial data. When a net
- * P&L exists it is authoritative — the result is set to match it (auto-correct
- * with a message policy, chosen over blocking). Without financial data the
- * user's selected result stands.
+ * Reconcile a user-selected result against the entered financial data. Net P&L is
+ * authoritative when present (auto-correct policy, chosen over blocking):
+ *   net > 0 → win · net < 0 → loss · net === 0 → breakeven · net == null → keep selected.
+ * A scratch-at-entry trade with fees therefore reconciles to a LOSS (net < 0), not
+ * breakeven. Without any financial data, the user's selected outcome stands.
  * @param {string|null|undefined} selected  win|loss|breakeven|not_taken
  * @param {any} net
  * @returns {{ result: string|null, changed: boolean }}
