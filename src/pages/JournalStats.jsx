@@ -14,8 +14,9 @@ import {
 } from '@/lib/accounts';
 import { ensureDefaultAccount } from '@/lib/accountData';
 import { normalizeTrade } from '@/lib/tradeCompat';
+import { filterCurrentEngine } from '@/lib/engineConfig';
 import {
-  computePerformance, engineVersionsInScope, filterByEngineVersion,
+  computePerformance,
   breakdown, breakdownByReasonTags, reconcile, tradeSummary,
   tradingDrawdown, tradingEquityCurve, resolveFilterValue, KEYERS,
 } from '@/lib/performance';
@@ -25,8 +26,6 @@ import BreakdownGroup from '@/components/journal/BreakdownGroup';
 import TradingEquityCurve from '@/components/journal/TradingEquityCurve';
 import EquityCurve from '@/components/journal/EquityCurve';
 
-const LEGACY = 'legacy-pre-snapshot';
-const engineVersionLabel = (v) => (v === LEGACY ? 'Legacy — pre-snapshot' : v);
 const fmtMoney = (n, cur) => {
   if (n == null || !Number.isFinite(n)) return '—';
   const s = Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -37,7 +36,6 @@ export default function JournalStats() {
   const navigate = useNavigate();
   const [timeframe, setTimeframe] = useState('all');
   const [account, setAccount] = useState('all');       // 'all' | accountId
-  const [engineVersion, setEngineVersion] = useState('all'); // 'all' | version
   const [instrument, setInstrument] = useState('all');       // 'all' | symbol
 
   const { data: rawTrades = [], isLoading } = useQuery({
@@ -94,26 +92,30 @@ export default function JournalStats() {
     [accountTxns, windowStartMs]
   );
 
-  // Filter options come from the account+date window (before analysis filters).
-  const versionsInScope = useMemo(() => engineVersionsInScope(windowTrades), [windowTrades]);
+  // Current-engine window — the ONLY population that feeds trade-quality stats.
+  // Records produced by an obsolete ruleset (legacy pre-snapshot or a superseded
+  // version) are excluded here so grades, scores and win-rates never mix engine
+  // logic. They are not deleted: the account ledger below still counts their real
+  // money, and they remain visible in History and the admin diagnostics.
+  const currentWindowTrades = useMemo(() => filterCurrentEngine(windowTrades), [windowTrades]);
+
+  // Instrument options come from the current-engine window (after engine filter).
   const instrumentsInScope = useMemo(
-    () => [...new Set(windowTrades.map(t => t.instrument).filter(Boolean))].sort(),
-    [windowTrades]
+    () => [...new Set(currentWindowTrades.map(t => t.instrument).filter(Boolean))].sort(),
+    [currentWindowTrades]
   );
 
   // Never keep an invisible filter: when the account/date scope changes and the
-  // selected engine version / instrument no longer exists, reset it to 'all'. A
-  // still-valid selection is left untouched (functional setState bails out).
-  useEffect(() => { setEngineVersion(v => resolveFilterValue(v, versionsInScope)); }, [versionsInScope]);
+  // selected instrument no longer exists, reset it to 'all'. A still-valid
+  // selection is left untouched (functional setState bails out).
   useEffect(() => { setInstrument(v => resolveFilterValue(v, instrumentsInScope)); }, [instrumentsInScope]);
 
   // Analysis scope — the trade-quality set the Overview + all breakdowns use.
+  // Always current-engine only; the instrument filter narrows it further.
   const analysisTrades = useMemo(() => {
-    let list = windowTrades;
-    if (engineVersion !== 'all') list = filterByEngineVersion(list, engineVersion);
-    if (instrument !== 'all') list = list.filter(t => t.instrument === instrument);
-    return list;
-  }, [windowTrades, engineVersion, instrument]);
+    if (instrument === 'all') return currentWindowTrades;
+    return currentWindowTrades.filter(t => t.instrument === instrument);
+  }, [currentWindowTrades, instrument]);
 
   // Overview + engine/behaviour breakdowns reflect the analysis filters.
   const stats = useMemo(() => computeStats(analysisTrades), [analysisTrades]);
@@ -150,7 +152,6 @@ export default function JournalStats() {
     [monetaryEnabled, analysisTrades, openingBalance]
   );
 
-  const versionScopeCombines = engineVersion === 'all' && versionsInScope.length > 1;
   const crossAssetPips = instrument === 'all' && instrumentsInScope.length > 1;
 
   // Breakdown row-sets (all consume performance.breakdown — no maths here).
@@ -158,7 +159,6 @@ export default function JournalStats() {
     grade: breakdown(analysisTrades, KEYERS.effectiveGrade),
     rawGrade: breakdown(analysisTrades, KEYERS.rawGrade),
     scoreBand: breakdown(analysisTrades, KEYERS.scoreBand),
-    version: breakdown(analysisTrades, KEYERS.engineVersion, { labelFn: engineVersionLabel }),
     deep: breakdown(analysisTrades, KEYERS.deepStrength),
     dd: breakdown(analysisTrades, KEYERS.ddStrength),
     now: breakdown(analysisTrades, KEYERS.nowStrength),
@@ -196,28 +196,16 @@ export default function JournalStats() {
           ))}
         </div>
       )}
-      {!isLoading && trades.length > 0 && (versionsInScope.length > 1 || instrumentsInScope.length > 1) && (
+      {!isLoading && trades.length > 0 && instrumentsInScope.length > 1 && (
         <div className="flex flex-wrap gap-2">
-          {versionsInScope.length > 1 && (
-            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              Engine
-              <select value={engineVersion} onChange={e => setEngineVersion(e.target.value)}
-                className="h-8 rounded-lg border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="all">All versions</option>
-                {versionsInScope.map(v => <option key={v} value={v}>{engineVersionLabel(v)}</option>)}
-              </select>
-            </label>
-          )}
-          {instrumentsInScope.length > 1 && (
-            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              Instrument
-              <select value={instrument} onChange={e => setInstrument(e.target.value)}
-                className="h-8 rounded-lg border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="all">All instruments</option>
-                {instrumentsInScope.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
-          )}
+          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            Instrument
+            <select value={instrument} onChange={e => setInstrument(e.target.value)}
+              className="h-8 rounded-lg border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
+              <option value="all">All instruments</option>
+              {instrumentsInScope.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
         </div>
       )}
 
@@ -237,12 +225,9 @@ export default function JournalStats() {
           {scope.mixed && (
             <Banner>Your accounts use different currencies, so monetary totals aren’t combined. Pick a single account to see Net P/L, ROI and balance. Non-money stats (win rate, counts) still apply.</Banner>
           )}
-          {versionScopeCombines && (
-            <Banner>This view combines {versionsInScope.length} engine versions ({versionsInScope.map(engineVersionLabel).join(', ')}). Grade/score comparisons mix different engine logic — pick one version above for valid engine analysis.</Banner>
-          )}
 
           {/* ── Overview (trade analysis) ── */}
-          <SectionTitle sub="Trade analysis: selected account, period, engine version and instrument.">Overview</SectionTitle>
+          <SectionTitle sub="Trade analysis: current-engine trades only, for the selected account, period and instrument.">Overview</SectionTitle>
           <PerformanceSummary
             stats={stats} perf={overview}
             timeframe={timeframe} onTimeframe={setTimeframe}
@@ -257,7 +242,6 @@ export default function JournalStats() {
             <BreakdownGroup title="Effective grade" rows={engineBreakdowns.grade} {...bgProps} />
             <BreakdownGroup title="Raw grade (pre-cap)" rows={engineBreakdowns.rawGrade} {...bgProps} />
             <BreakdownGroup title="Score band" subtitle="Bands on the saved score, not the grade." rows={engineBreakdowns.scoreBand} {...bgProps} />
-            <BreakdownGroup title="Engine version" rows={engineBreakdowns.version} {...bgProps} />
             <BreakdownGroup title="Deep strength" rows={engineBreakdowns.deep} {...bgProps} />
             <BreakdownGroup title="DD strength" rows={engineBreakdowns.dd} {...bgProps} />
             <BreakdownGroup title="Now strength" rows={engineBreakdowns.now} {...bgProps} />
@@ -279,7 +263,7 @@ export default function JournalStats() {
           </div>
 
           {/* ── Account & cashflow (account ledger) ── */}
-          <SectionTitle sub="Account ledger: selected account and period only. Engine-version and instrument filters do not apply here — cash movement is not per-engine. External cash (deposits/withdrawals/wages) is kept separate from trading P&L.">Account &amp; cashflow</SectionTitle>
+          <SectionTitle sub="Account ledger: selected account and period only. The instrument filter does not apply here, and every trade's realised money counts (including historical records excluded from the engine stats above) — cash movement is not per-engine. External cash (deposits/withdrawals/wages) is kept separate from trading P&L.">Account &amp; cashflow</SectionTitle>
           {monetaryEnabled && perf ? (
             <div className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-1.5 text-sm">
               <CashRow label="Opening balance" value={fmtMoney(perf.openingBalance, scope.currency)} />

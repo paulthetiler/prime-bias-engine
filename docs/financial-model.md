@@ -476,10 +476,24 @@ grade, since thresholds vary by engine version): `90–100 · 85–89 · 75–84
 · 50–59 · 40–49 · <40`; no score → `unknown`.
 
 ### Engine-version separation
-`engineVersionsInScope`, `combinesEngineVersions`, `filterByEngineVersion` and a
-`breakdown(…, KEYERS.engineVersion)`. The Performance page shows a **warning** when
-a view combines multiple engine versions, so `legacy-pre-snapshot` and
-`prime-bias-current-v1` are never silently compared as identical logic.
+The current engine version is defined **once** in `lib/engineConfig.js`
+(`CURRENT_ENGINE_VERSION`, re-exported by `biasEngine.js` as `ENGINE_VERSION`, the
+value stamped onto every completed trade). Normal-user performance statistics
+apply `filterCurrentEngine` at the source, so only current-engine trades feed the
+Overview, win rates, grade analysis, instrument analysis and every
+engine/behaviour breakdown. Records under an obsolete ruleset
+(`legacy-pre-snapshot` or a superseded version) are **excluded** from these
+metrics — never deleted: they keep their real money in the account ledger and
+remain visible in History.
+
+The Performance page therefore has **no engine-version dropdown and no
+mixed-engine warning**. Engine-version diagnostics (`engineVersionsInScope`,
+`filterByEngineVersion`, `breakdown(…, KEYERS.engineVersion)`) are
+**admin/developer-only** — surfaced on `/admin/integrity` as an engine-version
+breakdown that flags which stored records are excluded from current-engine stats.
+Legacy trades predate the immutable snapshot columns (migration `0005`), so their
+inputs cannot be re-graded reliably; they are kept in history and omitted from
+current-engine metrics rather than recalculated.
 
 ## 11. Performance page & engine-quality breakdown UI (phase 7)
 
