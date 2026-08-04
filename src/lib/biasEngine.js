@@ -58,15 +58,14 @@
 // reproduces DEEP BULL/STRONG, DD BUY/STRONG, NOW BUY/STRONG, score 95, grade F.
 
 import { calcAlignment } from './alignmentUtils';
+import { CURRENT_ENGINE_VERSION } from './engineConfig';
 
-// Stable identifier of the engine implementation. Bump this whenever the engine
-// maths — weights, thresholds, grade caps or block rules — changes, so every
-// completed trade keeps an honest record of which ruleset produced it. This is
-// deliberately NOT a build timestamp. It is named "current" (not
-// "excel-verified") because the engine may still need correcting against the
-// Prime Bias workbook; only rename it once the formulas have been corrected and
-// independently verified.
-export const ENGINE_VERSION = 'prime-bias-current-v1';
+// Stable identifier of the engine implementation used to stamp every newly
+// completed trade. The single source of truth lives in `engineConfig.js`
+// (CURRENT_ENGINE_VERSION); it is re-exported here under the name the engine and
+// its callers have always used so the value the engine writes and the value the
+// stats read can never drift apart.
+export const ENGINE_VERSION = CURRENT_ENGINE_VERSION;
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 

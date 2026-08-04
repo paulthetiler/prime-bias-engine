@@ -21,11 +21,16 @@ vi.mock('@/api/base44Client', () => ({
 }));
 
 const JournalStats = (await import('./JournalStats')).default;
+const { CURRENT_ENGINE_VERSION } = await import('@/lib/engineConfig');
 
 const account = { id: 'acc-1', name: 'Main', currency: 'USD', starting_balance: 10000, archived_at: null };
+// Trades default to the CURRENT engine — that is what a freshly completed trade
+// carries and what the Performance page counts. Legacy/obsolete records are
+// opt-in via an explicit engine_version override.
 const trade = (over = {}) => ({
   id: 'ct', instrument: 'EUR/USD', result: 'win', direction: 'BUY', grade: 'A', score: 80,
-  status: 'completed', completed_at: '2026-01-10T10:00:00.000Z', account_id: 'acc-1', ...over,
+  status: 'completed', completed_at: '2026-01-10T10:00:00.000Z', account_id: 'acc-1',
+  engine_version: CURRENT_ENGINE_VERSION, ...over,
 });
 
 function renderPage() {
@@ -73,24 +78,55 @@ describe('JournalStats — real financial model', () => {
 
 // ── Phase 7: sections, filters and safety behaviours ────────────────────────────
 describe('JournalStats — Phase 7 breakdowns & safety', () => {
-  it('warns and offers an engine-version filter when versions are mixed', async () => {
+  it('never shows an engine-version dropdown or a mixed-engine warning', async () => {
+    // A current trade alongside an obsolete-engine one: no version UI at all.
     filter.mockResolvedValue([
-      trade({ id: 'a', engine_version: 'prime-bias-current-v1', net_pnl: 100 }),
+      trade({ id: 'a', engine_version: CURRENT_ENGINE_VERSION, net_pnl: 100 }),
       trade({ id: 'b', engine_version: 'exp-v2', net_pnl: 50 }),
     ]);
     renderPage();
-    expect(await screen.findByText(/combines 2 engine versions/i)).toBeInTheDocument();
-    // Engine-version filter control is offered.
-    expect(screen.getByText('Engine')).toBeInTheDocument();
-    // Engine-performance section is rendered.
-    expect(screen.getByText('Engine performance')).toBeInTheDocument();
+    // The Engine-performance section still renders (its stats are current-only).
+    expect(await screen.findByText('Engine performance')).toBeInTheDocument();
+    // No engine-version picker, no "All versions" option, no mixed-engine banner.
+    expect(screen.queryByRole('combobox', { name: 'Engine' })).toBeNull();
+    expect(screen.queryByText(/all versions/i)).toBeNull();
+    expect(screen.queryByText(/combines .* engine versions/i)).toBeNull();
+    // No per-version "Engine version" breakdown card on the normal page.
+    expect(screen.queryByText('Engine version')).toBeNull();
   });
 
-  it('labels legacy trades as "Legacy — pre-snapshot" and never hides them', async () => {
-    // No engine_version → normalizeTrade stamps legacy-pre-snapshot.
-    filter.mockResolvedValue([trade({ id: 'leg', net_pnl: 100 })]);
+  it('excludes obsolete-engine trades from performance stats without deleting them', async () => {
+    // Current trade (+100) plus an obsolete-engine trade (+999). Only the current
+    // trade's money reaches the Overview; the obsolete one must not be mixed in.
+    filter.mockResolvedValue([
+      trade({ id: 'cur', engine_version: CURRENT_ENGINE_VERSION, net_pnl: 100 }),
+      trade({ id: 'obs', engine_version: 'exp-v2', net_pnl: 999 }),
+    ]);
     renderPage();
-    expect(await screen.findByText('Legacy — pre-snapshot')).toBeInTheDocument();
+    const overviewNet = (await screen.findByText('Net P/L')).closest('.rounded-2xl');
+    // Overview Net P/L reflects the current engine only (+100), never +1099 / +999.
+    expect(within(overviewNet).getByText(/USD\s*100\b/)).toBeInTheDocument();
+    expect(within(overviewNet).queryByText(/1,?099/)).toBeNull();
+    expect(within(overviewNet).queryByText(/999/)).toBeNull();
+    // But the record is not deleted: the account ledger still counts its real
+    // money, so Trading net P&L (account-scoped, all engines) is +1099.
+    expect(screen.getByText('Trading net P&L').closest('div')).toHaveTextContent(/USD\s*1,?099\b/);
+  });
+
+  it('excludes legacy pre-snapshot trades from performance stats and shows no version label', async () => {
+    // A current trade plus a legacy (no engine_version) trade.
+    filter.mockResolvedValue([
+      trade({ id: 'cur', net_pnl: 100 }),
+      trade({ id: 'leg', engine_version: undefined, net_pnl: 40 }),
+    ]);
+    renderPage();
+    const overviewNet = (await screen.findByText('Net P/L')).closest('.rounded-2xl');
+    // Legacy money (40) is excluded from the engine stats (Overview = 100).
+    expect(within(overviewNet).getByText(/USD\s*100\b/)).toBeInTheDocument();
+    // The legacy label never surfaces on the normal user page.
+    expect(screen.queryByText('Legacy — pre-snapshot')).toBeNull();
+    // Not deleted: account ledger trading total still includes it (140).
+    expect(screen.getByText('Trading net P&L').closest('div')).toHaveTextContent(/USD\s*140\b/);
   });
 
   it('shows a balanced reconciliation panel for a clean account', async () => {
@@ -171,20 +207,6 @@ describe('JournalStats — scope labels & filter-reset (review)', () => {
     expect(screen.queryAllByText(/USD\s*50\b/).length).toBe(0);
     // The instrument selector is gone (one instrument), so no invisible filter remains.
     expect(screen.queryByRole('combobox', { name: 'Instrument' })).toBeNull();
-  });
-
-  it('resets an engine-version filter that disappears after a period change', async () => {
-    const user = userEvent.setup();
-    filter.mockResolvedValue([
-      trade({ id: 'cur', engine_version: 'prime-bias-current-v1', net_pnl: 100, completed_at: recent }),
-      trade({ id: 'old', engine_version: 'exp-v2', net_pnl: 50, completed_at: '2020-01-01T00:00:00.000Z' }),
-    ]);
-    renderPage();
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Engine' }), 'exp-v2');
-    expect((await screen.findAllByText(/USD\s*50\b/)).length).toBeGreaterThan(0);
-    await user.click(screen.getByText('7 Days'));
-    expect((await screen.findAllByText(/USD\s*100\b/)).length).toBeGreaterThan(0);
-    expect(screen.queryByRole('combobox', { name: 'Engine' })).toBeNull();
   });
 
   it('renders the cash-balance chart inside Account & cashflow, not the analysis area', async () => {

@@ -2,7 +2,11 @@ import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { checkLedgerIntegrity, formatIntegrityReport } from '@/lib/ledger';
+import { breakdown, KEYERS } from '@/lib/performance';
+import { CURRENT_ENGINE_VERSION, LEGACY_ENGINE_VERSION } from '@/lib/engineConfig';
 import PageNotFound from '@/lib/PageNotFound';
+
+const engineVersionLabel = (v) => (v === LEGACY_ENGINE_VERSION ? 'Legacy — pre-snapshot' : v);
 
 // Admin-only ledger integrity checker (route: /admin/integrity). Access is gated
 // by the SAME authoritative admin check used elsewhere (base44.auth.me().role,
@@ -45,6 +49,19 @@ export default function IntegrityCheck() {
   const report = useMemo(
     () => (isAdmin ? checkLedgerIntegrity({ accounts, txns, trades }) : null),
     [isAdmin, accounts, txns, trades]
+  );
+
+  // Engine-version diagnostics are ADMIN/DEVELOPER-ONLY: normal users never see a
+  // version breakdown (the Performance page always uses the current engine). This
+  // exposes how many stored records fall under each ruleset so a developer can
+  // confirm obsolete records are being excluded from current-engine stats.
+  const engineRows = useMemo(
+    () => (isAdmin ? breakdown(trades, KEYERS.engineVersion, { labelFn: engineVersionLabel }) : []),
+    [isAdmin, trades]
+  );
+  const nonCurrentCount = useMemo(
+    () => engineRows.filter(r => r.key !== CURRENT_ENGINE_VERSION).reduce((n, r) => n + r.totalTrades, 0),
+    [engineRows]
   );
 
   // Access unresolved → show nothing sensitive, run nothing protected.
@@ -91,6 +108,41 @@ export default function IntegrityCheck() {
           ))}
         </div>
       )}
+
+      <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <div>
+          <h2 className="text-sm font-semibold">Engine-version breakdown</h2>
+          <p className="text-[11px] text-muted-foreground">
+            Developer diagnostic. Current engine: <code className="font-mono">{CURRENT_ENGINE_VERSION}</code>.
+            {' '}Records under any other version are excluded from normal performance stats
+            ({nonCurrentCount} such record{nonCurrentCount === 1 ? '' : 's'}), but are kept in history.
+          </p>
+        </div>
+        {engineRows.length === 0 ? (
+          <div className="text-xs text-muted-foreground">No completed trades.</div>
+        ) : (
+          <div className="space-y-1">
+            {engineRows.map(r => {
+              const current = r.key === CURRENT_ENGINE_VERSION;
+              return (
+                <div key={r.key} className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <span className={`font-mono text-xs ${current ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{r.label}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border ${
+                      current
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        : 'border-border bg-secondary/60 text-muted-foreground'
+                    }`}>
+                      {current ? 'current' : 'excluded'}
+                    </span>
+                  </span>
+                  <span className="font-mono text-xs text-muted-foreground">{r.totalTrades} trade{r.totalTrades === 1 ? '' : 's'}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <details className="rounded-lg border border-border bg-secondary/40 p-3">
         <summary className="text-xs font-semibold cursor-pointer">Plain-text report</summary>

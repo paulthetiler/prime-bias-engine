@@ -24,6 +24,7 @@ import {
 import { buildLedger } from './ledger';
 import { realisedR } from './tradeFinancials';
 import { recordTime } from './journalStats';
+import { engineVersionOf } from './engineConfig';
 
 function round2(n) {
   const r = Math.round(n * 100) / 100;
@@ -274,8 +275,11 @@ export function cashDrawdown(trades = [], txns = [], openingBalance = 0) {
 }
 
 // ── Engine-version separation ───────────────────────────────────────────────────
-
-const engineVersionOf = (t) => t?.engine_version || 'legacy-pre-snapshot';
+//
+// These helpers describe/split trades BY engine version and are used by the
+// admin engine-version diagnostics and tests. Normal-user performance stats do
+// not offer a version picker — they always apply `filterCurrentEngine`
+// (engineConfig) so obsolete records are never mixed into current metrics.
 
 /** Distinct engine versions present in a set of trades (sorted). */
 export function engineVersionsInScope(trades = []) {
