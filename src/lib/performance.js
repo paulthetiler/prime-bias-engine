@@ -332,6 +332,35 @@ export function breakdown(trades = [], keyFn, { labelFn } = {}) {
     .sort((a, b) => b.directionalCount - a.directionalCount || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 }
 
+/** Sort rank for sample confidence — usable first, insufficient last. */
+export const SAMPLE_RANK = { usable: 0, early: 1, insufficient: 2 };
+
+/**
+ * Sort breakdown rows for display. The DEFAULT deliberately does not reward tiny
+ * samples: usable → early → insufficient, then by directional count desc. Metric
+ * sorts (netPnl/expectancy/winRate/avgR/sample) sort by that value desc with a
+ * count tiebreak; nulls sink to the bottom.
+ * @param {any[]} rows  rows from breakdown()/breakdownByReasonTags()
+ * @param {string} [sortKey]  default|sample|netPnl|expectancy|winRate|avgR
+ */
+export function sortBreakdownRows(rows = [], sortKey = 'default') {
+  const arr = [...rows];
+  const num = (v) => (v == null || !Number.isFinite(v) ? -Infinity : v);
+  const byCount = (a, b) => b.directionalCount - a.directionalCount;
+  const byKey = (a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+  switch (sortKey) {
+    case 'sample': return arr.sort((a, b) => byCount(a, b) || byKey(a, b));
+    case 'netPnl': return arr.sort((a, b) => num(b.netPnl) - num(a.netPnl) || byCount(a, b));
+    case 'expectancy': return arr.sort((a, b) => num(b.expectancy) - num(a.expectancy) || byCount(a, b));
+    case 'winRate': return arr.sort((a, b) => num(b.winRate) - num(a.winRate) || byCount(a, b));
+    case 'avgR': return arr.sort((a, b) => num(b.avgR) - num(a.avgR) || byCount(a, b));
+    case 'default':
+    default:
+      return arr.sort((a, b) =>
+        (SAMPLE_RANK[a.sampleStatus] - SAMPLE_RANK[b.sampleStatus]) || byCount(a, b) || byKey(a, b));
+  }
+}
+
 /**
  * Reason-tags breakdown — a trade with multiple tags contributes to each tag;
  * trades with none fall under 'untagged'.

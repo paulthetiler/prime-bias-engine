@@ -452,3 +452,43 @@ describe('expectancyMoney — correct population', () => {
     expect(a.expectancy).toBe(100);    // not 50
   });
 });
+
+// ── Breakdown sorting (phase 7 UI) ──────────────────────────────────────────────
+import { sortBreakdownRows, SAMPLE_RANK } from './performance';
+
+describe('sortBreakdownRows', () => {
+  // rows shaped like breakdown() output
+  const rows = [
+    { key: 'tiny', sampleStatus: 'insufficient', directionalCount: 2, netPnl: 9999, expectancy: 500, winRate: 1, avgR: 9 },
+    { key: 'big', sampleStatus: 'usable', directionalCount: 40, netPnl: 100, expectancy: 5, winRate: 0.55, avgR: 0.4 },
+    { key: 'mid', sampleStatus: 'early', directionalCount: 10, netPnl: 50, expectancy: 3, winRate: 0.6, avgR: 0.3 },
+  ];
+
+  it('default never promotes tiny samples: usable → early → insufficient', () => {
+    const out = sortBreakdownRows(rows, 'default').map(r => r.key);
+    expect(out).toEqual(['big', 'mid', 'tiny']);
+    expect(SAMPLE_RANK.usable).toBeLessThan(SAMPLE_RANK.insufficient);
+  });
+
+  it('default tiebreaks equal-status rows by directional count desc', () => {
+    const out = sortBreakdownRows([
+      { key: 'a', sampleStatus: 'usable', directionalCount: 20 },
+      { key: 'b', sampleStatus: 'usable', directionalCount: 55 },
+    ], 'default').map(r => r.key);
+    expect(out).toEqual(['b', 'a']);
+  });
+
+  it('metric sorts order by the metric desc (nulls last)', () => {
+    expect(sortBreakdownRows(rows, 'netPnl').map(r => r.key)).toEqual(['tiny', 'big', 'mid']);
+    expect(sortBreakdownRows([
+      { key: 'x', directionalCount: 5, expectancy: null },
+      { key: 'y', directionalCount: 5, expectancy: 10 },
+    ], 'expectancy').map(r => r.key)).toEqual(['y', 'x']);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [...rows];
+    sortBreakdownRows(input, 'netPnl');
+    expect(input.map(r => r.key)).toEqual(['tiny', 'big', 'mid']);
+  });
+});

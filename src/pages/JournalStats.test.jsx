@@ -69,3 +69,55 @@ describe('JournalStats — real financial model', () => {
     expect(screen.getAllByText('100%').length).toBeGreaterThan(0);
   });
 });
+
+// ── Phase 7: sections, filters and safety behaviours ────────────────────────────
+describe('JournalStats — Phase 7 breakdowns & safety', () => {
+  it('warns and offers an engine-version filter when versions are mixed', async () => {
+    filter.mockResolvedValue([
+      trade({ id: 'a', engine_version: 'prime-bias-current-v1', net_pnl: 100 }),
+      trade({ id: 'b', engine_version: 'exp-v2', net_pnl: 50 }),
+    ]);
+    renderPage();
+    expect(await screen.findByText(/combines 2 engine versions/i)).toBeInTheDocument();
+    // Engine-version filter control is offered.
+    expect(screen.getByText('Engine')).toBeInTheDocument();
+    // Engine-performance section is rendered.
+    expect(screen.getByText('Engine performance')).toBeInTheDocument();
+  });
+
+  it('labels legacy trades as "Legacy — pre-snapshot" and never hides them', async () => {
+    // No engine_version → normalizeTrade stamps legacy-pre-snapshot.
+    filter.mockResolvedValue([trade({ id: 'leg', net_pnl: 100 })]);
+    renderPage();
+    expect(await screen.findByText('Legacy — pre-snapshot')).toBeInTheDocument();
+  });
+
+  it('shows a balanced reconciliation panel for a clean account', async () => {
+    filter.mockResolvedValue([trade({ net_pnl: 100 })]); // 10000 + 100 = 10100
+    renderPage();
+    expect(await screen.findByText(/balanced/i)).toBeInTheDocument();
+    expect(screen.getByText('Account & cashflow')).toBeInTheDocument();
+  });
+
+  it('guards monetary totals and explains why under mixed currencies', async () => {
+    acctList.mockResolvedValue([
+      { id: 'acc-1', name: 'USD', currency: 'USD', starting_balance: 1000, archived_at: null },
+      { id: 'acc-2', name: 'GBP', currency: 'GBP', starting_balance: 1000, archived_at: null },
+    ]);
+    filter.mockResolvedValue([trade({ net_pnl: 100 }), trade({ id: 'g', account_id: 'acc-2', net_pnl: 50 })]);
+    renderPage();
+    expect(await screen.findByText(/different currencies/i)).toBeInTheDocument();
+    expect(screen.getByText(/Money totals are unavailable/i)).toBeInTheDocument();
+  });
+
+  it('flags cross-asset pip totals as informational and offers an instrument filter', async () => {
+    filter.mockResolvedValue([
+      trade({ id: 'e', instrument: 'EUR/USD', net_pnl: 100, points_pips: 20 }),
+      trade({ id: 'x', instrument: 'GOLD', net_pnl: 50, points_pips: 10 }),
+    ]);
+    renderPage();
+    expect(await screen.findByText(/informational only/i)).toBeInTheDocument();
+    // "Instrument" appears as both the filter label and a breakdown title.
+    expect(screen.getAllByText('Instrument').length).toBeGreaterThan(0);
+  });
+});
