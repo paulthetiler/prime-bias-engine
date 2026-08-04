@@ -452,3 +452,62 @@ describe('expectancyMoney — correct population', () => {
     expect(a.expectancy).toBe(100);    // not 50
   });
 });
+
+// ── Breakdown sorting (phase 7 UI) ──────────────────────────────────────────────
+import { sortBreakdownRows, SAMPLE_RANK } from './performance';
+
+describe('sortBreakdownRows', () => {
+  // rows shaped like breakdown() output
+  const rows = [
+    { key: 'tiny', sampleStatus: 'insufficient', directionalCount: 2, netPnl: 9999, expectancy: 500, winRate: 1, avgR: 9 },
+    { key: 'big', sampleStatus: 'usable', directionalCount: 40, netPnl: 100, expectancy: 5, winRate: 0.55, avgR: 0.4 },
+    { key: 'mid', sampleStatus: 'early', directionalCount: 10, netPnl: 50, expectancy: 3, winRate: 0.6, avgR: 0.3 },
+  ];
+
+  it('default never promotes tiny samples: usable → early → insufficient', () => {
+    const out = sortBreakdownRows(rows, 'default').map(r => r.key);
+    expect(out).toEqual(['big', 'mid', 'tiny']);
+    expect(SAMPLE_RANK.usable).toBeLessThan(SAMPLE_RANK.insufficient);
+  });
+
+  it('default tiebreaks equal-status rows by directional count desc', () => {
+    const out = sortBreakdownRows([
+      { key: 'a', sampleStatus: 'usable', directionalCount: 20 },
+      { key: 'b', sampleStatus: 'usable', directionalCount: 55 },
+    ], 'default').map(r => r.key);
+    expect(out).toEqual(['b', 'a']);
+  });
+
+  it('metric sorts order by the metric desc (nulls last)', () => {
+    expect(sortBreakdownRows(rows, 'netPnl').map(r => r.key)).toEqual(['tiny', 'big', 'mid']);
+    expect(sortBreakdownRows([
+      { key: 'x', directionalCount: 5, expectancy: null },
+      { key: 'y', directionalCount: 5, expectancy: 10 },
+    ], 'expectancy').map(r => r.key)).toEqual(['y', 'x']);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [...rows];
+    sortBreakdownRows(input, 'netPnl');
+    expect(input.map(r => r.key)).toEqual(['tiny', 'big', 'mid']);
+  });
+});
+
+// ── Invalid-filter reset (phase 7 review) ───────────────────────────────────────
+import { resolveFilterValue } from './performance';
+
+describe('resolveFilterValue', () => {
+  it("keeps 'all' always", () => {
+    expect(resolveFilterValue('all', [])).toBe('all');
+    expect(resolveFilterValue('all', ['EUR/USD'])).toBe('all');
+  });
+  it('keeps a still-available selection', () => {
+    expect(resolveFilterValue('EUR/USD', ['EUR/USD', 'GOLD'])).toBe('EUR/USD');
+    expect(resolveFilterValue('prime-bias-current-v1', ['prime-bias-current-v1', 'legacy-pre-snapshot'])).toBe('prime-bias-current-v1');
+  });
+  it("falls back to 'all' when the selection is no longer available", () => {
+    expect(resolveFilterValue('GOLD', ['EUR/USD'])).toBe('all');
+    expect(resolveFilterValue('exp-v2', ['prime-bias-current-v1'])).toBe('all');
+    expect(resolveFilterValue('GOLD', [])).toBe('all');
+  });
+});

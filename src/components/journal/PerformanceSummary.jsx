@@ -2,13 +2,17 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
-  TrendingUp, TrendingDown, Percent, Sigma, Scale, Hash, Flame, Trophy,
-  ArrowUpRight, ArrowDownRight, Target, Activity, Wallet, Ruler,
+  TrendingUp, TrendingDown, Percent, Scale, Hash, Flame, Trophy,
+  ArrowUpRight, ArrowDownRight, Target, Activity, Ruler, Sigma,
 } from 'lucide-react';
 import { TIME_FILTERS } from '@/lib/journalStats';
-import EquityCurve from './EquityCurve';
 
-// ── formatting helpers ────────────────────────────────────────────────────────
+// Trade-PERFORMANCE tiles only. Everything here is scoped to the analysis window
+// (account + date + engine version + instrument). Account-wide figures — ROI,
+// opening/current balance, wages and the cash-balance chart — are NOT rendered
+// here; they live in the Account & cashflow section (account + date only) so no
+// two adjacent tiles ever refer to different populations.
+
 const LOCKED = 'Add trade results to unlock this stat.';
 
 const fmtSigned = (n, opts = {}) => {
@@ -19,11 +23,6 @@ const fmtSigned = (n, opts = {}) => {
 };
 const fmtMoney = (n, currency) => (n == null || !Number.isFinite(n) ? '—' : fmtSigned(n, { prefix: currency ? `${currency} ` : '' }));
 
-/**
- * A single metric tile. Colour is opt-in via `tone` so green/red stays reserved
- * for the numbers where direction actually carries meaning. When `value` is null
- * the tile shows a muted empty-state hint instead of a fake number.
- */
 /** @param {{ icon: any, label: string, value?: any, sub?: any, hint?: any, tone?: 'up'|'down'|'neutral', index?: number }} props */
 function MetricCard({ icon: Icon, label, value, sub, hint, tone = 'neutral', index = 0 }) {
   const toneClass = tone === 'up' ? 'text-emerald-500' : tone === 'down' ? 'text-red-500' : 'text-foreground';
@@ -51,15 +50,7 @@ function MetricCard({ icon: Icon, label, value, sub, hint, tone = 'neutral', ind
   );
 }
 
-/**
- * The dashboard header: time-window chips, a metric grid and the equity curve.
- * Money figures come from realised net P/L; ROI + balance are account-relative
- * and passed in from the page (which owns deposits/withdrawals).
- */
-export default function PerformanceSummary({
-  stats, perf, series, timeframe, onTimeframe,
-  roiPct, openingBalance, currentBalance, currency, monetaryEnabled = true,
-}) {
+export default function PerformanceSummary({ stats, perf, timeframe, onTimeframe, currency, monetaryEnabled = true }) {
   const {
     totalTrades, wins, losses, winRate, hasPnl, netPnl, profitFactor,
     avgR, hasRiskData, bestWinStreak, currentStreak, streakType, incompleteCount,
@@ -68,7 +59,6 @@ export default function PerformanceSummary({
   const streakValue = currentStreak > 0 ? `${currentStreak}${streakType === 'win' ? 'W' : 'L'}` : null;
   const showMoney = monetaryEnabled && hasPnl;
 
-  // Profit factor rendering: null → empty; Infinity → "No losing trades".
   const profitFactorValue = !monetaryEnabled || profitFactor == null
     ? null
     : !Number.isFinite(profitFactor) ? '∞' : profitFactor.toFixed(2);
@@ -76,7 +66,7 @@ export default function PerformanceSummary({
 
   return (
     <div className="space-y-3">
-      {/* Time filters */}
+      {/* Date-period filter (applies globally: account + date). */}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TIME_FILTERS.map(f => (
           <button
@@ -94,125 +84,55 @@ export default function PerformanceSummary({
         ))}
       </div>
 
-      {/* Metric grid */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <MetricCard
-          index={0}
-          icon={netPnl >= 0 ? TrendingUp : TrendingDown}
-          label="Net P/L"
+        <MetricCard index={0} icon={netPnl >= 0 ? TrendingUp : TrendingDown} label="Net P/L"
           value={showMoney ? fmtMoney(netPnl, currency) : null}
-          tone={!showMoney ? 'neutral' : netPnl >= 0 ? 'up' : 'down'}
-        />
-        <MetricCard
-          index={1}
-          icon={Percent}
-          label="Win Rate"
-          value={totalTrades ? `${Math.round(winRate)}%` : null}
-          sub={`${wins}W · ${losses}L`}
-          tone={winRate >= 50 ? 'up' : winRate > 0 ? 'down' : 'neutral'}
-        />
-        <MetricCard
-          index={2}
-          icon={TrendingUp}
-          label="ROI"
-          value={monetaryEnabled && roiPct != null ? `${fmtSigned(roiPct, { dp: 1 })}%` : null}
-          sub={monetaryEnabled && roiPct != null && openingBalance != null ? `on ${fmtMoney(openingBalance, currency).replace('+', '')}` : undefined}
-          tone={roiPct == null ? 'neutral' : roiPct >= 0 ? 'up' : 'down'}
-        />
-        <MetricCard
-          index={3}
-          icon={Scale}
-          label="Profit Factor"
-          value={profitFactorValue}
-          sub={profitFactorSub}
-          tone={profitFactorValue == null ? 'neutral' : profitFactor >= 1 ? 'up' : 'down'}
-        />
-        <MetricCard
-          index={4}
-          icon={Sigma}
-          label="Avg R"
-          value={hasRiskData ? `${avgR.toFixed(2)}R` : null}
-          hint="Not enough risk data"
-          tone={!hasRiskData ? 'neutral' : avgR >= 0 ? 'up' : 'down'}
-        />
-        <MetricCard
-          index={5}
-          icon={Hash}
-          label="Total Trades"
-          value={totalTrades || null}
-          sub={incompleteCount ? `${incompleteCount} need a result` : undefined}
-        />
-        <MetricCard
-          index={6}
-          icon={Flame}
-          label="Streak"
-          value={streakValue}
-          sub={streakValue ? 'current' : undefined}
-          tone={currentStreak > 0 ? (streakType === 'win' ? 'up' : 'down') : 'neutral'}
-        />
-        <MetricCard
-          index={7}
-          icon={Trophy}
-          label="Best Streak"
-          value={bestWinStreak || null}
-          sub={bestWinStreak ? 'wins in a row' : undefined}
-          tone={bestWinStreak ? 'up' : 'neutral'}
-        />
+          tone={!showMoney ? 'neutral' : netPnl >= 0 ? 'up' : 'down'} />
+        <MetricCard index={1} icon={Percent} label="Win Rate"
+          value={totalTrades ? `${Math.round(winRate)}%` : null} sub={`${wins}W · ${losses}L`}
+          tone={winRate >= 50 ? 'up' : winRate > 0 ? 'down' : 'neutral'} />
+        <MetricCard index={2} icon={Scale} label="Profit Factor"
+          value={profitFactorValue} sub={profitFactorSub}
+          tone={profitFactorValue == null ? 'neutral' : profitFactor >= 1 ? 'up' : 'down'} />
+        <MetricCard index={3} icon={Sigma} label="Avg R"
+          value={hasRiskData ? `${avgR.toFixed(2)}R` : null} hint="Not enough risk data"
+          tone={!hasRiskData ? 'neutral' : avgR >= 0 ? 'up' : 'down'} />
+        <MetricCard index={4} icon={Hash} label="Total Trades"
+          value={totalTrades || null} sub={incompleteCount ? `${incompleteCount} need a result` : undefined} />
+        <MetricCard index={5} icon={Flame} label="Streak"
+          value={streakValue} sub={streakValue ? 'current' : undefined}
+          tone={currentStreak > 0 ? (streakType === 'win' ? 'up' : 'down') : 'neutral'} />
+        <MetricCard index={6} icon={Trophy} label="Best Streak"
+          value={bestWinStreak || null} sub={bestWinStreak ? 'wins in a row' : undefined}
+          tone={bestWinStreak ? 'up' : 'neutral'} />
+        {perf && monetaryEnabled && (
+          <MetricCard index={7} icon={ArrowUpRight} label="Avg Win"
+            value={perf.averageWin != null ? fmtMoney(perf.averageWin, currency) : null}
+            hint="No wins yet" tone={perf.averageWin != null ? 'up' : 'neutral'} />
+        )}
       </div>
 
-      {/* Extended metrics (phase 6) — proves the new performance layer is wired. */}
       {perf && monetaryEnabled && (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <MetricCard
-            index={0} icon={ArrowUpRight} label="Avg Win"
-            value={perf.averageWin != null ? fmtMoney(perf.averageWin, currency) : null}
-            hint="No wins yet" tone={perf.averageWin != null ? 'up' : 'neutral'}
-          />
-          <MetricCard
-            index={1} icon={ArrowDownRight} label="Avg Loss"
+          <MetricCard index={0} icon={ArrowDownRight} label="Avg Loss"
             value={perf.averageLoss != null ? fmtMoney(-perf.averageLoss, currency) : null}
-            hint="No losses yet" tone={perf.averageLoss != null ? 'down' : 'neutral'}
-          />
-          <MetricCard
-            index={2} icon={Target} label="Expectancy"
-            value={perf.expectancyMoney != null ? fmtMoney(perf.expectancyMoney, currency) : null}
-            sub="per trade"
-            tone={perf.expectancyMoney == null ? 'neutral' : perf.expectancyMoney >= 0 ? 'up' : 'down'}
-          />
-          <MetricCard
-            index={3} icon={Activity} label="Max Drawdown"
+            hint="No losses yet" tone={perf.averageLoss != null ? 'down' : 'neutral'} />
+          <MetricCard index={1} icon={Target} label="Expectancy"
+            value={perf.expectancyMoney != null ? fmtMoney(perf.expectancyMoney, currency) : null} sub="per trade"
+            tone={perf.expectancyMoney == null ? 'neutral' : perf.expectancyMoney >= 0 ? 'up' : 'down'} />
+          <MetricCard index={2} icon={Activity} label="Max Drawdown"
             value={perf.tradingDrawdown != null ? `${fmtMoney(-perf.tradingDrawdown, currency)}` : null}
             sub={perf.tradingDrawdownPct ? `${perf.tradingDrawdownPct}% · trading` : 'trading only'}
-            tone={perf.tradingDrawdown ? 'down' : 'neutral'}
-          />
-          <MetricCard
-            index={4} icon={Wallet} label="Wages Withdrawn"
-            value={perf.wages ? fmtMoney(-perf.wages, currency) : (perf.hasPnl ? fmtMoney(0, currency) : null)}
-            hint="No wages" tone="neutral"
-          />
-          <MetricCard
-            index={5} icon={Ruler} label="Total Pips"
+            tone={perf.tradingDrawdown ? 'down' : 'neutral'} />
+          <MetricCard index={3} icon={Ruler} label="Total Pips"
             value={perf.totalPips != null ? fmtSigned(perf.totalPips, { dp: 1 }) : null}
             sub={perf.pipsCount ? `${perf.pipsCount} trades · avg ${perf.avgPips}` : undefined}
-            hint="No pips recorded"
-            tone={perf.totalPips == null ? 'neutral' : perf.totalPips >= 0 ? 'up' : 'down'}
-          />
-          <MetricCard
-            index={6} icon={Hash} label="Worst Loss Streak"
-            value={perf.worstLossStreak || null}
-            sub={perf.worstLossStreak ? 'losses in a row' : undefined}
-            tone={perf.worstLossStreak ? 'down' : 'neutral'}
-          />
+            hint="No pips recorded" tone={perf.totalPips == null ? 'neutral' : perf.totalPips >= 0 ? 'up' : 'down'} />
+          <MetricCard index={4} icon={Hash} label="Worst Loss Streak"
+            value={perf.worstLossStreak || null} sub={perf.worstLossStreak ? 'losses in a row' : undefined}
+            tone={perf.worstLossStreak ? 'down' : 'neutral'} />
         </div>
       )}
-
-      {/* Equity curve */}
-      <EquityCurve
-        series={series}
-        hasPnl={showMoney}
-        currentBalance={currentBalance}
-        currency={currency}
-      />
     </div>
   );
 }
