@@ -15,7 +15,7 @@
 // entered yet (financially incomplete) and it must not move any total.
 
 /** @typedef {{ id: string, name: string, currency: string, starting_balance: number, archived_at?: string|null }} Account */
-/** @typedef {{ account_id: string, type: 'deposit'|'withdrawal'|'adjustment', amount: number, occurred_at: string }} Txn */
+/** @typedef {{ account_id: string, type: 'deposit'|'withdrawal'|'adjustment'|'wage_withdrawal', amount: number, occurred_at: string }} Txn */
 
 /** Fallback starting balance when the user has recorded nothing yet. */
 export const DEFAULT_STARTING_BALANCE = 10000;
@@ -63,8 +63,11 @@ export function tradeInAccount(trade, accountId, soleAccountId = null) {
 }
 
 /**
- * Signed cash effect of a transaction on the balance. Deposits add, withdrawals
- * subtract their (positive) magnitude, adjustments are already signed.
+ * Signed cash effect of a transaction on the balance. Deposits add; withdrawals
+ * AND wage withdrawals subtract their (positive) magnitude; adjustments are
+ * already signed. A wage withdrawal moves cash exactly like a withdrawal — it is
+ * kept as a distinct type only so wages can be reported separately, never so they
+ * move the balance differently.
  * @param {Txn} txn
  * @returns {number}
  */
@@ -74,9 +77,27 @@ export function txnDelta(txn) {
   switch (txn?.type) {
     case 'deposit': return Math.abs(amt);
     case 'withdrawal': return -Math.abs(amt);
+    case 'wage_withdrawal': return -Math.abs(amt);
     case 'adjustment': return amt; // signed
     default: return 0;
   }
+}
+
+/**
+ * Total wages withdrawn across the given transactions, as a positive magnitude.
+ * Counts ONLY the explicit 'wage_withdrawal' type — ordinary withdrawals are
+ * never treated as wages. Kept separate from trading P/L for future reporting.
+ * @param {Txn[]} txns
+ * @returns {number}
+ */
+export function wagesWithdrawn(txns = []) {
+  let sum = 0;
+  for (const tx of txns) {
+    if (tx?.type !== 'wage_withdrawal') continue;
+    const amt = Number(tx.amount);
+    if (Number.isFinite(amt)) sum += Math.abs(amt);
+  }
+  return round2(sum);
 }
 
 /**

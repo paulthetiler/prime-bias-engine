@@ -153,3 +153,69 @@ Component (Testing Library):
 - Trade History shows "Add result" on incomplete trades.
 
 Implementation proceeds in the stages listed in commits on this branch.
+
+## 7. Authoritative source-of-truth rules (Wage Maker integration, phase 3)
+
+These rules fix where each realised-money figure lives so nothing is ever counted
+twice. They are enforced by the pure helpers in `lib/accounts.js` and
+`lib/tradeCompat.js`; the schema for them lands in migrations `0006`/`0007`.
+
+### Per-trade costs
+Per-trade broker fees, commissions and direct costs belong on
+**`completed_trade.fees`** and are subtracted there (`net_pnl = gross_pnl − fees`,
+`lib/tradeCompletion.js`).
+
+### Account adjustments
+**`account_transaction.type = 'adjustment'`** is only for non-trade corrections or
+account-level adjustments (reconciliation, a manual balance fix). **A cost must
+never be recorded both as a trade fee and as an account adjustment** — pick one:
+per-trade cost → `completed_trade.fees`; account-level correction → `adjustment`.
+
+### Wages
+Profit taken out as personal wages belongs in
+**`account_transaction.type = 'wage_withdrawal'`** (migration `0007`). A wage
+withdrawal **reduces account cash balance** (it moves cash exactly like an
+ordinary withdrawal, `txnDelta`) but **does not reduce realised trading P/L** —
+gross/net P/L, win rate, profit factor, expectancy and R multiple are computed
+from `completed_trade` rows only and never see transactions. Wages are a distinct
+type purely so they can be reported separately (`wagesWithdrawn`); old
+`withdrawal` rows are **never** reclassified as wages.
+
+### Position size and points
+- **`completed_trade.position_size`** stores the actual bid / lot / point-value
+  input used for the trade.
+- **`completed_trade.points_pips`** stores the explicitly recorded movement
+  result (may be positive, negative or zero).
+- `points_pips` is **never** auto-populated from `net_pnl / position_size` during
+  migration. A future UI may show that computed value only as a clearly-labelled
+  fallback when no explicit `points_pips` was recorded.
+
+### Executed direction
+The existing `completed_trade.direction` column stores the **Prime Bias engine
+recommendation** (`results.mainDirection`, `BUY`/`SELL`). The new nullable
+**`completed_trade.trade_direction`** (`'long'`/`'short'`, migration `0006`)
+records the direction **actually taken**. Legacy rows leave it `null`; the
+executed side is not guessed from the engine recommendation.
+
+### Risk percentage — derived, not stored (decision + trade-off)
+There is intentionally **no** stored `risk_pct` column. The preferred value is
+derived: `amount_risked / balance_before_trade × 100`, where
+`balance_before_trade` comes from the ledger (`balanceBefore`).
+
+- **Trade-off.** Deriving keeps a single source of truth, but the derived risk %
+  of a *historical* trade can shift if earlier ledger records are later edited
+  (a corrected earlier deposit changes `balance_before_trade`). Snapshotting
+  `risk_pct` (or `balance_before_trade`) at completion would freeze it, at the
+  cost of a second, potentially-diverging stored figure.
+- **Decision for this phase.** Keep it derived. Snapshotting the balance-before
+  is a wider architectural change (it would belong with the engine-snapshot
+  approach) and is **out of scope here** — flagged for a future phase rather than
+  introduced silently.
+
+### Compatibility guarantees
+`normalizeTrade` (`lib/tradeCompat.js`) exposes read-time defaults for rows that
+predate these columns — `position_size: null`, `points_pips: null`,
+`split_count: 1`, `mood: null`, `reason_tags: []`, `trade_direction: null`,
+`engine_version: 'legacy-pre-snapshot'` — **without writing them back**. Invalid
+values normalise to `null`/safe defaults, never to `0`. `isWageWithdrawal`
+identifies wages solely by the explicit new type.
