@@ -119,7 +119,14 @@ export function eventTime(record) {
  */
 export function realisedPnl(trades = []) {
   let sum = 0;
-  for (const t of trades) if (hasFinancialResult(t)) sum += Number(t.net_pnl);
+  // Apply the legacy read-shim here too, so the balance is robust whether or not
+  // the caller already mapped `withDerivedFinancials` — a legacy `pnl`-only trade
+  // counts exactly once and the canonical balance always matches the rebuilt
+  // ledger. `withDerivedFinancials` is idempotent when `net_pnl` is already set.
+  for (const t0 of trades) {
+    const t = withDerivedFinancials(t0);
+    if (hasFinancialResult(t)) sum += Number(t.net_pnl);
+  }
   return sum;
 }
 

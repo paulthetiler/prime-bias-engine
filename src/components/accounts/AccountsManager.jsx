@@ -3,17 +3,49 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { ensureDefaultAccount } from '@/lib/accountData';
 import { accountBalance, activeAccounts, withDerivedFinancials } from '@/lib/accounts';
+import { buildLedger } from '@/lib/ledger';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Plus, X, Wallet, Archive } from 'lucide-react';
+import { Plus, X, Wallet, Archive, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CURRENCIES = ['USD', 'GBP', 'EUR', 'AUD', 'CAD', 'JPY', 'CHF', 'NZD', 'BTC', 'USDT'];
 const TXN_TYPES = [
   { value: 'deposit', label: 'Deposit', hint: 'Money paid into the account' },
   { value: 'withdrawal', label: 'Withdrawal', hint: 'Money taken out of the account' },
+  { value: 'wage_withdrawal', label: 'Wage', hint: 'Profit taken as wages — reduces cash, not trading P/L' },
   { value: 'adjustment', label: 'Adjustment', hint: 'Reconcile a discrepancy (can be + or −)' },
 ];
+
+const LEDGER_KIND_LABEL = {
+  starting: 'Start', deposit: 'Deposit', withdrawal: 'Withdrawal',
+  wage_withdrawal: 'Wage', adjustment: 'Adjustment', trade: 'Trade',
+};
+
+// Read-only transaction history for one account: the derived ledger, newest
+// first, each row carrying its running balance. Running balances are never stored.
+function LedgerView({ account, txns, trades, currency }) {
+  const rows = buildLedger(account, txns, trades);
+  const fmtN = (n) => (n == null || !Number.isFinite(n) ? '—' : n.toLocaleString(undefined, { maximumFractionDigits: 2 }));
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-secondary/30 overflow-hidden">
+      {[...rows].reverse().map((r) => (
+        <div key={r.id} className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border/40 last:border-0 text-xs">
+          <div className="min-w-0">
+            <div className="font-semibold">{LEDGER_KIND_LABEL[r.kind] ?? r.kind}{r.reference ? <span className="text-muted-foreground font-normal"> · {r.reference}</span> : ''}</div>
+            <div className="text-[10px] text-muted-foreground">{r.timestamp ? new Date(r.timestamp).toLocaleDateString() : (r.kind === 'starting' ? 'opening' : 'undated')}</div>
+          </div>
+          <div className="text-right shrink-0 font-mono">
+            <div className={cn(r.kind === 'starting' ? 'text-muted-foreground' : r.delta > 0 ? 'text-emerald-500' : r.delta < 0 ? 'text-red-500' : 'text-muted-foreground')}>
+              {r.kind === 'starting' ? '' : r.delta > 0 ? '+' : r.delta < 0 ? '−' : ''}{r.kind === 'starting' ? '' : fmtN(Math.abs(r.delta))}
+            </div>
+            <div className="text-[10px] text-muted-foreground">{currency} {fmtN(r.running_balance)}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const fmt = (n, cur) => (n == null || !Number.isFinite(n) ? '—' : `${cur ? cur + ' ' : ''}${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
 
@@ -84,6 +116,7 @@ export default function AccountsManager() {
   const [currency, setCurrency] = useState('USD');
   const [startingBalance, setStartingBalance] = useState('');
   const [txnFor, setTxnFor] = useState(null);
+  const [openLedger, setOpenLedger] = useState(null);
 
   const { data: accounts = [] } = useQuery({ queryKey: ['tradingAccounts'], queryFn: () => ensureDefaultAccount(), staleTime: 60_000 });
   const { data: txns = [] } = useQuery({ queryKey: ['accountTransactions'], queryFn: () => base44.entities.AccountTransaction.list('occurred_at', 500) });
@@ -202,18 +235,29 @@ export default function AccountsManager() {
               <Button variant="secondary" size="sm" className="flex-1 gap-1.5" onClick={() => setTxnFor(acc)}>
                 <Plus className="w-3.5 h-3.5" /> Transaction
               </Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground gap-1.5" onClick={() => setOpenLedger(id => id === acc.id ? null : acc.id)}>
+                {openLedger === acc.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />} History
+              </Button>
               {active.length > 1 && (
                 <Button variant="ghost" size="sm" className="text-muted-foreground gap-1.5" onClick={() => archiveAccount.mutate(acc.id)}>
                   <Archive className="w-3.5 h-3.5" /> Archive
                 </Button>
               )}
             </div>
+            {openLedger === acc.id && (
+              <LedgerView
+                account={acc}
+                currency={acc.currency}
+                txns={txns.filter(t => t.account_id === acc.id)}
+                trades={trades.filter(t => (t.account_id ?? soleId) === acc.id)}
+              />
+            )}
           </div>
         ))}
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        Balance is calculated: starting balance + deposits − withdrawals + realised trade P/L + adjustments. It is never overwritten.
+        Balance is calculated: starting balance + deposits + realised trade P/L + adjustments − withdrawals − wage withdrawals. It is never stored or overwritten.
       </p>
 
       {txnFor && (
