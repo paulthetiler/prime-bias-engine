@@ -357,21 +357,38 @@ checker flags any divergence (`balance_reconstruction_failure`). `realisedPnl`
 now applies the legacy `withDerivedFinancials` shim internally, so a legacy
 `pnl`-only trade counts once and both figures agree regardless of caller mapping.
 
-### Integrity checker (developer-only, no repairs)
+### Integrity checker (admin-only, no repairs)
 `checkLedgerIntegrity({ accounts, txns, trades })` → `formatIntegrityReport`
 detects: duplicate analysis IDs, orphan trades, missing accounts, broken
 transaction chains, possible fee double-counts (adjustments that look like trade
 fees), negative balances and balance-reconstruction failures. Surfaced read-only
-at `/admin/integrity`. It never mutates or repairs anything.
+at `/admin/integrity`, **gated by the app's admin check** (`base44.auth.me()`
+role = Supabase `user_metadata.role === 'admin'`, the same check `PageNotFound`
+uses). Access is resolved **before** any query runs — the accounts, transactions
+and trades are fetched with React Query `enabled: isAdmin`, so a non-admin (or
+the pre-auth loading state) never triggers them and a direct visit renders the
+existing not-found page with no report or identifiers. It never mutates or
+repairs anything. Being unlinked in the nav is **not** the access control — the
+role check is.
 
 ### Duplicate protection (DB-level, deferred from phase 4)
 Migration `0009` adds a **partial unique index** on
 `completed_trade (user_id, analysis_id) WHERE analysis_id IS NOT NULL`. It is
-**self-investigating and non-destructive**: it counts duplicate groups first and
-only creates the index when there are none; if duplicates exist it raises a
-NOTICE listing the affected groups and leaves the index uncreated (resolve, then
-re-run). It never deletes data. This complements the app-level `analysis_id`
-guard from phase 4.
+**self-investigating, non-destructive, and fails loudly** so it can never be
+recorded as applied without enforcing uniqueness:
+
+- **clean database** → creates the index and succeeds;
+- **duplicates present** → prints each offending `(user_id, analysis_id)` group,
+  then `RAISE EXCEPTION` so the whole migration **fails and stays unapplied** —
+  nothing is created;
+- **duplicates resolved** (a manual operator step — the migration never deletes,
+  archives or modifies rows) → re-running succeeds and creates the index;
+- **index already exists** → `IF NOT EXISTS` makes it a safe no-op success.
+
+Because a migration that exited successfully without the index could be marked
+applied by Supabase (and `supabase db push` would not run it again), the
+duplicate branch must fail rather than "succeed with a NOTICE". This complements
+the app-level `analysis_id` guard from phase 4.
 
 ### Orphan trades
 Trades with `account_id = NULL` remain **visible** and are attributed to the sole

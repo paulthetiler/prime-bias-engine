@@ -1,28 +1,62 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { ensureDefaultAccount } from '@/lib/accountData';
 import { checkLedgerIntegrity, formatIntegrityReport } from '@/lib/ledger';
+import PageNotFound from '@/lib/PageNotFound';
 
-// Developer-only ledger integrity checker (route: /admin/integrity — not linked
-// in the nav). Read-only: it detects problems and prints a readable report. It
-// NEVER repairs anything.
+// Admin-only ledger integrity checker (route: /admin/integrity). Access is gated
+// by the SAME authoritative admin check used elsewhere (base44.auth.me().role,
+// i.e. Supabase user_metadata.role === 'admin'; see PageNotFound). Non-admins get
+// the existing not-found behaviour and — crucially — the protected account,
+// transaction and trade queries never run for them (they are `enabled` only once
+// admin access is resolved). Read-only: it never repairs anything.
 export default function IntegrityCheck() {
-  const { data: accounts = [], isLoading: la } = useQuery({
-    queryKey: ['tradingAccounts'], queryFn: () => ensureDefaultAccount(), staleTime: 60_000,
+  // Resolve access FIRST. Protected queries stay disabled until this settles.
+  const { data: authData, isLoading: authLoading } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => {
+      try {
+        return { user: await base44.auth.me(), isAuthenticated: true };
+      } catch {
+        return { user: null, isAuthenticated: false };
+      }
+    },
   });
-  const { data: txns = [], isLoading: lt } = useQuery({
-    queryKey: ['accountTransactions'], queryFn: () => base44.entities.AccountTransaction.list('occurred_at', 1000),
+  const isAdmin = Boolean(authData?.isAuthenticated && authData.user?.role === 'admin');
+
+  // These only fetch once admin access is confirmed (`enabled: isAdmin`), so a
+  // non-admin — or the pre-auth loading state — never triggers them.
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['integrityAccounts'],
+    queryFn: () => base44.entities.TradingAccount.list('created_at', 500),
+    enabled: isAdmin,
   });
-  const { data: trades = [], isLoading: lc } = useQuery({
-    queryKey: ['completedTradesAll'], queryFn: () => base44.entities.CompletedTrade.list('-completed_at', 1000),
+  const { data: txns = [] } = useQuery({
+    queryKey: ['integrityTransactions'],
+    queryFn: () => base44.entities.AccountTransaction.list('occurred_at', 1000),
+    enabled: isAdmin,
+  });
+  const { data: trades = [] } = useQuery({
+    queryKey: ['integrityTrades'],
+    queryFn: () => base44.entities.CompletedTrade.list('-completed_at', 1000),
+    enabled: isAdmin,
   });
 
-  const loading = la || lt || lc;
   const report = useMemo(
-    () => (loading ? null : checkLedgerIntegrity({ accounts, txns, trades })),
-    [loading, accounts, txns, trades]
+    () => (isAdmin ? checkLedgerIntegrity({ accounts, txns, trades }) : null),
+    [isAdmin, accounts, txns, trades]
   );
+
+  // Access unresolved → show nothing sensitive, run nothing protected.
+  if (authLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+  // Non-admin → existing not-authorised/not-found behaviour, no report, no IDs.
+  if (!isAdmin) return <PageNotFound />;
 
   const badge = (sev) =>
     sev === 'critical'
@@ -33,39 +67,35 @@ export default function IntegrityCheck() {
     <div className="p-4 space-y-4 pb-24 max-w-2xl mx-auto">
       <div className="pt-2">
         <h1 className="text-lg font-bold tracking-tight">Ledger integrity check</h1>
-        <p className="text-xs text-muted-foreground">Developer diagnostic · read-only, never repairs.</p>
+        <p className="text-xs text-muted-foreground">Admin diagnostic · read-only, never repairs.</p>
       </div>
 
-      {loading || !report ? (
-        <div className="h-24 rounded-xl bg-secondary animate-pulse" />
+      <div className={cnStatus(report.ok)}>
+        {report.ok ? 'OK — no critical issues' : 'ISSUES FOUND'}
+        <span className="ml-2 text-xs font-normal opacity-80">
+          critical {report.counts.critical} · warning {report.counts.warning}
+        </span>
+      </div>
+
+      {report.findings.length === 0 ? (
+        <div className="text-sm text-muted-foreground">
+          No issues detected across {accounts.length} account(s), {txns.length} transaction(s), {trades.length} trade(s).
+        </div>
       ) : (
-        <>
-          <div className={cnStatus(report.ok)}>
-            {report.ok ? 'OK — no critical issues' : 'ISSUES FOUND'}
-            <span className="ml-2 text-xs font-normal opacity-80">
-              critical {report.counts.critical} · warning {report.counts.warning}
-            </span>
-          </div>
-
-          {report.findings.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No issues detected across {accounts.length} account(s), {txns.length} transaction(s), {trades.length} trade(s).</div>
-          ) : (
-            <div className="space-y-2">
-              {report.findings.map((f, i) => (
-                <div key={i} className={`rounded-lg border px-3 py-2 text-sm ${badge(f.severity)}`}>
-                  <div className="font-semibold text-xs uppercase tracking-wider">{f.severity} · {f.code}</div>
-                  <div className="mt-0.5">{f.message}</div>
-                </div>
-              ))}
+        <div className="space-y-2">
+          {report.findings.map((f, i) => (
+            <div key={i} className={`rounded-lg border px-3 py-2 text-sm ${badge(f.severity)}`}>
+              <div className="font-semibold text-xs uppercase tracking-wider">{f.severity} · {f.code}</div>
+              <div className="mt-0.5">{f.message}</div>
             </div>
-          )}
-
-          <details className="rounded-lg border border-border bg-secondary/40 p-3">
-            <summary className="text-xs font-semibold cursor-pointer">Plain-text report</summary>
-            <pre className="mt-2 text-[11px] whitespace-pre-wrap font-mono text-muted-foreground">{formatIntegrityReport(report)}</pre>
-          </details>
-        </>
+          ))}
+        </div>
       )}
+
+      <details className="rounded-lg border border-border bg-secondary/40 p-3">
+        <summary className="text-xs font-semibold cursor-pointer">Plain-text report</summary>
+        <pre className="mt-2 text-[11px] whitespace-pre-wrap font-mono text-muted-foreground">{formatIntegrityReport(report)}</pre>
+      </details>
     </div>
   );
 }

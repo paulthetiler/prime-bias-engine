@@ -179,3 +179,36 @@ describe('double-count protection', () => {
     expect(rebuildBalance(account({ starting_balance: 0 }), [adj], [t])).toBe(175);
   });
 });
+
+// ── Migration 0009 static assertions (review blocker 1) ─────────────────────────
+import { readFileSync } from 'node:fs';
+
+describe('migration 0009_completed_trade_unique_analysis.sql', () => {
+  const sql = readFileSync('supabase/migrations/0009_completed_trade_unique_analysis.sql', 'utf8').toLowerCase();
+
+  it('FAILS on duplicates: the duplicate branch raises an exception', () => {
+    expect(sql).toContain('raise exception');
+    expect(sql).toContain('if dup_groups > 0');
+  });
+
+  it('does not create the index when duplicates exist (exception precedes create)', () => {
+    const raiseIdx = sql.indexOf('raise exception');
+    const createIdx = sql.indexOf('create unique index');
+    expect(raiseIdx).toBeGreaterThan(-1);
+    expect(createIdx).toBeGreaterThan(-1);
+    expect(raiseIdx).toBeLessThan(createIdx); // duplicates abort before any create
+  });
+
+  it('clean branch creates the partial unique index; existing index is a safe no-op', () => {
+    expect(sql).toContain('create unique index if not exists completed_trade_user_analysis_uk');
+    expect(sql).toContain('where analysis_id is not null');
+  });
+
+  it('never deletes, updates or archives any row', () => {
+    expect(sql).not.toMatch(/delete\s+from/);
+    expect(sql).not.toMatch(/update\s+public\./);
+    expect(sql).not.toMatch(/update\s+\w+\s+set/);
+    expect(sql).not.toMatch(/drop\s+(table|column|index)/);
+    expect(sql).not.toMatch(/set\s+archived_at/);
+  });
+});
