@@ -13,7 +13,7 @@ It scores indicators across 7 timeframes grouped into three blocks:
 
 The result is a directional bias (BUY / SELL), a grade (A–F), a status (e.g. Ready / Extended), a target quality, and a block alignment indicator (HIGH / MEDIUM / LOW).
 
-The final Trade / No Trade permission is a separate step — it comes only from the Extra Check (1H + 15M), never from the grade or "Extended" status on their own.`
+For most grades (A–D) the Action is a readiness verdict (TRADE / WAIT). For an Extended / grade-F setup the decision is deferred to the Extra Check (1H + 15M) instead — it is never marked "No Trade" just for being Extended.`
   },
   {
     title: '📋 Step 1 — Add an Instrument',
@@ -57,14 +57,14 @@ The decision is always visible as you work — no need to scroll down.`
   },
   {
     title: '🚦 Extra Check (Red / Green Light)',
-    content: `Below the timeframe rows is the Extra Check — the final gate that decides Trade vs No Trade, using H1 and M15.
+    content: `Below the timeframe rows is the Extra Check — a standalone confirmation using H1 and M15. It always adds +5 pts to the winning side when both agree, and for an Extended / grade-F setup it becomes the deciding gate for Trade vs No Trade.
 
 Set each to +1 or −1:
-• Both +1 → Green Light ✅ BUY confirmed (and adds +5 pts to the winning side)
-• Both −1 → Red Light 🔴 SELL confirmed (and adds +5 pts to the winning side)
+• Both +1 → Green Light ✅ BUY confirmed
+• Both −1 → Red Light 🔴 SELL confirmed
 • They conflict → No Trade (no bonus added)
 
-Until BOTH 1H and 15M are set, the Action shows PENDING — not No Trade. The grade and "Extended" status describe the market; only this Extra Check grants permission to enter.`
+On an Extended / grade-F card the Action stays PENDING until BOTH 1H and 15M are set — never "No Trade" just for being Extended. On A–D grades the Extra Check is an optional confirmation; the Action there comes from the grade and alignment.`
   },
   {
     title: '📁 Summary Dashboard',
@@ -146,18 +146,22 @@ Enable or disable this in Settings → Display → Why this trade?`
 
 Grade, status and target quality describe the MARKET. They never say No Trade on their own — even an Extended / grade-F setup keeps its direction and a GOOD target.
 
-Action (the final trade permission) comes ONLY from the Extra Check:
-  PENDING = 1H / 15M not both set yet — enter them to decide
-  BUY = 1H and 15M both +1
-  SELL = 1H and 15M both −1
-  NO TRADE = 1H and 15M mismatch or neutral`
+Action (trade permission):
+  A–D grades — a readiness verdict from grade + block alignment:
+    TRADE = aligned setup, ready to act
+    WAIT = signals present but not fully aligned yet
+  Extended / grade-F — deferred to the Extra Check:
+    PENDING = 1H / 15M not both set yet — enter them to decide
+    BUY = 1H and 15M both +1
+    SELL = 1H and 15M both −1
+    NO TRADE = 1H and 15M mismatch or neutral`
   },
   {
     title: '🔧 Filters',
     content: `Use the filter button (top-right of Summary) to narrow your card list:
 
 • A/B Only — hide C, D, F grades
-• Hide WAIT — hide setups whose status isn't ready (Wait / Trend Off / Monitor / Dangerous)
+• Hide WAIT — hide setups that aren't actionable yet (WAIT, and PENDING on Extended/F)
 • Hide Extended — remove overextended setups
 • Aligned Only — show only HIGH or MEDIUM alignment
 

@@ -25,9 +25,9 @@ export default function AssetQuickSwitch({ analyses, currentInstrument, onInstru
           const isActive = a.instrument === currentInstrument;
           const { results } = a;
           
-          // Determine status indicators — the Extra Check has confirmed a
-          // tradeable direction (BUY or SELL), not merely PENDING/No Trade.
-          const isTradeReady = ['BUY', 'SELL'].includes(results?.tradeAction);
+          // Determine status indicators — an actionable setup: an aligned A–D
+          // TRADE, or an Extra-Check-confirmed BUY/SELL on an Extended/F setup.
+          const isTradeReady = ['TRADE', 'BUY', 'SELL'].includes(results?.tradeAction);
           const isIncomplete = !results || !results.mainDirection;
           
           return (
