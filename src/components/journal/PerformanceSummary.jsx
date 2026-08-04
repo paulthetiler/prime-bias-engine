@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import {
   TrendingUp, TrendingDown, Percent, Sigma, Scale, Hash, Flame, Trophy,
+  ArrowUpRight, ArrowDownRight, Target, Activity, Wallet, Ruler,
 } from 'lucide-react';
 import { TIME_FILTERS } from '@/lib/journalStats';
 import EquityCurve from './EquityCurve';
@@ -56,7 +57,7 @@ function MetricCard({ icon: Icon, label, value, sub, hint, tone = 'neutral', ind
  * and passed in from the page (which owns deposits/withdrawals).
  */
 export default function PerformanceSummary({
-  stats, series, timeframe, onTimeframe,
+  stats, perf, series, timeframe, onTimeframe,
   roiPct, openingBalance, currentBalance, currency, monetaryEnabled = true,
 }) {
   const {
@@ -158,6 +159,52 @@ export default function PerformanceSummary({
           tone={bestWinStreak ? 'up' : 'neutral'}
         />
       </div>
+
+      {/* Extended metrics (phase 6) — proves the new performance layer is wired. */}
+      {perf && monetaryEnabled && (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <MetricCard
+            index={0} icon={ArrowUpRight} label="Avg Win"
+            value={perf.averageWin != null ? fmtMoney(perf.averageWin, currency) : null}
+            hint="No wins yet" tone={perf.averageWin != null ? 'up' : 'neutral'}
+          />
+          <MetricCard
+            index={1} icon={ArrowDownRight} label="Avg Loss"
+            value={perf.averageLoss != null ? fmtMoney(-perf.averageLoss, currency) : null}
+            hint="No losses yet" tone={perf.averageLoss != null ? 'down' : 'neutral'}
+          />
+          <MetricCard
+            index={2} icon={Target} label="Expectancy"
+            value={perf.expectancyMoney != null ? fmtMoney(perf.expectancyMoney, currency) : null}
+            sub="per trade"
+            tone={perf.expectancyMoney == null ? 'neutral' : perf.expectancyMoney >= 0 ? 'up' : 'down'}
+          />
+          <MetricCard
+            index={3} icon={Activity} label="Max Drawdown"
+            value={perf.tradingDrawdown != null ? `${fmtMoney(-perf.tradingDrawdown, currency)}` : null}
+            sub={perf.tradingDrawdownPct ? `${perf.tradingDrawdownPct}% · trading` : 'trading only'}
+            tone={perf.tradingDrawdown ? 'down' : 'neutral'}
+          />
+          <MetricCard
+            index={4} icon={Wallet} label="Wages Withdrawn"
+            value={perf.wages ? fmtMoney(-perf.wages, currency) : (perf.hasPnl ? fmtMoney(0, currency) : null)}
+            hint="No wages" tone="neutral"
+          />
+          <MetricCard
+            index={5} icon={Ruler} label="Total Pips"
+            value={perf.totalPips != null ? fmtSigned(perf.totalPips, { dp: 1 }) : null}
+            sub={perf.pipsCount ? `${perf.pipsCount} trades · avg ${perf.avgPips}` : undefined}
+            hint="No pips recorded"
+            tone={perf.totalPips == null ? 'neutral' : perf.totalPips >= 0 ? 'up' : 'down'}
+          />
+          <MetricCard
+            index={6} icon={Hash} label="Worst Loss Streak"
+            value={perf.worstLossStreak || null}
+            sub={perf.worstLossStreak ? 'losses in a row' : undefined}
+            tone={perf.worstLossStreak ? 'down' : 'neutral'}
+          />
+        </div>
+      )}
 
       {/* Equity curve */}
       <EquityCurve

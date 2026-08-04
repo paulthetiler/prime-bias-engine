@@ -14,6 +14,7 @@ import {
 } from '@/lib/accounts';
 import { ensureDefaultAccount } from '@/lib/accountData';
 import { normalizeTrade } from '@/lib/tradeCompat';
+import { computePerformance, engineVersionsInScope } from '@/lib/performance';
 import PerformanceSummary from '@/components/journal/PerformanceSummary';
 import GradeAssetBreakdown from '@/components/journal/GradeAssetBreakdown';
 
@@ -108,6 +109,14 @@ export default function JournalStats() {
   const grades = useMemo(() => computeGradeBreakdown(windowTrades), [windowTrades]);
   const assets = useMemo(() => computeAssetRanking(windowTrades), [windowTrades]);
 
+  // Phase-6 extended metrics (avg win/loss, expectancy, drawdown, wages, pips)
+  // and the engine-version awareness for the current scope.
+  const perf = useMemo(
+    () => (monetaryEnabled ? computePerformance({ account: combinedAccount, txns: accountTxns, trades: accountTrades, windowStartMs }) : null),
+    [monetaryEnabled, combinedAccount, accountTxns, accountTrades, windowStartMs]
+  );
+  const engineVersions = useMemo(() => engineVersionsInScope(windowTrades), [windowTrades]);
+
   return (
     <div className="p-4 space-y-4 pb-24">
       <div className="flex items-center gap-2 pt-2">
@@ -151,8 +160,14 @@ export default function JournalStats() {
               Your accounts use different currencies, so monetary totals aren’t combined. Pick a single account to see Net P/L, ROI and balance.
             </div>
           )}
+          {engineVersions.length > 1 && (
+            <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-700 dark:text-yellow-300">
+              This view combines {engineVersions.length} engine versions ({engineVersions.join(', ')}). Grade/score comparisons mix different engine logic — read engine-quality breakdowns per version.
+            </div>
+          )}
           <PerformanceSummary
             stats={stats}
+            perf={perf}
             series={series}
             timeframe={timeframe}
             onTimeframe={setTimeframe}
