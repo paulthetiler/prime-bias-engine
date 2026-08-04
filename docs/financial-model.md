@@ -305,3 +305,94 @@ Editing realised/journal fields never writes the engine-snapshot columns
 (`engine_version`, `engine_settings`, `raw_grade`, `buy_score`, `sell_score`,
 `timeframes_snapshot`, `grade`, `score`, `inputs_snapshot`, …), so the original
 analysis is preserved byte-for-byte across edits.
+
+## 9. Ledger hardening (Wage Maker integration, phase 5)
+
+The account balance is one **derived, ordered** sequence of events — never a
+stored number. `lib/ledger.js` is the single view over the two sources of truth.
+
+```mermaid
+flowchart LR
+  subgraph Sources[Sources of truth]
+    CT["CompletedTrade<br/>net_pnl (fees inside)"]
+    AT["AccountTransaction<br/>deposit · withdrawal ·<br/>wage_withdrawal · adjustment"]
+    SB["TradingAccount<br/>starting_balance"]
+  end
+  CT --> LE[ledgerEvents]
+  AT --> LE
+  LE --> SORT[sortLedgerEvents<br/>deterministic order]
+  SB --> BL[buildLedger]
+  SORT --> BL
+  BL --> RUN["rows with DERIVED<br/>running_balance"]
+  BL --> RB[rebuildBalance]
+  RB -. must equal .-> AB["accountBalance()<br/>(canonical)"]
+  RUN --> UI[AccountsManager · History]
+  CT --> IC[checkLedgerIntegrity]
+  AT --> IC
+  SB --> IC
+  IC --> REP["readable report<br/>(/admin/integrity)"]
+```
+
+### One source per value (no duplication)
+- **CompletedTrade** holds gross P&L, fees and `net_pnl` (fees are *inside*
+  net_pnl). A trade contributes `net_pnl` to the ledger **exactly once**; fees are
+  never a separate ledger event, so a trade fee cannot be double-counted.
+- **AccountTransaction** holds deposits, withdrawals, wage withdrawals and
+  adjustments. Each contributes its signed `txnDelta` exactly once.
+- **TradingAccount.starting_balance** is the only opening figure.
+- Running balances are **derived** in `buildLedger`, never persisted.
+
+### Deterministic ordering (same timestamp)
+Events sort by event time ascending (undated legacy events sort **first**, as
+prior history). Ties break by a fixed **kind rank**
+`starting < deposit < adjustment < trade < withdrawal < wage_withdrawal`
+(money in and the trade that may depend on it apply before money out), then by
+record `id` as a final stable tiebreak. The final balance is order-independent
+(a sum); the rank only stabilises the displayed running balance.
+
+### Balance rebuilding
+`rebuildBalance(account, txns, trades)` = starting balance folded over the
+ordered events. By construction it equals `accountBalance()`; the integrity
+checker flags any divergence (`balance_reconstruction_failure`). `realisedPnl`
+now applies the legacy `withDerivedFinancials` shim internally, so a legacy
+`pnl`-only trade counts once and both figures agree regardless of caller mapping.
+
+### Integrity checker (admin-only, no repairs)
+`checkLedgerIntegrity({ accounts, txns, trades })` → `formatIntegrityReport`
+detects: duplicate analysis IDs, orphan trades, missing accounts, broken
+transaction chains, possible fee double-counts (adjustments that look like trade
+fees), negative balances and balance-reconstruction failures. Surfaced read-only
+at `/admin/integrity`, **gated by the app's admin check** (`base44.auth.me()`
+role = Supabase `user_metadata.role === 'admin'`, the same check `PageNotFound`
+uses). Access is resolved **before** any query runs — the accounts, transactions
+and trades are fetched with React Query `enabled: isAdmin`, so a non-admin (or
+the pre-auth loading state) never triggers them and a direct visit renders the
+existing not-found page with no report or identifiers. It never mutates or
+repairs anything. Being unlinked in the nav is **not** the access control — the
+role check is.
+
+### Duplicate protection (DB-level, deferred from phase 4)
+Migration `0009` adds a **partial unique index** on
+`completed_trade (user_id, analysis_id) WHERE analysis_id IS NOT NULL`. It is
+**self-investigating, non-destructive, and fails loudly** so it can never be
+recorded as applied without enforcing uniqueness:
+
+- **clean database** → creates the index and succeeds;
+- **duplicates present** → prints each offending `(user_id, analysis_id)` group,
+  then `RAISE EXCEPTION` so the whole migration **fails and stays unapplied** —
+  nothing is created;
+- **duplicates resolved** (a manual operator step — the migration never deletes,
+  archives or modifies rows) → re-running succeeds and creates the index;
+- **index already exists** → `IF NOT EXISTS` makes it a safe no-op success.
+
+Because a migration that exited successfully without the index could be marked
+applied by Supabase (and `supabase db push` would not run it again), the
+duplicate branch must fail rather than "succeed with a NOTICE". This complements
+the app-level `analysis_id` guard from phase 4.
+
+### Orphan trades
+Trades with `account_id = NULL` remain **visible** and are attributed to the sole
+active account when exactly one exists (`tradeInAccount` / ledger `soleId`), so
+they never drop out of totals. With multiple accounts they surface under "All
+accounts" and the integrity checker flags them (`orphan_trade`, warning) for
+explicit assignment — they are never silently dropped or reassigned.

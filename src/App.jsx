@@ -25,6 +25,7 @@ const JournalStats = lazy(() => import('@/pages/JournalStats.jsx'));
 const ATR          = lazy(() => import('@/pages/ATR'));
 const Settings     = lazy(() => import('@/pages/Settings.jsx'));
 const EngineTest   = lazy(() => import('@/pages/EngineTest.jsx'));
+const IntegrityCheck = lazy(() => import('@/pages/IntegrityCheck.jsx'));
 
 // Shown briefly while a route chunk loads. Mirrors the auth-loading spinner.
 const RouteFallback = () => (
@@ -85,6 +86,7 @@ const AuthenticatedApp = () => {
 
           </Route>
           <Route path="/admin/engine-test" element={<EngineTest />} />
+          <Route path="/admin/integrity" element={<IntegrityCheck />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </AnimatePresence>
