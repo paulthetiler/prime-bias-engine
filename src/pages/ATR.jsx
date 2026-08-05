@@ -62,7 +62,7 @@ export default function ATR() {
 
       {/* Description */}
       <p className="text-xs text-muted-foreground px-1">
-        Set custom ATR values for your top 5 traded assets. These will override default values when calculating targets.
+        Set custom ATR values for your top 5 traded assets. These override the default values when calculating the minimum safe move.
       </p>
 
       {/* Top 5 Assets with ATR Overrides */}
@@ -223,10 +223,15 @@ export default function ATR() {
       <div className="text-xs text-muted-foreground bg-accent/20 rounded-lg p-3 border border-border space-y-1">
         <div className="font-semibold">How ATR is used:</div>
         <ul className="list-disc list-inside space-y-0.5">
-          <li>Target = (ATR ÷ 9) × grade weight</li>
+          <li>Minimum Safe Move = (ATR ÷ 9) × grade weight</li>
           <li>Grade weights: A (1.25), B (1.0), C (0.75), D (0.5)</li>
           <li>Custom values override base ATR for selected assets</li>
         </ul>
+        <div className="pt-1">
+          This is the minimum room a trade needs to breathe — a floor, not a
+          take-profit. Your actual target comes from market structure (support,
+          resistance, liquidity) and is often further out.
+        </div>
       </div>
     </div>
   );

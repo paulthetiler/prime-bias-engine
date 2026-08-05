@@ -518,8 +518,9 @@ function formatAtrValue(value) {
 }
 
 /**
- * The full "ATR Used" label for an instrument, e.g. "128 pips" or "245 points".
- * Returns null when there is no ATR value to show.
+ * The formatted "Minimum Safe Move" value for an instrument, e.g. "128 pips" or
+ * "245 points". This is the ATR-derived floor a trade needs to breathe — NOT a
+ * take-profit target. Returns null when there is no ATR value to show.
  *
  * @param {number|null|undefined} value
  * @param {string} instrument

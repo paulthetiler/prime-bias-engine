@@ -591,13 +591,17 @@ export default function Input() {
         </>
       )}
 
-      {/* ATR & Target */}
+      {/* Minimum Safe Move & Target */}
       {instrument && (
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="grid grid-cols-2 divide-x divide-border">
-            <div className="px-3 py-2.5">
-              <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">ATR Used</div>
+            <div
+              className="px-3 py-2.5"
+              title="The minimum room this trade needs to breathe (based on ATR). It is a floor, not a take-profit — the actual target comes from market structure and is often further out."
+            >
+              <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Minimum Safe Move</div>
               <div className="text-base font-mono font-bold text-foreground">{formatAtrUsed(baseAtr, instrument) || '—'}</div>
+              <div className="text-[9px] text-muted-foreground mt-0.5">min. room to breathe — not a take-profit</div>
             </div>
             <div className="px-3 py-2.5">
               <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Target</div>

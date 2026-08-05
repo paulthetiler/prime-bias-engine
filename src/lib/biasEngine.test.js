@@ -371,7 +371,7 @@ describe('ATR display units', () => {
     expect(formatAtrValue(NaN)).toBeNull();
   });
 
-  it('builds the full "ATR Used" label with the right unit', () => {
+  it('builds the full Minimum Safe Move value with the right unit', () => {
     expect(formatAtrUsed(128, 'GBP/JPY')).toBe('128 pips');
     expect(formatAtrUsed(245, 'US100')).toBe('245 points');
     expect(formatAtrUsed(19, 'XAUUSD')).toBe('19 points');
