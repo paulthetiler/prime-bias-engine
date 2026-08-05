@@ -36,10 +36,13 @@ export default function TopNav() {
 
     openPicker();
   };
-  
+
   return (
-    <div className="sticky top-0 z-40 px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm" style={{ paddingTop: `calc(0.75rem + var(--safe-area-top))` }}>
-      <div className="flex items-center gap-3 max-w-lg mx-auto">
+    <div
+      className="sticky top-0 z-40 px-3 py-2.5 border-b border-border bg-background/80 backdrop-blur-sm"
+      style={{ paddingTop: `calc(0.625rem + var(--safe-area-top))` }}
+    >
+      <div className="flex items-center gap-2 max-w-lg mx-auto">
         {!isOnDashboard && !isOnBiasTool && (
           <Button
             variant="ghost"
@@ -54,7 +57,7 @@ export default function TopNav() {
           <Button
             variant={isOnDashboard ? 'default' : 'outline'}
             size="sm"
-            className="rounded-full"
+            className="rounded-full px-3"
           >
             Summary
           </Button>
@@ -63,7 +66,7 @@ export default function TopNav() {
           <Button
             variant={isOnBiasTool ? 'default' : 'outline'}
             size="sm"
-            className="rounded-full"
+            className="rounded-full px-3"
           >
             Bias Tool
           </Button>
@@ -73,11 +76,12 @@ export default function TopNav() {
           variant="outline"
           size="sm"
           onClick={openInstrumentPicker}
-          className="rounded-full ml-auto gap-1.5 whitespace-nowrap"
+          className="rounded-full ml-auto gap-1 px-3 whitespace-nowrap"
           aria-label="Add instrument"
+          title="Add instrument"
         >
           <Plus className="w-4 h-4" />
-          Add Instrument
+          Add
         </Button>
       </div>
     </div>
