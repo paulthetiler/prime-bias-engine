@@ -17,7 +17,7 @@ function TriButton({ label, value, onChange }) {
   return (
     <button
       onClick={cycle}
-      className={cn('flex-1 rounded-lg border px-3 py-2 text-center transition-colors', color)}
+      className={cn('min-w-0 rounded-lg border px-3 py-2 text-center transition-colors', color)}
     >
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{label}</div>
       <div className="text-base font-bold font-mono">{display}</div>
@@ -38,7 +38,7 @@ export default function ExtraCheck({ h1, m15, onChange }) {
     buy:      { box: 'bg-emerald-500/10 border-emerald-500/30', dot: 'bg-emerald-400', text: 'text-emerald-700 dark:text-emerald-300', label: 'Green Light — Buy confirmed' },
     sell:     { box: 'bg-red-500/10 border-red-500/30',         dot: 'bg-red-400',     text: 'text-red-700 dark:text-red-300',         label: 'Red Light — Sell confirmed' },
     conflict: { box: 'bg-yellow-500/10 border-yellow-500/30',   dot: 'bg-yellow-400',  text: 'text-yellow-700 dark:text-yellow-300',   label: 'No confirmation — 1H and 15M disagree' },
-    none:     { box: 'bg-secondary border-border',              dot: 'bg-muted-foreground', text: 'text-muted-foreground',            label: 'Set 1H and 15M to check' },
+    none:     { box: 'bg-secondary border-border',              dot: 'bg-muted-foreground', text: 'text-muted-foreground',            label: 'Set checks' },
   }[result];
 
   return (
@@ -48,14 +48,14 @@ export default function ExtraCheck({ h1, m15, onChange }) {
         <div className="text-[10px] text-muted-foreground">red light / green light</div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
         <TriButton label="1H" value={h1} onChange={(v) => onChange('h1', v)} />
         <TriButton label="15M" value={m15} onChange={(v) => onChange('m15', v)} />
-      </div>
 
-      <div className={cn('flex items-center gap-2 rounded-lg border px-3 py-2', light.box)}>
-        <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', light.dot)} />
-        <span className={cn('text-xs font-semibold', light.text)}>{light.label}</span>
+        <div className={cn('flex min-w-[108px] items-center justify-center gap-2 rounded-lg border px-3 py-2', light.box)}>
+          <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', light.dot)} />
+          <span className={cn('text-xs font-semibold whitespace-nowrap', light.text)}>{light.label}</span>
+        </div>
       </div>
     </div>
   );
