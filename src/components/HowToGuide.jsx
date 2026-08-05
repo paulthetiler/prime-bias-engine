@@ -23,9 +23,9 @@ The asset is immediately added to your active set and appears as a card on the S
 
 You can have multiple instruments active at once. Switch between them using the quick-switch tabs at the top of the Bias Tool.
 
-To remove an instrument, select it and tap "Remove".
+To remove an instrument, select it and tap the trash icon in the top-right of the Bias Tool, then confirm.
 
-To clear all active analyses, tap the trash icon in the top-right of the Bias Tool or Summary.`
+To clear all active analyses at once, tap the trash icon in the top-right of the Summary.`
   },
   {
     title: '🎛️ Step 2 — Enter Your Indicators',

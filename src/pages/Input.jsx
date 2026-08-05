@@ -94,7 +94,7 @@ export default function Input() {
   const [activeAssets, setActiveAssets] = useState(() => getActiveStore());
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle | saving | saved | error
   const [autoSaveError, setAutoSaveError] = useState(null); // human-readable reason a save failed
-  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   const [topAssets, setTopAssets] = useState(() => {
     const top = JSON.parse(localStorage.getItem('primebias_top_assets') || '[]');
@@ -320,40 +320,34 @@ export default function Input() {
     setExtraCheck(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleClearAll = () => {
-    localStorage.removeItem('primebias_active');
-    localStorage.removeItem('primebias_inputs');
-    localStorage.removeItem('primebias_instrument');
+  const handleRemoveInstrument = () => {
+    const removed = instrument;
+
+    // Cancel any pending DB save for the instrument being removed (and supersede
+    // any in-flight retry loop) so a late save can't resurrect it.
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    saveGenRef.current++; // supersede any in-flight retry loop
+    saveGenRef.current++;
     pendingSaveRef.current = null;
     setAutoSaveError(null);
     setAutoSaveStatus('idle');
-    setInstrument('');
-    setInputs(getDefaultInputs());
-    setExtraCheck({ h1: null, m15: null });
-    setActiveAssets({});
-    window.dispatchEvent(new Event('biasUpdated'));
-    toast.success('Cleared all analyses');
-    setConfirmClear(false);
-  };
 
-  const handleRemoveInstrument = () => {
     // Remove from active trades
     const active = getActiveStore();
-    delete active[instrument];
+    delete active[removed];
     saveActiveStore(active);
 
-    // Also remove from input storage if user wants a full reset
+    // Also remove its saved indicator inputs
     const inputStore = getInputStore();
-    delete inputStore[instrument];
+    delete inputStore[removed];
     saveInputStore(inputStore);
 
     localStorage.removeItem('primebias_instrument');
     setActiveAssets({ ...active });
     window.dispatchEvent(new Event('biasUpdated'));
-    toast.success('Removed from active');
-    // Switch to another active instrument or clear
+    toast.success(`Removed ${removed}`);
+    setConfirmRemove(false);
+
+    // Automatically select the next available instrument (or clear if none left)
     const remaining = Object.keys(active);
     switchInstrument(remaining[0] || '');
   };
@@ -402,10 +396,11 @@ export default function Input() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setConfirmClear(true)}
-            className="h-8 w-8 text-destructive hover:text-destructive"
-            aria-label="Clear all data"
-            title="Clear all data"
+            onClick={() => setConfirmRemove(true)}
+            disabled={!instrument}
+            className="h-11 w-11 text-muted-foreground hover:text-destructive disabled:opacity-40"
+            aria-label={instrument ? `Remove ${instrument}` : 'Remove instrument'}
+            title={instrument ? `Remove ${instrument}` : 'Remove instrument'}
           >
             <Trash2 className="w-4 h-4" />
           </Button>
@@ -435,22 +430,22 @@ export default function Input() {
         </div>
       )}
 
-      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear all analyses?</AlertDialogTitle>
+            <AlertDialogTitle>Remove {instrument}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This clears every saved instrument and its indicator inputs from the Bias Tool and
-              Summary on this device. Your completed trades, journals and history are not affected.
+              This clears {instrument} and its indicator inputs from the Bias Tool and Summary on this
+              device. Your completed trades, journals and history are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleClearAll}
+              onClick={handleRemoveInstrument}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Clear all
+              Remove
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -505,12 +500,6 @@ export default function Input() {
             </Command>
           </PopoverContent>
         </Popover>
-
-        {instrument && (
-          <Button variant="outline" size="sm" className="w-full" onClick={handleRemoveInstrument}>
-            Remove {instrument}
-          </Button>
-        )}
       </div>
 
       {/* No instrument helper */}
