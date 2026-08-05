@@ -137,6 +137,22 @@
   white-space: nowrap;
 }
 
+/* Make the Summary card's Complete action read as the clear primary next step. */
+div.flex.items-center.justify-between.px-3.py-2.border-t.border-border\/40.bg-secondary\/10 > button {
+  color: hsl(var(--primary-foreground));
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  box-shadow: 0 4px 10px -4px hsl(var(--primary) / 0.45);
+}
+div.flex.items-center.justify-between.px-3.py-2.border-t.border-border\/40.bg-secondary\/10 > button:hover {
+  color: hsl(var(--primary-foreground));
+  background-color: hsl(var(--primary) / 0.9);
+  border-color: hsl(var(--primary));
+}
+div.flex.items-center.justify-between.px-3.py-2.border-t.border-border\/40.bg-secondary\/10 > button:active {
+  transform: scale(0.97);
+}
+
 /* ── Buy / Sell / Neutral semantic helpers ─────────────────────────────────── */
 .text-buy  { color: hsl(var(--chart-1)); }  /* teal */
 .text-sell { color: hsl(var(--destructive)); }
