@@ -464,10 +464,18 @@ function getATRForAsset(asset, topAssets) {
   return BASE_ATR[asset] || 0;
 }
 
-function calculateTarget(atr, grade) {
+// Minimum Safe Move — the ATR-derived FLOOR a trade needs to breathe, scaled by
+// grade: (ATR ÷ 9) × grade weight. This is a minimum, NOT a take-profit. The
+// actual take-profit is the trader's decision from market structure and is
+// usually further out — the app does not compute a market-structure target.
+//
+// Returns { value, grade }, with `target`/`targetType` kept as aliases so
+// already-persisted analyses and completed trades (which stored those keys) keep
+// resolving. Do not read the aliases in new code — use `value`/`grade`.
+function calculateMinSafeMove(atr, grade) {
   if (!atr) return null;
-  const target = (atr * (TARGET_WEIGHTS[grade] || 0.5)) / TARGET_DIVISOR;
-  return { target: parseFloat(target.toFixed(4)), targetType: grade };
+  const value = parseFloat(((atr * (TARGET_WEIGHTS[grade] || 0.5)) / TARGET_DIVISOR).toFixed(4));
+  return { value, grade, target: value, targetType: grade };
 }
 
 // ─── ATR display units ────────────────────────────────────────────────────────
@@ -518,15 +526,16 @@ function formatAtrValue(value) {
 }
 
 /**
- * The formatted "Minimum Safe Move" value for an instrument, e.g. "128 pips" or
- * "245 points". This is the ATR-derived floor a trade needs to breathe — NOT a
- * take-profit target. Returns null when there is no ATR value to show.
+ * Format a value in the instrument's trading unit, e.g. "128 pips" or
+ * "14.2 points". Used for both the raw ATR ("ATR Used") and the ATR-derived
+ * "Minimum Safe Move", so the unit always matches the instrument. Returns null
+ * when there is no value to show.
  *
  * @param {number|null|undefined} value
  * @param {string} instrument
  * @returns {string|null}
  */
-function formatAtrUsed(value, instrument) {
+function formatWithUnit(value, instrument) {
   const formatted = formatAtrValue(value);
   if (formatted == null) return null;
   const unit = atrUnitForInstrument(instrument);
@@ -621,7 +630,7 @@ const TF_GRADE_WEIGHTS = TF_SCORE_WEIGHTS;
 export {
   TIMEFRAMES, WEIGHTS, TF_SCORE_WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS,
   ASSETS, BASE_ATR, TARGET_WEIGHTS,
-  getDefaultInputs, calculateBias, getATRForAsset, calculateTarget,
-  atrUnitForInstrument, formatAtrValue, formatAtrUsed,
+  getDefaultInputs, calculateBias, getATRForAsset, calculateMinSafeMove,
+  atrUnitForInstrument, formatAtrValue, formatWithUnit,
   engineOptionsFromSettings, createEngineSnapshot,
 };

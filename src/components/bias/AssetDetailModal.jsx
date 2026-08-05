@@ -4,6 +4,7 @@ import { X, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhyThisTrade from './WhyThisTrade';
 import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
+import { formatWithUnit } from '@/lib/biasEngine';
 import { blockBg, blockText, actionBadge, actionLabel, actionHint } from '@/lib/gradeStyles';
 
 const gradeColors = {
@@ -46,7 +47,7 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
 
   const alignment = calcAlignment(results);
   const dirColor = mainDirection === 'BUY' ? 'text-primary' : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
-  const showTarget = settings?.showTarget !== false;
+  const showMinSafeMove = settings?.showTarget !== false; // showTarget: legacy key
   const showScore = settings?.showScore !== false;
   const showAlignment = settings?.showAlignment !== false;
   const showWhy = settings?.showWhyThisTrade !== false;
@@ -104,10 +105,10 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
             {showScore && (
               <Row label="Score" value={`${winningScore} pts`} valueClass="text-foreground" />
             )}
-            {showTarget && (
+            {showMinSafeMove && (
               <Row
-                label="Target"
-                value={targetInfo?.target ? targetInfo.target.toFixed(4) : '—'}
+                label="Min Safe Move"
+                value={formatWithUnit(targetInfo?.target, instrument) || '—'}
                 valueClass="text-foreground font-mono"
               />
             )}

@@ -59,7 +59,7 @@ export default function BiasResult({ results, settings }) {
                 )}
               </span>
 
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Target</span>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Setup Quality</span>
               <span className="text-[11px] font-mono font-semibold text-foreground">{targetNote || '—'}</span>
             </div>
           </div>

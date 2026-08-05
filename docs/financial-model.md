@@ -14,9 +14,10 @@ derived, and the "Avg R:R" tile showed a meaningless number.
 | `bias_analysis`, `trade_journal_entry` | Analysis snapshots / journaling. | Not financial. |
 
 **The "Avg R:R 173.9 planned" bug.** `computeStats` averaged `trade.target`.
-`target` is **not** an R:R ratio — it is `calculateTarget()` from the bias
-engine (`(atr * TARGET_WEIGHTS[grade]) / TARGET_DIVISOR`, `biasEngine.js`), an
-ATR-derived price distance. Averaging those yields nonsense. `rMultiple()`
+`target` is **not** an R:R ratio — it is the **Minimum Safe Move** from the bias
+engine (`calculateMinSafeMove()`: `(atr * TARGET_WEIGHTS[grade]) / TARGET_DIVISOR`,
+`biasEngine.js`), an ATR-derived floor, not a take-profit. (The value is stored
+under the legacy `target` key.) Averaging those yields nonsense. `rMultiple()`
 likewise faked R as "win = planned target, loss = −1", i.e. it never used real
 risk. Both are removed; real R needs `amountRisked`.
 

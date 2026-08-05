@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateBias,
-  calculateTarget,
+  calculateMinSafeMove,
   getATRForAsset,
   getDefaultInputs,
   atrUnitForInstrument,
   formatAtrValue,
-  formatAtrUsed,
+  formatWithUnit,
   engineOptionsFromSettings,
   createEngineSnapshot,
   ENGINE_VERSION,
@@ -304,21 +304,27 @@ describe('A/B/C/D keep the grade+alignment readiness Action (do NOT defer)', () 
   });
 });
 
-describe('calculateTarget & ATR', () => {
-  it('computes target = (ATR / 9) * grade weight', () => {
-    expect(calculateTarget(90, 'A')).toEqual({ target: 12.5, targetType: 'A' }); // 90/9*1.25
-    expect(calculateTarget(90, 'B')).toEqual({ target: 10, targetType: 'B' });   // 90/9*1.0
-    expect(calculateTarget(90, 'C')).toEqual({ target: 7.5, targetType: 'C' });  // 90/9*0.75
-    expect(calculateTarget(90, 'D')).toEqual({ target: 5, targetType: 'D' });    // 90/9*0.5
+describe('calculateMinSafeMove & ATR', () => {
+  it('computes minimum safe move = (ATR / 9) * grade weight', () => {
+    expect(calculateMinSafeMove(90, 'A').value).toBe(12.5); // 90/9*1.25
+    expect(calculateMinSafeMove(90, 'B').value).toBe(10);   // 90/9*1.0
+    expect(calculateMinSafeMove(90, 'C').value).toBe(7.5);  // 90/9*0.75
+    expect(calculateMinSafeMove(90, 'D').value).toBe(5);    // 90/9*0.5
+  });
+
+  it('carries the grade and keeps legacy target/targetType aliases', () => {
+    expect(calculateMinSafeMove(90, 'A')).toEqual({
+      value: 12.5, grade: 'A', target: 12.5, targetType: 'A',
+    });
   });
 
   it('falls back to 0.5 weight for grades without an explicit weight (e.g. F)', () => {
-    expect(calculateTarget(90, 'F')).toEqual({ target: 5, targetType: 'F' });
+    expect(calculateMinSafeMove(90, 'F').value).toBe(5);
   });
 
   it('returns null when ATR is missing', () => {
-    expect(calculateTarget(0, 'A')).toBeNull();
-    expect(calculateTarget(null, 'A')).toBeNull();
+    expect(calculateMinSafeMove(0, 'A')).toBeNull();
+    expect(calculateMinSafeMove(null, 'A')).toBeNull();
   });
 
   it('prefers a user ATR override, else falls back to BASE_ATR', () => {
@@ -371,12 +377,13 @@ describe('ATR display units', () => {
     expect(formatAtrValue(NaN)).toBeNull();
   });
 
-  it('builds the full Minimum Safe Move value with the right unit', () => {
-    expect(formatAtrUsed(128, 'GBP/JPY')).toBe('128 pips');
-    expect(formatAtrUsed(245, 'US100')).toBe('245 points');
-    expect(formatAtrUsed(19, 'XAUUSD')).toBe('19 points');
-    expect(formatAtrUsed(1, 'EUR/USD')).toBe('1 pip'); // singular
-    expect(formatAtrUsed(null, 'EUR/USD')).toBeNull();
+  it('formats a value in the instrument trading unit', () => {
+    expect(formatWithUnit(128, 'GBP/JPY')).toBe('128 pips');
+    expect(formatWithUnit(245, 'US100')).toBe('245 points');
+    expect(formatWithUnit(19, 'XAUUSD')).toBe('19 points');
+    expect(formatWithUnit(14.22, 'GBP/JPY')).toBe('14.2 pips'); // ATR-derived min safe move
+    expect(formatWithUnit(1, 'EUR/USD')).toBe('1 pip'); // singular
+    expect(formatWithUnit(null, 'EUR/USD')).toBeNull();
   });
 });
 

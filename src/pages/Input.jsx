@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget, formatAtrUsed, engineOptionsFromSettings } from '@/lib/biasEngine';
+import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateMinSafeMove, formatWithUnit, engineOptionsFromSettings } from '@/lib/biasEngine';
 import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
 import ExtraCheck from '@/components/bias/ExtraCheck';
@@ -253,8 +253,9 @@ export default function Input() {
     const atrValue = getATRForAsset(instrument, topAssets);
     setBaseAtr(atrValue);
 
-    const targetData = calculateTarget(atrValue, res.grade);
-    setTargetInfo(targetData);
+    // `targetInfo` is a legacy storage key; it holds the Minimum Safe Move.
+    const minSafeMove = calculateMinSafeMove(atrValue, res.grade);
+    setTargetInfo(minSafeMove);
 
     // ── Persist inputs to separate storage (decoupled from active trades) ──
     const inputStore = getInputStore();
@@ -591,24 +592,21 @@ export default function Input() {
         </>
       )}
 
-      {/* Minimum Safe Move & Target */}
+      {/* ATR Used & Minimum Safe Move */}
       {instrument && (
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="grid grid-cols-2 divide-x divide-border">
+            <div className="px-3 py-2.5">
+              <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">ATR Used</div>
+              <div className="text-base font-mono font-bold text-foreground">{formatWithUnit(baseAtr, instrument) || '—'}</div>
+            </div>
             <div
               className="px-3 py-2.5"
-              title="The minimum room this trade needs to breathe (based on ATR). It is a floor, not a take-profit — the actual target comes from market structure and is often further out."
+              title="The minimum room this trade needs to breathe (ATR-derived). It is a floor, not a take-profit — set your actual target from market structure, usually further out."
             >
               <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Minimum Safe Move</div>
-              <div className="text-base font-mono font-bold text-foreground">{formatAtrUsed(baseAtr, instrument) || '—'}</div>
-              <div className="text-[9px] text-muted-foreground mt-0.5">min. room to breathe — not a take-profit</div>
-            </div>
-            <div className="px-3 py-2.5">
-              <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Target</div>
-              <div className="text-base font-mono font-bold text-foreground">
-                {targetInfo?.target ? targetInfo.target.toFixed(6) : '—'}
-              </div>
-              {targetInfo?.targetType && <div className="text-[9px] text-muted-foreground">{targetInfo.targetType}</div>}
+              <div className="text-base font-mono font-bold text-foreground">{formatWithUnit(targetInfo?.target, instrument) || '—'}</div>
+              <div className="text-[9px] text-muted-foreground mt-0.5">Minimum room required — not a take-profit.</div>
             </div>
           </div>
         </div>

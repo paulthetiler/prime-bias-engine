@@ -8,7 +8,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { calculateBias, engineOptionsFromSettings } from '@/lib/biasEngine';
+import { calculateBias, engineOptionsFromSettings, formatWithUnit } from '@/lib/biasEngine';
 import { calcAlignment } from '@/lib/alignmentUtils';
 import { gradeText, blockBg, blockText, actionBadge, actionLabel } from '@/lib/gradeStyles';
 import { getSettings } from '@/lib/userSettings';
@@ -57,7 +57,8 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
     ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
     : 'bg-secondary text-muted-foreground border-border';
 
-  const targetDisplay = targetInfo?.target ? targetInfo.target.toFixed(4) : '—';
+  // `targetInfo.target` is the ATR-derived Minimum Safe Move (legacy storage key).
+  const minSafeMoveDisplay = formatWithUnit(targetInfo?.target, instrument) || '—';
 
   return (
     <div
@@ -107,8 +108,8 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
 
             {settings.showTarget && (
               <>
-                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Target</span>
-                <span className="text-xs font-mono font-semibold text-foreground">{targetDisplay}</span>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Min Safe Move</span>
+                <span className="text-xs font-mono font-semibold text-foreground">{minSafeMoveDisplay}</span>
               </>
             )}
           </div>
