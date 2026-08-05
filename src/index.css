@@ -119,6 +119,17 @@
   }
 }
 
+/* Horizontal rows stay swipeable without showing a chunky native scrollbar. */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* ── Buy / Sell / Neutral semantic helpers ─────────────────────────────────── */
 .text-buy  { color: hsl(var(--chart-1)); }  /* teal */
 .text-sell { color: hsl(var(--destructive)); }
