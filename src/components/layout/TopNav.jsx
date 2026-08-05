@@ -22,6 +22,41 @@ export default function TopNav() {
     };
   }, [isOnBiasTool]);
 
+  // Keep the selected instrument visible. This matters most immediately after
+  // adding a new instrument: the pill is appended to the saved order, so without
+  // this it can appear off-screen at the far end of the horizontal row.
+  useEffect(() => {
+    if (!isOnBiasTool) return undefined;
+
+    let lastActive = null;
+    let frame = null;
+
+    const focusActiveInstrument = () => {
+      const activePill = document.querySelector('[data-active="true"]');
+      if (!(activePill instanceof HTMLElement) || activePill === lastActive) return;
+
+      lastActive = activePill;
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        activePill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      });
+    };
+
+    focusActiveInstrument();
+    const observer = new MutationObserver(focusActiveInstrument);
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['data-active'],
+    });
+
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [isOnBiasTool]);
+
   const openInstrumentPicker = () => {
     const openPicker = () => {
       const selector = document.querySelector('button[role="combobox"]');
