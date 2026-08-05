@@ -286,7 +286,7 @@ export default function Input() {
         ? new Date().toISOString()
         : (active[instrument]?.timestamp || new Date().toISOString()),
       atr: atrValue,
-      targetInfo: targetData,
+      targetInfo: minSafeMove,
     };
     saveActiveStore(active);
     setActiveAssets({ ...active });
