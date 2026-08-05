@@ -130,6 +130,13 @@
   height: 0;
 }
 
+/* Keep the Bias Tool workflow helper compact and on one line on mobile. */
+.text-\[10px\].text-muted-foreground\/70 {
+  font-size: 9px;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
 /* ── Buy / Sell / Neutral semantic helpers ─────────────────────────────────── */
 .text-buy  { color: hsl(var(--chart-1)); }  /* teal */
 .text-sell { color: hsl(var(--destructive)); }
