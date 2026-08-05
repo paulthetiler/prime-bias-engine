@@ -15,9 +15,8 @@ import {
 // feel responsive — the same ballpark as rearranging apps on a phone.
 const LONG_PRESS_MS = 300;
 // If the finger travels further than this before the hold completes, the user
-// is scrolling the row, not reordering — abandon the long-press so the native
-// horizontal scroll takes over untouched.
-const MOVE_CANCEL_PX = 8;
+// is scrolling the row, not reordering.
+const MOVE_THRESHOLD_PX = 8;
 
 function triggerHaptic() {
   // Best-effort — silently a no-op where the device/browser doesn't support it
@@ -33,15 +32,22 @@ function triggerHaptic() {
 
 const sameOrder = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
-// One draggable favourite pill. Drag is manually gated behind a long-press
-// (dragListener={false} + our own timer → dragControls.start) so a plain tap
-// still selects the instrument and a horizontal swipe still scrolls the row.
-function ReorderablePill({ analysis, isActive, reordering, onSelect, onReorderStart, interactionRef }) {
+// One draggable favourite pill.
+//
+// The pill owns the horizontal axis (its container is `touch-action: pan-y`, so
+// the browser only ever handles vertical page scroll and never cancels the
+// pointer mid-gesture). That lets one continuous gesture do three things,
+// disambiguated the way a phone home-screen does:
+//   • tap                     → select the instrument
+//   • horizontal swipe        → scroll the row (we drive scrollLeft ourselves)
+//   • press-and-hold, then drag → reorder (framer drag via dragControls)
+function ReorderablePill({ analysis, isActive, reordering, onSelect, onReorderStart, scrollRef, interactionRef }) {
   const controls = useDragControls();
   const longPressTimer = useRef(null);
-  const downEventRef = useRef(null);
-  const pointerStart = useRef(null);
+  const gesture = useRef(null); // { x, y, scrollLeft } | null
   const enteredReorder = useRef(false);
+  const scrolling = useRef(false);
+  const cleanupRef = useRef(null); // detaches the window listeners for this gesture
 
   const clearLongPress = useCallback(() => {
     if (longPressTimer.current) {
@@ -50,44 +56,80 @@ function ReorderablePill({ analysis, isActive, reordering, onSelect, onReorderSt
     }
   }, []);
 
-  useEffect(() => clearLongPress, [clearLongPress]);
+  const endGesture = useCallback(() => {
+    clearLongPress();
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+    gesture.current = null;
+    scrolling.current = false;
+  }, [clearLongPress]);
+
+  useEffect(() => endGesture, [endGesture]);
 
   const handlePointerDown = (e) => {
     // Ignore secondary mouse buttons; touch/pen/left-click only.
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    downEventRef.current = e.nativeEvent;
-    pointerStart.current = { x: e.clientX, y: e.clientY };
+
+    const startEvent = e.nativeEvent;
+    gesture.current = { x: e.clientX, y: e.clientY, scrollLeft: scrollRef.current?.scrollLeft ?? 0 };
     enteredReorder.current = false;
+    scrolling.current = false;
+
+    // Track the whole gesture on window so moves keep coming even as the finger
+    // slides off this pill — and so framer (which also listens on window) and
+    // our scroll handling never fight over pointer capture.
+    const onMove = (ev) => {
+      if (enteredReorder.current || !gesture.current) return; // framer drives the drag
+      const dx = ev.clientX - gesture.current.x;
+      const dy = ev.clientY - gesture.current.y;
+
+      if (!scrolling.current) {
+        if (Math.abs(dx) > MOVE_THRESHOLD_PX && Math.abs(dx) >= Math.abs(dy)) {
+          scrolling.current = true; // predominantly horizontal → a row scroll
+          clearLongPress();
+        } else if (Math.abs(dy) > MOVE_THRESHOLD_PX) {
+          endGesture(); // vertical intent → let the page scroll; abandon this gesture
+          return;
+        }
+      }
+      if (scrolling.current && scrollRef.current) {
+        scrollRef.current.scrollLeft = gesture.current.scrollLeft - dx;
+      }
+    };
+    const onUp = () => {
+      if (scrolling.current) {
+        // A completed scroll must not also register as a tap-to-select.
+        interactionRef.current.suppressClickUntil = performance.now() + 150;
+      }
+      endGesture();
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    cleanupRef.current = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+
     clearLongPress();
     longPressTimer.current = setTimeout(() => {
       enteredReorder.current = true;
       onReorderStart();
       // Hand the in-progress press to framer to begin the drag from here.
-      controls.start(downEventRef.current);
+      controls.start(startEvent);
     }, LONG_PRESS_MS);
   };
 
-  const handlePointerMove = (e) => {
-    if (enteredReorder.current || !pointerStart.current) return;
-    const dx = Math.abs(e.clientX - pointerStart.current.x);
-    const dy = Math.abs(e.clientY - pointerStart.current.y);
-    if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) {
-      // Movement before the hold completes = a scroll gesture. Bail out.
-      clearLongPress();
-    }
-  };
-
-  const endPress = () => {
-    clearLongPress();
-    pointerStart.current = null;
-  };
-
   const handleClick = (e) => {
-    // Swallow the click that trails a drag or a long-press activation so it
-    // never gets mistaken for a tap-to-select.
+    // Swallow the click that trails a drag, a scroll or a long-press activation
+    // so it never gets mistaken for a tap-to-select.
     if (
       reordering ||
       enteredReorder.current ||
+      scrolling.current ||
       (interactionRef.current && performance.now() < interactionRef.current.suppressClickUntil)
     ) {
       e.preventDefault();
@@ -114,16 +156,18 @@ function ReorderablePill({ analysis, isActive, reordering, onSelect, onReorderSt
         cursor: 'grabbing',
       }}
       className="shrink-0"
-      style={{ touchAction: reordering ? 'none' : 'auto' }}
+      style={{ touchAction: 'pan-y' }}
       onContextMenu={(e) => e.preventDefault()}
     >
       <button
         data-active={isActive}
         onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endPress}
-        onPointerCancel={endPress}
         onClick={handleClick}
+        // The finger lands on this button, so IT must own the horizontal axis
+        // (pan-y = browser handles vertical page scroll only). Without this the
+        // button's default `auto` lets the browser claim horizontal drags and
+        // fire pointercancel, killing both the reorder and our manual scroll.
+        style={{ touchAction: 'pan-y' }}
         className={cn(
           'relative flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-[13px] border transition-colors whitespace-nowrap select-none w-full',
           isActive
@@ -174,7 +218,7 @@ export default function AssetQuickSwitch({ analyses, currentInstrument, onInstru
   const orderRef = useRef(order);
   const hintSeenRef = useRef(hintSeen);
   const dragStartOrderRef = useRef(null);
-  // Shared window during which a trailing click must be ignored (post-drag).
+  // Shared window during which a trailing click must be ignored (post-drag/scroll).
   const interactionRef = useRef({ suppressClickUntil: 0 });
 
   useEffect(() => { orderRef.current = order; }, [order]);
@@ -183,7 +227,7 @@ export default function AssetQuickSwitch({ analyses, currentInstrument, onInstru
   // Reconcile the local order whenever the set of active instruments changes
   // (an asset added, removed or completed) without disturbing the user's
   // arrangement: keep known instruments in place, drop gone ones, append new.
-  const instrumentKey = analyses.map((a) => a.instrument).join('');
+  const instrumentKey = analyses.map((a) => a.instrument).join('');
   useEffect(() => {
     const incoming = analyses.map((a) => a.instrument);
     setOrder((prev) => {
@@ -253,7 +297,11 @@ export default function AssetQuickSwitch({ analyses, currentInstrument, onInstru
 
   return (
     <div className="relative">
-      <div ref={scrollContainerRef} className="overflow-x-auto scrollbar-hide">
+      <div
+        ref={scrollContainerRef}
+        className="overflow-x-auto scrollbar-hide"
+        style={{ touchAction: 'pan-y' }}
+      >
         <Reorder.Group
           as="div"
           axis="x"
@@ -269,6 +317,7 @@ export default function AssetQuickSwitch({ analyses, currentInstrument, onInstru
               reordering={reordering}
               onSelect={() => onInstrumentChange(inst)}
               onReorderStart={onReorderStart}
+              scrollRef={scrollContainerRef}
               interactionRef={interactionRef}
             />
           ))}
