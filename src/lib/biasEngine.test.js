@@ -4,6 +4,9 @@ import {
   calculateTarget,
   getATRForAsset,
   getDefaultInputs,
+  atrUnitForInstrument,
+  formatAtrValue,
+  formatAtrUsed,
   engineOptionsFromSettings,
   createEngineSnapshot,
   ENGINE_VERSION,
@@ -321,6 +324,59 @@ describe('calculateTarget & ATR', () => {
   it('prefers a user ATR override, else falls back to BASE_ATR', () => {
     expect(getATRForAsset('EUR/USD', [{ asset: 'EUR/USD', atr: '77' }])).toBe(77);
     expect(getATRForAsset('EUR/USD', [])).toBe(BASE_ATR['EUR/USD']);
+  });
+});
+
+describe('ATR display units', () => {
+  it('reports pips for forex pairs (with or without a separator)', () => {
+    expect(atrUnitForInstrument('EUR/USD')).toBe('pips');
+    expect(atrUnitForInstrument('GBP/JPY')).toBe('pips');
+    expect(atrUnitForInstrument('USDJPY')).toBe('pips');
+    expect(atrUnitForInstrument('eur/usd')).toBe('pips');
+  });
+
+  it('reports points for indices', () => {
+    expect(atrUnitForInstrument('US100')).toBe('points');
+    expect(atrUnitForInstrument('DE40')).toBe('points');
+    expect(atrUnitForInstrument('UK100')).toBe('points');
+    expect(atrUnitForInstrument('JP225')).toBe('points');
+    expect(atrUnitForInstrument('DAX')).toBe('points');
+  });
+
+  it('reports points for metals, commodities and crypto', () => {
+    expect(atrUnitForInstrument('XAUUSD')).toBe('points'); // looks like a pair but is a metal
+    expect(atrUnitForInstrument('XAU/USD')).toBe('points');
+    expect(atrUnitForInstrument('GOLD')).toBe('points');
+    expect(atrUnitForInstrument('GOLD/USD')).toBe('points');
+    expect(atrUnitForInstrument('BITCOIN')).toBe('points');
+    expect(atrUnitForInstrument('ETHUSDT')).toBe('points');
+  });
+
+  it('defaults to points for an empty/unknown instrument', () => {
+    expect(atrUnitForInstrument('')).toBe('points');
+    expect(atrUnitForInstrument(null)).toBe('points');
+  });
+
+  it('formats values without unnecessary decimals', () => {
+    expect(formatAtrValue(128)).toBe('128');
+    expect(formatAtrValue(128.000006)).toBe('128'); // never 128.000000
+    expect(formatAtrValue(245)).toBe('245');
+    expect(formatAtrValue(128.45)).toBe('128.5');   // max one decimal
+    expect(formatAtrValue(128.04)).toBe('128');
+  });
+
+  it('returns null when there is no value to format', () => {
+    expect(formatAtrValue(null)).toBeNull();
+    expect(formatAtrValue(undefined)).toBeNull();
+    expect(formatAtrValue(NaN)).toBeNull();
+  });
+
+  it('builds the full "ATR Used" label with the right unit', () => {
+    expect(formatAtrUsed(128, 'GBP/JPY')).toBe('128 pips');
+    expect(formatAtrUsed(245, 'US100')).toBe('245 points');
+    expect(formatAtrUsed(19, 'XAUUSD')).toBe('19 points');
+    expect(formatAtrUsed(1, 'EUR/USD')).toBe('1 pip'); // singular
+    expect(formatAtrUsed(null, 'EUR/USD')).toBeNull();
   });
 });
 

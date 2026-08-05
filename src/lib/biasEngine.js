@@ -470,6 +470,69 @@ function calculateTarget(atr, grade) {
   return { target: parseFloat(target.toFixed(4)), targetType: grade };
 }
 
+// ─── ATR display units ────────────────────────────────────────────────────────
+// The ATR is stored as a raw count (128, 245, …) but the unit that count means
+// depends on the instrument: forex trades in PIPS, everything else (indices,
+// metals, commodities, crypto) in POINTS. We derive the unit from the symbol so
+// the user never has to pick it.
+
+// ISO currency codes that make up a tradeable forex pair.
+const FOREX_CURRENCIES = new Set([
+  'AUD', 'CAD', 'CHF', 'CNH', 'DKK', 'EUR', 'GBP', 'HKD', 'JPY', 'MXN',
+  'NOK', 'NZD', 'PLN', 'SEK', 'SGD', 'TRY', 'USD', 'ZAR',
+]);
+
+// Metal codes that look like currencies (XAUUSD, XAG/USD) but trade in points.
+const METAL_CURRENCIES = new Set(['XAU', 'XAG', 'XPT', 'XPD']);
+
+/**
+ * The trading unit the ATR count is expressed in for an instrument.
+ * Forex pairs → 'pips'; indices, metals, commodities and crypto → 'points'.
+ *
+ * @param {string} instrument  e.g. 'EUR/USD', 'US100', 'XAUUSD', 'GOLD'.
+ * @returns {'pips'|'points'}
+ */
+function atrUnitForInstrument(instrument) {
+  if (!instrument) return 'points';
+  const sym = String(instrument).toUpperCase().replace(/\s+/g, '');
+  // Split a possible pair with or without a separator (EUR/USD or EURUSD).
+  const [base, quote] = sym.includes('/') ? sym.split('/') : [sym.slice(0, 3), sym.slice(3)];
+  // A metal quoted against a currency (XAUUSD) trades in points, not pips.
+  if (METAL_CURRENCIES.has(base) || METAL_CURRENCIES.has(quote)) return 'points';
+  if (FOREX_CURRENCIES.has(base) && FOREX_CURRENCIES.has(quote)) return 'pips';
+  return 'points';
+}
+
+/**
+ * Format an ATR count for display: no trailing zeros, whole numbers where the
+ * value is whole (128 → "128"), otherwise at most one decimal place
+ * (128.04 → "128"; 128.45 → "128.5"). Returns null when there is no value.
+ *
+ * @param {number|null|undefined} value
+ * @returns {string|null}
+ */
+function formatAtrValue(value) {
+  if (value == null || !Number.isFinite(Number(value))) return null;
+  const rounded = Math.round(Number(value) * 10) / 10; // clamp to one decimal
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+/**
+ * The full "ATR Used" label for an instrument, e.g. "128 pips" or "245 points".
+ * Returns null when there is no ATR value to show.
+ *
+ * @param {number|null|undefined} value
+ * @param {string} instrument
+ * @returns {string|null}
+ */
+function formatAtrUsed(value, instrument) {
+  const formatted = formatAtrValue(value);
+  if (formatted == null) return null;
+  const unit = atrUnitForInstrument(instrument);
+  const label = formatted === '1' ? unit.slice(0, -1) : unit; // 1 pip / 128 pips
+  return `${formatted} ${label}`;
+}
+
 // Build engine options from a user-settings object (see lib/userSettings.js).
 // Missing/invalid values fall back to the Excel defaults.
 function engineOptionsFromSettings(settings) {
@@ -558,5 +621,6 @@ export {
   TIMEFRAMES, WEIGHTS, TF_SCORE_WEIGHTS, TF_GRADE_WEIGHTS, GRADE_THRESHOLDS,
   ASSETS, BASE_ATR, TARGET_WEIGHTS,
   getDefaultInputs, calculateBias, getATRForAsset, calculateTarget,
+  atrUnitForInstrument, formatAtrValue, formatAtrUsed,
   engineOptionsFromSettings, createEngineSnapshot,
 };

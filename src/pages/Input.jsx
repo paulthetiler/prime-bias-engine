@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget, engineOptionsFromSettings } from '@/lib/biasEngine';
+import { TIMEFRAMES, ASSETS, getDefaultInputs, calculateBias, getATRForAsset, calculateTarget, formatAtrUsed, engineOptionsFromSettings } from '@/lib/biasEngine';
 import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
 import ExtraCheck from '@/components/bias/ExtraCheck';
@@ -597,7 +597,7 @@ export default function Input() {
           <div className="grid grid-cols-2 divide-x divide-border">
             <div className="px-3 py-2.5">
               <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">ATR Used</div>
-              <div className="text-base font-mono font-bold text-foreground">{baseAtr ? baseAtr.toFixed(6) : '—'}</div>
+              <div className="text-base font-mono font-bold text-foreground">{formatAtrUsed(baseAtr, instrument) || '—'}</div>
             </div>
             <div className="px-3 py-2.5">
               <div className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Target</div>
