@@ -12,6 +12,7 @@ import { calculateBias, engineOptionsFromSettings, formatWithUnit } from '@/lib/
 import { calcAlignment } from '@/lib/alignmentUtils';
 import { gradeText, blockBg, blockText, actionBadge, actionLabel } from '@/lib/gradeStyles';
 import { getSettings } from '@/lib/userSettings';
+import { orderAnalyses } from '@/lib/instrumentOrder';
 import { isAnalysisLocked } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
@@ -210,10 +211,13 @@ export default function Dashboard() {
     window.addEventListener('biasUpdated', load);
     window.addEventListener('storage', load);
     window.addEventListener('settingsUpdated', load);
+    // Re-render in the saved pill order when it's changed in the Bias Tool.
+    window.addEventListener('instrumentOrderUpdated', load);
     return () => {
       window.removeEventListener('biasUpdated', load);
       window.removeEventListener('storage', load);
       window.removeEventListener('settingsUpdated', load);
+      window.removeEventListener('instrumentOrderUpdated', load);
     };
   }, []);
 
@@ -310,7 +314,11 @@ export default function Dashboard() {
     </>
   );
 
-  let analyses = Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId));
+  // Match the favourite-instrument pill order from the Bias Tool so the Summary
+  // reads top-to-bottom in the same sequence the trader arranged their pills.
+  let analyses = orderAnalyses(
+    Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId)),
+  );
 
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
   if (filters.filterHideWait) analyses = analyses.filter(a => !WAITING.includes(a.results?.tradeAction));
