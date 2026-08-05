@@ -40,7 +40,7 @@ export default function TopNav() {
   return (
     <div className="sticky top-0 z-40 px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm" style={{ paddingTop: `calc(0.75rem + var(--safe-area-top))` }}>
       <div className="flex items-center gap-3 max-w-lg mx-auto">
-        {!isOnDashboard && (
+        {!isOnDashboard && !isOnBiasTool && (
           <Button
             variant="ghost"
             size="icon"
