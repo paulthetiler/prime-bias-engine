@@ -58,6 +58,35 @@ describe('Dashboard — Summary follows the favourite-instrument order', () => {
   });
 });
 
+describe('Dashboard — Extended caution pill on the summary card', () => {
+  // All-BUY across every timeframe → winning score 95 → grade F / status Extended.
+  const strongBuy = {
+    month: { close: 1, macd: 1, rsi: 1, boli: 1 },
+    week:  { close: 1, macd: 1, rsi: 1, boli: 1 },
+    day:   { close: 1, macd: 1, rsi: 1, boli: 1 },
+    h4:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+    h1:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+    m15:   { close: 1, macd: 1, rsi: 1, boli: 1 },
+    m5:    { close: 1, macd: 1, rsi: 1, boli: 1 },
+  };
+
+  it('shows the amber CAUTION pill for an Extended/F card, but not for a normal one', async () => {
+    localStorage.setItem('primebias_active', JSON.stringify({
+      'GBP/JPY': { ...card('GBP/JPY'), inputs: strongBuy },   // → Extended / F
+      'EUR/USD': card('EUR/USD'),                             // day-only → not Extended
+    }));
+
+    renderDashboard();
+    await screen.findByText('GBP/JPY');
+
+    // Exactly one caution pill — on the Extended card only.
+    const pills = screen.getAllByText(/caution/i);
+    expect(pills).toHaveLength(1);
+    expect(pills[0].className).toMatch(/amber/);
+    expect(pills[0].className).not.toMatch(/red|destructive/);
+  });
+});
+
 describe('Dashboard — clear all requires confirmation', () => {
   it('does not clear until confirmed, and cancelling makes no change', async () => {
     const user = userEvent.setup();

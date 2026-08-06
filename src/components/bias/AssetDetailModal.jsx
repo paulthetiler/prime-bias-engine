@@ -6,6 +6,7 @@ import WhyThisTrade from './WhyThisTrade';
 import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
 import { formatWithUnit } from '@/lib/biasEngine';
 import { blockBg, blockText, actionBadge, actionLabel, extraCheckStyle } from '@/lib/gradeStyles';
+import ExtendedCautionPill, { isExtendedCaution } from './ExtendedCautionPill';
 
 const gradeColors = {
   A: 'text-primary bg-primary/15 border-primary/30',
@@ -88,6 +89,14 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
               <div className="text-[10px] uppercase tracking-wider opacity-80 mt-0.5">{status}</div>
             </div>
           </div>
+
+          {/* Extended caution — quick visual awareness only. It never blocks the
+              BUY/SELL Action; the full explanation is in the warnings below. */}
+          {isExtendedCaution(results) && (
+            <div className="flex justify-center">
+              <ExtendedCautionPill className="text-[10px] px-2.5 py-1" />
+            </div>
+          )}
 
           {/* Grade + Metrics */}
           <div className="rounded-xl border border-border bg-secondary/40 p-3 space-y-0">

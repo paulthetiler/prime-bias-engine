@@ -2,6 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
 import { blockBg, blockText, actionBadge, actionLabel, extraCheckStyle } from '@/lib/gradeStyles';
+import ExtendedCautionPill, { isExtendedCaution } from './ExtendedCautionPill';
 
 export default function BiasResult({ results, settings }) {
   if (!results) return null;
@@ -46,14 +47,7 @@ export default function BiasResult({ results, settings }) {
               <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
                 {status}
               </span>
-              {status === 'Extended' && (
-                <span
-                  title="Market is extended — valid setup, but be careful with entry and risk."
-                  className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                >
-                  <AlertTriangle className="w-2.5 h-2.5" /> Caution
-                </span>
-              )}
+              {isExtendedCaution(results) && <ExtendedCautionPill />}
             </div>
 
             {/* Grid: label → value */}
