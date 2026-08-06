@@ -240,6 +240,18 @@ describe('Extended/F take their Action from the main bias — NOT gated by the E
     expect(r.gradeLabel).not.toBe('No Trade');
   });
 
+  it('warns with a non-alarming caution (no "high risk"), matching the Extended status', () => {
+    const r = calculateBias(EXTENDED_F, null);
+    expect(r.status).toBe('Extended');
+    // The caution wording — a valid setup that needs extra care.
+    expect(r.warnings).toContain('Extended conditions — valid setup, but use extra caution');
+    // It must NOT read like danger / no-trade, and must not contradict itself
+    // with the "approaching extended territory" near-extended message.
+    const joined = r.warnings.join(' | ');
+    expect(joined).not.toMatch(/high (reversal )?risk|danger|no trade/i);
+    expect(joined).not.toContain('approaching extended territory');
+  });
+
   describe('the Extra Check is a separate CONFIRMATION layer (does not change the Action)', () => {
     it('confirming check (both +1) → Action still BUY, Extra Check CONFIRMS', () => {
       const r = calculateBias(EXTENDED_F, { h1: 1, m15: 1 });
@@ -297,6 +309,14 @@ describe('Extended/F take their Action from the main bias — NOT gated by the E
     const r = calculateBias(CASES[4].inputs, null);
     expect(r.grade).toBe('B');
     expect(r.targetNote).toBe('MED BUY');
+  });
+
+  it('a NEAR-extended (80-90) setup keeps the "approaching" warning, not the Extended one', () => {
+    // CASES[5]: winning score 80, grade C, NOT extended.
+    const r = calculateBias(CASES[5].inputs, null);
+    expect(r.status).not.toBe('Extended');
+    expect(r.warnings).toContain('Score 80-90 — approaching extended territory, use caution');
+    expect(r.warnings).not.toContain('Extended conditions — valid setup, but use extra caution');
   });
 });
 

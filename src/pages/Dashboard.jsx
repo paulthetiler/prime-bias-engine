@@ -15,6 +15,7 @@ import { getSettings } from '@/lib/userSettings';
 import { orderAnalyses } from '@/lib/instrumentOrder';
 import { isAnalysisLocked } from '@/lib/tradeCompletion';
 import AssetDetailModal from '@/components/bias/AssetDetailModal';
+import ExtendedCautionPill, { isExtendedCaution } from '@/components/bias/ExtendedCautionPill';
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 import { InstallBanner } from '@/components/InstallApp';
@@ -93,10 +94,14 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
 
         {/* Right — Decision info */}
         <div className="flex flex-col justify-center px-4 py-3 flex-1 gap-2">
-          {/* Status badge */}
-          <span className={cn('self-start text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
-            {status}
-          </span>
+          {/* Status badge (+ amber caution when Extended — quick awareness only,
+              a valid setup that needs extra care, never a danger / no-trade) */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
+              {status}
+            </span>
+            {isExtendedCaution(results) && <ExtendedCautionPill />}
+          </div>
 
           {/* Grid rows */}
           <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '1fr minmax(90px, auto)', columnGap: '12px' }}>

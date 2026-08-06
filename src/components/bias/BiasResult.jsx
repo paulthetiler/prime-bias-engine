@@ -2,6 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
 import { blockBg, blockText, actionBadge, actionLabel, extraCheckStyle } from '@/lib/gradeStyles';
+import ExtendedCautionPill, { isExtendedCaution } from './ExtendedCautionPill';
 
 export default function BiasResult({ results, settings }) {
   if (!results) return null;
@@ -40,10 +41,14 @@ export default function BiasResult({ results, settings }) {
 
           {/* Right — Decision info */}
           <div className="flex flex-col justify-center px-3 py-3 flex-1 gap-2">
-            {/* Status badge */}
-            <span className={cn('self-start text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
-              {status}
-            </span>
+            {/* Status badge (+ amber caution when Extended — a valid setup that
+                just needs extra care, NOT a danger / no-trade state) */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
+                {status}
+              </span>
+              {isExtendedCaution(results) && <ExtendedCautionPill />}
+            </div>
 
             {/* Grid: label → value */}
             <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '80px 1fr' }}>
