@@ -21,9 +21,10 @@ import { InstallBanner } from '@/components/InstallApp';
 
 
 
-// Action buckets. A/B/C/D grades give TRADE / WAIT; Extended/F defer to the
-// Extra Check (PENDING → BUY / SELL / NO_TRADE). "Actionable" = an aligned A–D
-// trade or an Extra-Check-confirmed BUY/SELL; "waiting" = WAIT or PENDING.
+// Action buckets. A/B/C/D grades give TRADE / WAIT; an Extended / grade-F setup
+// shows its Action directionally (BUY / SELL) straight from the main bias.
+// "Actionable" = an aligned A–D trade or a directional Extended/F BUY/SELL;
+// "waiting" = WAIT (PENDING is legacy-only, kept so old saved rows still bucket).
 const ACTIONABLE = ['TRADE', 'BUY', 'SELL'];
 const WAITING = ['WAIT', 'PENDING'];
 

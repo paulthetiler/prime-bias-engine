@@ -1,12 +1,13 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
-import { blockBg, blockText, actionBadge, actionLabel, actionHint } from '@/lib/gradeStyles';
+import { blockBg, blockText, actionBadge, actionLabel, extraCheckStyle } from '@/lib/gradeStyles';
 
 export default function BiasResult({ results, settings }) {
   if (!results) return null;
 
-  const { mainDirection, grade, gradeLabel, tradeAction, status, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, winningScore, warnings, targetNote } = results;
+  const { mainDirection, grade, gradeLabel, tradeAction, status, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, winningScore, warnings, targetNote, extraCheckConfirmation } = results;
+  const extraCheck = extraCheckStyle(extraCheckConfirmation);
 
   const dirColor = mainDirection === 'BUY' ? 'text-primary' : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
 
@@ -54,9 +55,11 @@ export default function BiasResult({ results, settings }) {
                 <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>
                   {actionLabel(tradeAction)}
                 </span>
-                {actionHint(tradeAction) && (
-                  <span className="text-[8px] uppercase tracking-wider text-muted-foreground">{actionHint(tradeAction)}</span>
-                )}
+              </span>
+
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Extra Check</span>
+              <span className={cn('text-[9px] font-semibold px-2 py-0.5 rounded self-start w-fit', extraCheck.badge)}>
+                {extraCheck.label}
               </span>
 
               <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Setup Quality</span>

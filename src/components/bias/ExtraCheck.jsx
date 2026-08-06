@@ -38,7 +38,7 @@ export default function ExtraCheck({ h1, m15, onChange }) {
     buy:      { box: 'bg-emerald-500/10 border-emerald-500/30', dot: 'bg-emerald-400', text: 'text-emerald-700 dark:text-emerald-300', label: 'Buy confirmed' },
     sell:     { box: 'bg-red-500/10 border-red-500/30',         dot: 'bg-red-400',     text: 'text-red-700 dark:text-red-300',         label: 'Sell confirmed' },
     conflict: { box: 'bg-yellow-500/10 border-yellow-500/30',   dot: 'bg-yellow-400',  text: 'text-yellow-700 dark:text-yellow-300',   label: '1H / 15M disagree' },
-    none:     { box: 'bg-secondary border-border',              dot: 'bg-muted-foreground', text: 'text-muted-foreground',            label: 'Set checks' },
+    none:     { box: 'bg-secondary border-border',              dot: 'bg-muted-foreground', text: 'text-muted-foreground',            label: 'Not checked' },
   }[result];
 
   return (

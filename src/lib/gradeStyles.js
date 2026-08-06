@@ -41,9 +41,11 @@ export const directionText = (dir) =>
   : dir === 'SELL' ? 'text-red-600 dark:text-red-400'
   : 'text-muted-foreground';
 
-// Action / trade permission → badge colour + human label. The engine's
-// `tradeAction` is a readiness verdict for A/B/C/D grades (TRADE / WAIT) and the
-// Extra-Check gate for Extended/grade-F setups (PENDING / BUY / SELL / NO_TRADE).
+// Action / Trade → badge colour + human label. The engine's `tradeAction` is a
+// readiness verdict for A/B/C/D grades (TRADE / WAIT) and, for an Extended /
+// grade-F setup, the directional main bias (BUY / SELL) straight from the score —
+// never gated by the Extra Check. (PENDING is legacy only, kept so previously
+// saved analyses still render; the engine no longer produces it.)
 const ACTION_BADGE = {
   TRADE:    'bg-primary text-white',
   WAIT:     'bg-yellow-500 text-black',
@@ -52,15 +54,22 @@ const ACTION_BADGE = {
   NO_TRADE: 'bg-destructive text-white',
   PENDING:  'bg-secondary text-muted-foreground border border-border',
 };
-export const actionBadge = (action) => ACTION_BADGE[action] || ACTION_BADGE.PENDING;
+export const actionBadge = (action) => ACTION_BADGE[action] || ACTION_BADGE.WAIT;
 
 // Short label shown inside the Action badge.
 export const actionLabel = (action) =>
-  action === 'NO_TRADE' ? 'NO TRADE' : action || 'PENDING';
+  action === 'NO_TRADE' ? 'NO TRADE' : action || 'WAIT';
 
-// Longer hint for the PENDING state (e.g. shown under the badge on detail views).
-export const actionHint = (action) =>
-  action === 'PENDING' ? 'Set 1H & 15M extra checks' : '';
+// Extra Check confirmation → badge colour + label. This is a SECONDARY layer that
+// compares the manual 1H/15M Extra Check against the main direction. It is
+// confirmation information only — it never gates or changes the Action.
+const EXTRA_CHECK_STYLE = {
+  CONFIRMS:    { badge: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30', label: 'Extra Check confirms' },
+  CONFLICTS:   { badge: 'text-yellow-700 dark:text-yellow-400 bg-yellow-500/15 border border-yellow-500/30',      label: 'Extra Check conflicts' },
+  NOT_CHECKED: { badge: 'text-muted-foreground bg-secondary border border-border',                                label: 'Extra Check not run' },
+};
+export const extraCheckStyle = (confirmation) =>
+  EXTRA_CHECK_STYLE[confirmation] || EXTRA_CHECK_STYLE.NOT_CHECKED;
 
 // Block direction (BUY/BULL, SELL/BEAR, NEUTRAL) → shaded card bg + border,
 // matching the engine's indicator buttons: green buy, red sell, amber neutral.

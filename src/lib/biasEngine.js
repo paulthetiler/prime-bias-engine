@@ -44,18 +44,27 @@
 //   target quality is derived from the winning grade, separately from Deep/DD/Now
 //   block alignment.
 //
-// ── ACTION / TRADE PERMISSION ────────────────────────────────────────────────
-//   A/B/C/D grades: the Action is a readiness verdict (TRADE / WAIT) from the
-//     grade plus Deep/DD/Now block alignment — the normal engine behaviour.
-//   Extended / grade-F: the grade-based readiness is off the scale, so the
-//     decision is DEFERRED entirely to the manual Extra Check on 1H and 15M:
-//       =IF(AND(1H=-1,15M=-1),"SELL",IF(AND(1H=1,15M=1),"BUY","No Trade"))
-//     Until BOTH checks are entered the Action is PENDING (awaiting the check) —
-//     never "No Trade". Once set: both -1 → SELL, both +1 → BUY, mismatch or
-//     neutral → No Trade. Extended/F never force NO_TRADE on their own.
+// ── ACTION / TRADE (Excel "Trade" col L16 = AC34, the score direction) ────────
+//   The Trade/Action comes from the MAIN bias, exactly as the sheet does it — it
+//   is NEVER gated by the Extra Check. In the workbook the Extended/F snapshot
+//   shows Status "Extended", Grade "F" and Trade "BUY" at the same time as the
+//   Extra Check (K12) reads "No Trade": the two are independent columns.
+//     A/B/C/D grades: the Action is a readiness verdict (TRADE / WAIT) from the
+//       grade plus Deep/DD/Now block alignment — the normal engine behaviour.
+//     Extended / grade-F: the top score band shows its Action DIRECTIONALLY
+//       (BUY / SELL) straight from the main score direction — no Extra Check
+//       required, never PENDING, never forced to NO_TRADE by the Extended state.
+//
+// ── EXTRA CHECK (Excel K12) — a SEPARATE confirmation layer ───────────────────
+//   =IF(AND(1H=-1,15M=-1),"SELL",IF(AND(1H=1,15M=1),"BUY","No Trade"))
+//   Gary's Extra Check confirms (or conflicts with) the analysis already made; it
+//   does NOT calculate the grade and does NOT grant permission to trade. It reads
+//   the manual 1H/15M inputs and is compared against the main direction purely as
+//   confirmation information (CONFIRMS / CONFLICTS / NOT CHECKED).
 //
 // Verified: the all-BUY snapshot saved in every workbook tab (Bias Tool, B1–B4)
-// reproduces DEEP BULL/STRONG, DD BUY/STRONG, NOW BUY/STRONG, score 95, grade F.
+// reproduces DEEP BULL/STRONG, DD BUY/STRONG, NOW BUY/STRONG, score 95, grade F,
+// Status Extended, Trade BUY (workbook cells AB35=95, AC35=F, AC34/L16=BUY).
 
 import { calcAlignment } from './alignmentUtils';
 import { CURRENT_ENGINE_VERSION } from './engineConfig';
@@ -224,22 +233,33 @@ function targetQuality(grade) {
   }
 }
 
-// ─── Extra Check gate (Excel Extra Check) ─────────────────────────────────────
+// ─── Extra Check result (Excel K12) ───────────────────────────────────────────
 // =IF(AND(1H=-1,15M=-1),"SELL",IF(AND(1H=1,15M=1),"BUY","No Trade"))
-// The trade permission for an Extended/grade-F setup, where the grade-based
-// readiness is off the scale. It reads the manual 1H/15M Extra Check inputs, NOT
-// the computed timeframe directions, and is independent of status/grade. Returns:
-//   'PENDING'  — 1H or 15M not yet set (awaiting the check; NOT a No-Trade)
-//   'SELL'     — both -1
-//   'BUY'      — both +1
-//   'NO_TRADE' — both set but mismatched or neutral
-function calcTradePermission(extraCheck) {
+// A SECONDARY confirmation layer, fully independent of the grade / direction /
+// action. It reads the manual 1H/15M Extra Check inputs, never gates a trade and
+// never changes the grade. Returns:
+//   'NOT_CHECKED' — 1H or 15M not entered yet (blank)
+//   'SELL'        — both -1
+//   'BUY'         — both +1
+//   'NO_TRADE'    — both entered but mixed/opposing
+function calcExtraCheckResult(extraCheck) {
   const h1  = extraCheck ? extraCheck.h1  : null;
   const m15 = extraCheck ? extraCheck.m15 : null;
-  if (h1 == null || m15 == null) return 'PENDING';
+  if (h1 == null || m15 == null) return 'NOT_CHECKED';
   if (h1 === -1 && m15 === -1)   return 'SELL';
   if (h1 === 1  && m15 === 1)    return 'BUY';
   return 'NO_TRADE';
+}
+
+// Compare the Extra Check result against the MAIN trade direction and express it
+// as confirmation information (never a trade gate):
+//   'NOT_CHECKED' — no check entered
+//   'CONFIRMS'    — the check agrees with the main direction
+//   'CONFLICTS'   — the check opposes it, or resolved to NO_TRADE (mixed)
+function calcExtraCheckConfirmation(extraCheckResult, mainDirection) {
+  if (extraCheckResult === 'NOT_CHECKED') return 'NOT_CHECKED';
+  if (extraCheckResult === mainDirection) return 'CONFIRMS';
+  return 'CONFLICTS';
 }
 
 // ─── Main calculation ─────────────────────────────────────────────────────────
@@ -357,13 +377,11 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   }
 
   const isExtended = winningScore > EXTENDED_SCORE;
-  // An Extended / grade-F setup defers its Action entirely to the Extra Check.
-  const deferToExtraCheck = isExtended || effectiveGrade === 'F';
 
   // 9. Status — a DESCRIPTIVE read of the market/readiness state. It must never
   // encode a "No Trade" verdict: "Extended" and grade "F" are market states.
   let status;
-  if (deferToExtraCheck) {
+  if (isExtended || effectiveGrade === 'F') {
     status = 'Extended';
   } else if (effectiveGrade === 'D') {
     status = 'Dangerous';
@@ -382,14 +400,14 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   // alignment and of the trade gate. An Extended/F setup keeps a GOOD target.
   const targetNote = `${targetQuality(effectiveGrade)} ${mainDirection}`;
 
-  // Action / trade permission:
-  //  • Extended/F → deferred to the Excel Extra Check gate (PENDING until both
-  //    1H and 15M are set, then BUY / SELL / NO_TRADE). Never forced to NO_TRADE
-  //    by the Extended/F state itself.
+  // Action / Trade (Excel "Trade" col = AC34, the score direction):
+  //  • Extended / grade-F → the top score band shows its Action DIRECTIONALLY
+  //    (BUY / SELL) straight from the main bias, exactly as the workbook's Trade
+  //    cell does. It is NOT gated by the Extra Check and is never PENDING.
   //  • A/B/C/D → readiness verdict (TRADE / WAIT) from grade + block alignment.
   let tradeAction;
-  if (deferToExtraCheck) {
-    tradeAction = calcTradePermission(extraCheck);
+  if (effectiveGrade === 'F') {
+    tradeAction = mainDirection; // 'BUY' | 'SELL'
   } else if (effectiveGrade === 'A' || effectiveGrade === 'B') {
     tradeAction = nowMatchesScore ? 'TRADE' : 'WAIT';
   } else if (effectiveGrade === 'C') {
@@ -398,6 +416,11 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
     // D
     tradeAction = 'WAIT';
   }
+
+  // Extra Check — a SEPARATE confirmation layer (Excel K12). It is compared with
+  // the main direction purely as confirmation info; it never gates the Action.
+  const extraCheckResult = calcExtraCheckResult(extraCheck);
+  const extraCheckConfirmation = calcExtraCheckConfirmation(extraCheckResult, mainDirection);
 
   // 10. Warnings
   const warnings = [];
@@ -450,6 +473,7 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
     mainDirection, scoreDirection,
     rawGrade, effectiveGrade, grade: effectiveGrade, gradeLabel, strength: ddStrength,
     tradeAction, status, targetNote,
+    extraCheckResult, extraCheckConfirmation,
     confidenceScore, warnings,
     engineVersion: ENGINE_VERSION,
     resolvedOptions,
