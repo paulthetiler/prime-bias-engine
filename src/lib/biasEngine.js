@@ -432,8 +432,11 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
     warnings.push('DD block is NEUTRAL — execution zone has no clear trend');
   if (deepDir === 0)
     warnings.push('Deep Trend is NEUTRAL — no macro direction confirmed');
-  if (isExtended)
-    warnings.push('Score >90 — market EXTENDED, high reversal risk');
+  // Extended is a VALID directional setup that simply needs extra care — not a
+  // "no trade" / danger state. The wording deliberately avoids "high risk". This
+  // condition mirrors the 'Extended' status exactly so the two never contradict.
+  if (isExtended || effectiveGrade === 'F')
+    warnings.push('Extended conditions — valid setup, but use extra caution');
   else if (winningScore >= 80)
     warnings.push('Score 80-90 — approaching extended territory, use caution');
 

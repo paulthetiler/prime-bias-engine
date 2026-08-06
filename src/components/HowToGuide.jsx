@@ -239,7 +239,7 @@ Tap "Reset" at the top of Settings to restore all defaults.`
 • NOW momentum is OPPOSITE to DD — momentum conflict
 • DD block is NEUTRAL — no clear execution trend
 • Deep Trend is NEUTRAL — no macro direction confirmed
-• Score >90 — market EXTENDED, high reversal risk
+• Extended conditions — valid setup, but use extra caution
 • Score 80–90 — approaching extended territory, use caution
 
 Warnings don't mean "don't trade" — they flag elevated risk. Always apply your own judgment and proper risk management.`

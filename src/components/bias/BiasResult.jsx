@@ -40,10 +40,21 @@ export default function BiasResult({ results, settings }) {
 
           {/* Right — Decision info */}
           <div className="flex flex-col justify-center px-3 py-3 flex-1 gap-2">
-            {/* Status badge */}
-            <span className={cn('self-start text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
-              {status}
-            </span>
+            {/* Status badge (+ amber caution when Extended — a valid setup that
+                just needs extra care, NOT a danger / no-trade state) */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
+                {status}
+              </span>
+              {status === 'Extended' && (
+                <span
+                  title="Market is extended — valid setup, but be careful with entry and risk."
+                  className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                >
+                  <AlertTriangle className="w-2.5 h-2.5" /> Caution
+                </span>
+              )}
+            </div>
 
             {/* Grid: label → value */}
             <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '80px 1fr' }}>
