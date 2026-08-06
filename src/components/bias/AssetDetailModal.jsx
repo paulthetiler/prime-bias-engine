@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import WhyThisTrade from './WhyThisTrade';
 import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
 import { formatWithUnit } from '@/lib/biasEngine';
-import { blockBg, blockText, actionBadge, actionLabel, actionHint } from '@/lib/gradeStyles';
+import { blockBg, blockText, actionBadge, actionLabel, extraCheckStyle } from '@/lib/gradeStyles';
 
 const gradeColors = {
   A: 'text-primary bg-primary/15 border-primary/30',
@@ -42,9 +42,10 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
   const {
     mainDirection, grade, gradeLabel, status, tradeAction,
     deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength,
-    winningScore, warnings,
+    winningScore, warnings, extraCheckConfirmation,
   } = results;
 
+  const extraCheck = extraCheckStyle(extraCheckConfirmation);
   const alignment = calcAlignment(results);
   const dirColor = mainDirection === 'BUY' ? 'text-primary' : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
   const showMinSafeMove = settings?.showTarget !== false; // showTarget: legacy key
@@ -84,7 +85,7 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
             </div>
             <div className={cn('rounded-xl p-4 text-center flex flex-col items-center justify-center', actionBadge(tradeAction))}>
               <div className="text-lg font-bold leading-tight">{actionLabel(tradeAction)}</div>
-              <div className="text-[10px] uppercase tracking-wider opacity-80 mt-0.5">{actionHint(tradeAction) || status}</div>
+              <div className="text-[10px] uppercase tracking-wider opacity-80 mt-0.5">{status}</div>
             </div>
           </div>
 
@@ -105,6 +106,11 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
             {showScore && (
               <Row label="Score" value={`${winningScore} pts`} valueClass="text-foreground" />
             )}
+            <Row
+              label="Extra Check"
+              value={extraCheck.label}
+              valueClass={extraCheck.badge.split(' ').filter(c => c.startsWith('text-')).join(' ')}
+            />
             {showMinSafeMove && (
               <Row
                 label="Min Safe Move"

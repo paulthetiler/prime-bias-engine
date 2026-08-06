@@ -201,16 +201,22 @@ describe('calculateBias — grade cap when the block trend conflicts', () => {
   });
 });
 
-describe('Extended/F defer their Action to the Extra Check (not forced NO_TRADE)', () => {
+describe('Extended/F take their Action from the main bias — NOT gated by the Extra Check', () => {
   // The all-BUY workbook snapshot: score 95, grade F, status Extended, dir BUY.
+  // In Gary's sheet this shows Status Extended / Grade F / Trade BUY at the same
+  // time as the Extra Check (K12) reads "No Trade" — the two are independent.
   const EXTENDED_F = CASES[0].inputs;
 
-  it('Extended / grade-F does NOT force NO_TRADE while the extra check is unset', () => {
+  it('with the Extra Check BLANK: shows a directional BUY Action (never PENDING)', () => {
     const r = calculateBias(EXTENDED_F, null);
     expect(r.grade).toBe('F');
     expect(r.status).toBe('Extended');
-    // The old engine returned NO_TRADE here purely from Extended/F — it must not.
-    expect(r.tradeAction).toBe('PENDING');
+    expect(r.mainDirection).toBe('BUY');
+    // The main-bias Trade direction — not the old PENDING/NO_TRADE gate.
+    expect(r.tradeAction).toBe('BUY');
+    // The Extra Check is a separate layer and simply reports "not run".
+    expect(r.extraCheckResult).toBe('NOT_CHECKED');
+    expect(r.extraCheckConfirmation).toBe('NOT_CHECKED');
   });
 
   it('keeps a GOOD, directional target for an Extended/F setup (not "NO TRADE")', () => {
@@ -219,13 +225,13 @@ describe('Extended/F defer their Action to the Extra Check (not forced NO_TRADE)
     expect(r.targetNote).not.toMatch(/NO TRADE|EXTENDED|WAIT/);
   });
 
-  it('matches the requested UI: Status Extended, Grade F, Direction BUY, Target GOOD, Action PENDING', () => {
+  it('matches the workbook: Status Extended, Grade F, Direction BUY, Target GOOD, Action BUY', () => {
     const r = calculateBias(EXTENDED_F, { h1: null, m15: null });
     expect(r.status).toBe('Extended');
     expect(r.grade).toBe('F');
     expect(r.mainDirection).toBe('BUY');
     expect(r.targetNote).toBe('GOOD BUY');
-    expect(r.tradeAction).toBe('PENDING');
+    expect(r.tradeAction).toBe('BUY');
   });
 
   it('grade F never maps to a "No Trade" status or gradeLabel', () => {
@@ -234,32 +240,60 @@ describe('Extended/F defer their Action to the Extra Check (not forced NO_TRADE)
     expect(r.gradeLabel).not.toBe('No Trade');
   });
 
-  describe('Extra Check formula: IF(1H=-1 & 15M=-1,"SELL", IF(1H=1 & 15M=1,"BUY","No Trade"))', () => {
-    it('both -1 → SELL', () => {
-      expect(calculateBias(EXTENDED_F, { h1: -1, m15: -1 }).tradeAction).toBe('SELL');
+  describe('the Extra Check is a separate CONFIRMATION layer (does not change the Action)', () => {
+    it('confirming check (both +1) → Action still BUY, Extra Check CONFIRMS', () => {
+      const r = calculateBias(EXTENDED_F, { h1: 1, m15: 1 });
+      expect(r.tradeAction).toBe('BUY');           // from the main bias
+      expect(r.extraCheckResult).toBe('BUY');
+      expect(r.extraCheckConfirmation).toBe('CONFIRMS');
     });
-    it('both +1 → BUY', () => {
-      expect(calculateBias(EXTENDED_F, { h1: 1, m15: 1 }).tradeAction).toBe('BUY');
-    });
-    it('mismatch → NO_TRADE', () => {
-      expect(calculateBias(EXTENDED_F, { h1: 1, m15: -1 }).tradeAction).toBe('NO_TRADE');
-      expect(calculateBias(EXTENDED_F, { h1: -1, m15: 1 }).tradeAction).toBe('NO_TRADE');
-    });
-    it('either check unset → PENDING (never NO_TRADE)', () => {
-      expect(calculateBias(EXTENDED_F, { h1: 1, m15: null }).tradeAction).toBe('PENDING');
-      expect(calculateBias(EXTENDED_F, { h1: null, m15: -1 }).tradeAction).toBe('PENDING');
-      expect(calculateBias(EXTENDED_F, null).tradeAction).toBe('PENDING');
-    });
-    it('the permission is independent of the analysis direction (follows the check)', () => {
-      // Score direction is BUY, but the manual extra check both-SELL → SELL permission.
+
+    it('conflicting check (both -1) → Action stays BUY, Extra Check CONFLICTS', () => {
+      // The check must NOT flip a BUY analysis to SELL — that was the old bug.
       const r = calculateBias(EXTENDED_F, { h1: -1, m15: -1 });
       expect(r.mainDirection).toBe('BUY');
-      expect(r.tradeAction).toBe('SELL');
+      expect(r.tradeAction).toBe('BUY');
+      expect(r.extraCheckResult).toBe('SELL');
+      expect(r.extraCheckConfirmation).toBe('CONFLICTS');
+    });
+
+    it('mixed check (1H +1 / 15M -1) → Action stays BUY, Extra Check CONFLICTS (No Trade)', () => {
+      const r = calculateBias(EXTENDED_F, { h1: 1, m15: -1 });
+      expect(r.tradeAction).toBe('BUY');
+      expect(r.extraCheckResult).toBe('NO_TRADE');
+      expect(r.extraCheckConfirmation).toBe('CONFLICTS');
+    });
+
+    it('a blank Extra Check never blocks the Extended/F trade', () => {
+      for (const ec of [null, { h1: 1, m15: null }, { h1: null, m15: -1 }]) {
+        const r = calculateBias(EXTENDED_F, ec);
+        expect(r.tradeAction).toBe('BUY');
+        expect(r.extraCheckResult).toBe('NOT_CHECKED');
+        expect(r.extraCheckConfirmation).toBe('NOT_CHECKED');
+      }
     });
   });
 
-  it('target quality tracks the grade, not block alignment', () => {
-    // Grade B setup (score 55) → MED target, regardless of the extra-check gate.
+  describe('Extra Check result formula (Excel K12): IF(1H=-1 & 15M=-1,"SELL", IF(1H=1 & 15M=1,"BUY","No Trade"))', () => {
+    it('both -1 → SELL', () => {
+      expect(calculateBias(EXTENDED_F, { h1: -1, m15: -1 }).extraCheckResult).toBe('SELL');
+    });
+    it('both +1 → BUY', () => {
+      expect(calculateBias(EXTENDED_F, { h1: 1, m15: 1 }).extraCheckResult).toBe('BUY');
+    });
+    it('mismatch → NO_TRADE', () => {
+      expect(calculateBias(EXTENDED_F, { h1: 1, m15: -1 }).extraCheckResult).toBe('NO_TRADE');
+      expect(calculateBias(EXTENDED_F, { h1: -1, m15: 1 }).extraCheckResult).toBe('NO_TRADE');
+    });
+    it('either check unset → NOT_CHECKED', () => {
+      expect(calculateBias(EXTENDED_F, { h1: 1, m15: null }).extraCheckResult).toBe('NOT_CHECKED');
+      expect(calculateBias(EXTENDED_F, { h1: null, m15: -1 }).extraCheckResult).toBe('NOT_CHECKED');
+      expect(calculateBias(EXTENDED_F, null).extraCheckResult).toBe('NOT_CHECKED');
+    });
+  });
+
+  it('target quality tracks the grade, not block alignment or the Extra Check', () => {
+    // Grade B setup (score 55) → MED target, regardless of the extra check.
     const r = calculateBias(CASES[4].inputs, null);
     expect(r.grade).toBe('B');
     expect(r.targetNote).toBe('MED BUY');
@@ -291,7 +325,7 @@ describe('A/B/C/D keep the grade+alignment readiness Action (do NOT defer)', () 
     expect(r.tradeAction).toBe('TRADE');
   });
 
-  it('a B grade does NOT defer to the Extra Check — its Action ignores 1H/15M', () => {
+  it('a B grade Action ignores the Extra Check (which only confirms/conflicts)', () => {
     // Setting the extra check must not flip a graded readiness verdict to BUY/SELL.
     const base = calculateBias(CASES[4].inputs, null);
     const sell = calculateBias(CASES[4].inputs, { h1: -1, m15: -1 });
@@ -299,8 +333,12 @@ describe('A/B/C/D keep the grade+alignment readiness Action (do NOT defer)', () 
     expect(base.tradeAction).toBe('TRADE');
     expect(sell.tradeAction).toBe('TRADE'); // still TRADE, not SELL
     expect(buy.tradeAction).toBe('TRADE');
-    // A/B/C/D Action is never PENDING/BUY/SELL/NO_TRADE — those are Extended/F only.
+    // A/B/C/D Action is always the TRADE/WAIT readiness verdict.
     expect(['TRADE', 'WAIT']).toContain(base.tradeAction);
+    // ...but the Extra Check confirmation is still surfaced as separate info.
+    expect(base.extraCheckConfirmation).toBe('NOT_CHECKED');
+    expect(buy.extraCheckConfirmation).toBe('CONFIRMS');   // both +1 agrees with BUY
+    expect(sell.extraCheckConfirmation).toBe('CONFLICTS'); // both -1 opposes BUY
   });
 });
 

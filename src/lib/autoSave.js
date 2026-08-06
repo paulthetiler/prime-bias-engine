@@ -25,10 +25,11 @@ export function buildBiasAnalysisPayload({ analysisId, instrument, inputs, extra
   const direction = res.mainDirection;
   const overallBias = direction === 'BUY' ? 'BUY' : direction === 'SELL' ? 'SELL' : 'NEUTRAL';
   const grade = ['A', 'B', 'C', 'D', 'F'].includes(res.grade) ? res.grade : 'F';
-  // tradeAction is the Action / trade permission: a readiness verdict for A/B/C/D
-  // grades (TRADE / WAIT) or the Extra-Check gate for Extended/grade-F setups
-  // (PENDING / BUY / SELL / NO_TRADE). It is NOT forced to NO_TRADE by the
-  // Extended/F state. Default to WAIT when absent/invalid.
+  // tradeAction is the Action / Trade: a readiness verdict for A/B/C/D grades
+  // (TRADE / WAIT) or, for an Extended / grade-F setup, the directional main bias
+  // (BUY / SELL) — never gated by the Extra Check. Default to WAIT when
+  // absent/invalid. PENDING/NO_TRADE stay in the whitelist so previously saved
+  // rows keep validating.
   const VALID_ACTIONS = ['TRADE', 'WAIT', 'PENDING', 'BUY', 'SELL', 'NO_TRADE'];
   const tradeAction = VALID_ACTIONS.includes(res.tradeAction) ? res.tradeAction : 'WAIT';
   return {
