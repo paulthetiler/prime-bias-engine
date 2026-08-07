@@ -22,6 +22,7 @@ const History      = lazy(() => import('@/pages/History'));
 const TradeHistory = lazy(() => import('@/pages/TradeHistory.jsx'));
 const Journal      = lazy(() => import('@/pages/Journal.jsx'));
 const JournalStats = lazy(() => import('@/pages/JournalStats.jsx'));
+const Strength     = lazy(() => import('@/pages/Strength.jsx'));
 const ATR          = lazy(() => import('@/pages/ATR'));
 const Settings     = lazy(() => import('@/pages/Settings.jsx'));
 const EngineTest   = lazy(() => import('@/pages/EngineTest.jsx'));
@@ -79,6 +80,7 @@ const AuthenticatedApp = () => {
             <Route path="/trade-history" element={<TradeHistory />} />
             <Route path="/journal" element={<Journal />} />
             <Route path="/journal/stats" element={<JournalStats />} />
+            <Route path="/strength" element={<Strength />} />
 
             <Route path="/atr" element={<ATR />} />
             <Route path="/settings" element={<Settings />} />
