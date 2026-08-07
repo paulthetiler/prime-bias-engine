@@ -11,7 +11,7 @@ let cache = null;
 function json(res, status, body) {
   res.status(status);
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+  res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=900');
   return res.json(body);
 }
 
