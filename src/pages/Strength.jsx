@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 const WINDOWS = [
   { key: '1h', label: '1H' },
   { key: '4h', label: '4H' },
+  { key: 'today', label: 'Today' },
   { key: '24h', label: '24H' },
 ];
 
@@ -34,7 +35,7 @@ function StrengthBar({ row, maxAbs }) {
 }
 
 export default function Strength() {
-  const [windowKey, setWindowKey] = useState('4h');
+  const [windowKey, setWindowKey] = useState('today');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -66,6 +67,7 @@ export default function Strength() {
 
   const strongest = strengths[0];
   const weakest = strengths[strengths.length - 1];
+  const activeLabel = WINDOWS.find((item) => item.key === windowKey)?.label || windowKey;
 
   return (
     <div className="px-3 py-4 space-y-3">
@@ -77,7 +79,7 @@ export default function Strength() {
               <h1 className="text-lg font-black tracking-tight">Currency Strength</h1>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Measures separation only — Prime Bias still decides direction.
+              Full 28-pair basket. Separation suggests movement potential — not trade direction.
             </p>
           </div>
           <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={load} disabled={loading} aria-label="Refresh strength">
@@ -85,14 +87,14 @@ export default function Strength() {
           </Button>
         </div>
 
-        <div className="flex gap-2 mt-4">
+        <div className="grid grid-cols-4 gap-2 mt-4">
           {WINDOWS.map(item => (
             <button
               key={item.key}
               type="button"
               onClick={() => setWindowKey(item.key)}
               className={cn(
-                'flex-1 rounded-lg border py-2 text-xs font-bold transition-colors',
+                'rounded-lg border py-2 text-xs font-bold transition-colors',
                 windowKey === item.key
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-secondary/60 text-muted-foreground border-border',
@@ -123,7 +125,7 @@ export default function Strength() {
               <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3">
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Strongest</div>
                 <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{strongest.currency}</div>
-                <div className="text-xs font-mono">+{strongest.strength.toFixed(2)}%</div>
+                <div className="text-xs font-mono">{strongest.strength >= 0 ? '+' : ''}{strongest.strength.toFixed(2)}%</div>
               </div>
               <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-right">
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Weakest</div>
@@ -136,7 +138,7 @@ export default function Strength() {
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-bold">Strength ranking</h2>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{windowKey.toUpperCase()}</span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{activeLabel}</span>
             </div>
             <div>
               {strengths.map(row => <StrengthBar key={row.currency} row={row} maxAbs={maxAbs} />)}
@@ -163,7 +165,7 @@ export default function Strength() {
           </div>
 
           <div className="text-center text-[10px] text-muted-foreground pb-2">
-            Source: {data.source} · {data.cached ? 'cached' : 'fresh'} · {data.fetchedAt ? new Date(data.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+            Source: {data.source} · {data.methodology || 'basket'} · {data.cached ? 'cached' : 'fresh'} · {data.fetchedAt ? new Date(data.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
           </div>
         </>
       )}
