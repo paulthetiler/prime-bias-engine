@@ -2,34 +2,39 @@ import React from 'react';
 
 // ── Monochrome market icons ──────────────────────────────────────────────────
 // A subtle supporting glyph for each instrument — the instrument NAME stays the
-// primary identifier. Every glyph is drawn in `currentColor` so it inherits the
-// pill's colour (muted on a resting pill, white on the selected one) and works
-// in both themes. No flags, no emoji, no invented symbols: FX pairs show their
-// two familiar currency symbols; commodities, crypto, energy and indices get a
-// simple category mark.
+// primary identifier. Every glyph uses `currentColor` so it inherits the pill's
+// colour and works in both themes. No flags or emoji.
 
-const SYM = { USD: '$', EUR: '€', JPY: '¥', GBP: '£', CHF: '₣', AUD: '$', CAD: '$', NZD: '$' };
+const FX_LABEL = {
+  USD: '$',
+  EUR: '€',
+  JPY: '¥',
+  GBP: '£',
+  CHF: 'Fr',
+  AUD: 'A$',
+  CAD: 'C$',
+  NZD: 'NZ$',
+};
 
 const METALS = new Set(['GOLD', 'GOLD/USD', 'Copper', 'Aluminum', 'Zinc', 'Lead', 'Carbon']);
 const CRYPTO = new Set(['BITCOIN', 'ETHUSDT']);
 const ENERGY = new Set(['OIL', 'GAS']);
 const INDICES = new Set(['DAX', 'FTSE', 'DOW', 'SP500', 'US100', 'CAC40', 'JAP225', 'Hong HS50', 'AUD200', 'SMI', 'Dollar']);
 
-// Stacked bars — metals.
-const Bars = (
-  <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
-    <path d="M9.6 13h4.8l.7 2.7H8.9z" />
-    <path d="M5.9 16.6h4.8l.7 2.7H5.2z" />
-    <path d="M13.3 16.6h4.8l.7 2.7h-6.2z" />
+// Clear ingot silhouette — deliberately larger and more centred than the old
+// stacked-bars mark, which could read as a briefcase at pill size.
+const Ingot = (
+  <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+    <path d="M6.2 9.1h11.6l2 6.2H4.2z" />
+    <path d="M8.4 9.1 9.5 6.8h5L15.6 9" />
+    <path d="M7.1 13.1h9.8" opacity="0.45" />
   </g>
 );
 
-// Bitcoin — its own recognisable mark.
 const Bitcoin = (
   <text x="12" y="18" fontSize="16" fontWeight="800" fill="currentColor" textAnchor="middle">₿</text>
 );
 
-// Ethereum — minimal diamond.
 const EthDiamond = (
   <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
     <path d="M12 4 17.5 12 12 15 6.5 12z" />
@@ -37,13 +42,16 @@ const EthDiamond = (
   </g>
 );
 
-// Droplet — energy.
 const Droplet = (
-  <path d="M12 4.5c2.8 3.8 4.6 6.2 4.6 8.6a4.6 4.6 0 0 1-9.2 0c0-2.4 1.8-4.8 4.6-8.6z"
-    fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+  <path
+    d="M12 4.5c2.8 3.8 4.6 6.2 4.6 8.6a4.6 4.6 0 0 1-9.2 0c0-2.4 1.8-4.8 4.6-8.6z"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.4"
+    strokeLinejoin="round"
+  />
 );
 
-// Candlesticks — indices and generic fallback.
 const Candles = (
   <g fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
     <line x1="9" y1="4.6" x2="9" y2="19.4" />
@@ -53,27 +61,59 @@ const Candles = (
   </g>
 );
 
-// FX pair — the two currency symbols, split by a hairline diagonal.
-function pair(baseSym, quoteSym) {
+// FX pair — readable at 18px without pretending every currency has a unique
+// symbol. Dollar currencies use a tiny qualifier (A$, C$, NZ$) where needed.
+function pair(base, quote) {
+  const baseLabel = FX_LABEL[base];
+  const quoteLabel = FX_LABEL[quote];
+  const baseSize = baseLabel.length > 1 ? 6.7 : 9.5;
+  const quoteSize = quoteLabel.length > 1 ? 6.7 : 9.5;
+
   return (
     <>
-      <line x1="6.5" y1="17.5" x2="17.5" y2="6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" opacity="0.35" />
-      <text x="7.4" y="11.4" fontSize="9" fontWeight="700" fill="currentColor" textAnchor="middle">{baseSym}</text>
-      <text x="16.4" y="19.6" fontSize="9" fontWeight="700" fill="currentColor" textAnchor="middle">{quoteSym}</text>
+      <text
+        x="7.1"
+        y="11"
+        fontSize={baseSize}
+        fontWeight="750"
+        fill="currentColor"
+        textAnchor="middle"
+      >
+        {baseLabel}
+      </text>
+      <path
+        d="M9.6 16.7 14.5 7.3"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        opacity="0.35"
+      />
+      <text
+        x="16.9"
+        y="19.1"
+        fontSize={quoteSize}
+        fontWeight="750"
+        fill="currentColor"
+        textAnchor="middle"
+      >
+        {quoteLabel}
+      </text>
     </>
   );
 }
 
 function resolveGlyph(instrument) {
   if (!instrument) return Candles;
-  if (METALS.has(instrument)) return Bars;
+  if (METALS.has(instrument)) return Ingot;
   if (CRYPTO.has(instrument)) return instrument === 'BITCOIN' ? Bitcoin : EthDiamond;
   if (ENERGY.has(instrument)) return Droplet;
   if (INDICES.has(instrument)) return Candles;
+
   if (instrument.includes('/')) {
     const [base, quote] = instrument.split('/');
-    if (SYM[base] && SYM[quote]) return pair(SYM[base], SYM[quote]);
+    if (FX_LABEL[base] && FX_LABEL[quote]) return pair(base, quote);
   }
+
   return Candles;
 }
 
