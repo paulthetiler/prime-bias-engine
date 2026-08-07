@@ -4,15 +4,7 @@ const TWELVE_DATA_URL = 'https://api.twelvedata.com/time_series';
 const INTERVAL = '15min';
 const OUTPUT_SIZE = 120;
 const WINDOW_BARS = { '1h': 4, '4h': 16, '24h': 96 };
-
-// Twelve Data Basic permits 8 credits/minute. A 28-symbol batch still costs
-// 28 credits, so it cannot be used on the free tier. Fetch the basket in four
-// chunks of <=7 symbols and deliberately cross minute boundaries. One complete
-// refresh therefore costs 28 credits but never exceeds the per-minute cap.
-// 28 symbols × 24 hourly refreshes = 672 credits/day, within the 800/day limit.
-const CHUNK_SIZE = 7;
-const CHUNK_DELAY_MS = 61 * 1000;
-const CACHE_MS = 60 * 60 * 1000;
+const CACHE_MS = 15 * 60 * 1000;
 
 let cache = null;
 let inFlight = null;
@@ -20,7 +12,7 @@ let inFlight = null;
 function json(res, status, body) {
   res.status(status);
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=1800');
+  res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=900');
   return res.json(body);
 }
 
@@ -71,11 +63,9 @@ function buildTodayPairPrices(payload) {
   return { pairPrices, missing };
 }
 
-function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-
-async function fetchChunk(apiKey, symbols) {
+async function fetchTwelveData(apiKey) {
   const url = new URL(TWELVE_DATA_URL);
-  url.searchParams.set('symbol', symbols.join(','));
+  url.searchParams.set('symbol', STRENGTH_SYMBOLS.join(','));
   url.searchParams.set('interval', INTERVAL);
   url.searchParams.set('outputsize', String(OUTPUT_SIZE));
   url.searchParams.set('order', 'desc');
@@ -91,42 +81,31 @@ async function fetchChunk(apiKey, symbols) {
   return payload;
 }
 
-async function fetchTwelveData(apiKey) {
-  const merged = {};
-  const chunks = [];
-  for (let i = 0; i < STRENGTH_SYMBOLS.length; i += CHUNK_SIZE) {
-    chunks.push(STRENGTH_SYMBOLS.slice(i, i + CHUNK_SIZE));
-  }
-
-  for (let i = 0; i < chunks.length; i += 1) {
-    if (i > 0) await sleep(CHUNK_DELAY_MS);
-    const chunk = chunks[i];
-    const payload = await fetchChunk(apiKey, chunk);
-    for (const symbol of chunk) {
-      const data = symbolPayload(payload, symbol);
-      if (data) merged[symbol] = data;
-    }
-  }
-  return merged;
-}
-
 async function buildBody(apiKey) {
   const payload = await fetchTwelveData(apiKey);
   const windows = {};
   const warnings = [];
+
   for (const [window, barsAgo] of Object.entries(WINDOW_BARS)) {
     const { pairPrices, missing } = buildPairPrices(payload, barsAgo);
     windows[window] = buildStrengthSnapshot(pairPrices);
     if (missing.length) warnings.push(`${window}: missing ${missing.join(', ')}`);
   }
+
   const today = buildTodayPairPrices(payload);
   windows.today = buildStrengthSnapshot(today.pairPrices);
   if (today.missing.length) warnings.push(`today: missing ${today.missing.join(', ')}`);
 
   return {
-    source: 'Twelve Data', methodology: '28-pair basket average', interval: INTERVAL,
-    symbols: STRENGTH_SYMBOLS, fetchedAt: new Date().toISOString(), windows, warnings,
-    informationalOnly: true, cached: false,
+    source: 'Twelve Data',
+    methodology: '8-currency relative basket derived from 7 USD crosses using log returns',
+    interval: INTERVAL,
+    symbols: STRENGTH_SYMBOLS,
+    fetchedAt: new Date().toISOString(),
+    windows,
+    warnings,
+    informationalOnly: true,
+    cached: false,
   };
 }
 
@@ -135,6 +114,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return json(res, 405, { error: 'Method not allowed' });
   }
+
   const apiKey = process.env.TWELVE_DATA_API_KEY;
   if (!apiKey) return json(res, 500, { error: 'TWELVE_DATA_API_KEY is not configured' });
 
@@ -142,7 +122,6 @@ export default async function handler(req, res) {
     return json(res, 200, { ...cache.body, cached: true });
   }
 
-  // Coalesce simultaneous page loads/refreshes into one provider refresh.
   if (!inFlight) {
     inFlight = buildBody(apiKey)
       .then((body) => {
