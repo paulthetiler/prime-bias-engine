@@ -2,37 +2,46 @@ import { describe, expect, it } from 'vitest';
 import {
   calculatePairSeparations,
   calculateStrength,
-  returnsVsUsd,
+  STRENGTH_SYMBOLS,
 } from './currencyStrength';
 
-describe('currency strength proof of concept', () => {
-  const prices = {
-    'EUR/USD': { from: 1.10, to: 1.111 },       // EUR +1%
-    'GBP/USD': { from: 1.25, to: 1.275 },       // GBP +2%
-    'AUD/USD': { from: 0.66, to: 0.6633 },      // AUD +0.5%
-    'NZD/USD': { from: 0.60, to: 0.594 },       // NZD -1%
-    'USD/JPY': { from: 150, to: 147 },           // JPY strengthens ~2.04%
-    'USD/CHF': { from: 0.90, to: 0.9045 },       // CHF weakens ~0.5%
-    'USD/CAD': { from: 1.35, to: 1.377 },        // CAD weakens ~1.96%
-  };
-
-  it('inverts USD/base crosses so quote strength has the correct sign', () => {
-    const returns = returnsVsUsd(prices);
-    expect(returns.GBP).toBeGreaterThan(0);
-    expect(returns.JPY).toBeGreaterThan(0);
-    expect(returns.CAD).toBeLessThan(0);
+describe('currency strength basket', () => {
+  it('contains all 28 unique crosses for the eight major currencies', () => {
+    expect(STRENGTH_SYMBOLS).toHaveLength(28);
+    expect(new Set(STRENGTH_SYMBOLS).size).toBe(28);
   });
 
-  it('ranks currencies from strongest to weakest and centres the basket', () => {
+  it('gives base and quote opposite strength contributions', () => {
+    const rows = calculateStrength({
+      'GBP/JPY': { from: 200, to: 202 },
+    });
+    const gbp = rows.find((row) => row.currency === 'GBP');
+    const jpy = rows.find((row) => row.currency === 'JPY');
+
+    expect(gbp.strength).toBeGreaterThan(0);
+    expect(jpy.strength).toBeLessThan(0);
+  });
+
+  it('averages each currency across all available direct crosses and centres the basket', () => {
+    const prices = {
+      'GBP/JPY': { from: 200, to: 204 },
+      'GBP/CAD': { from: 1.70, to: 1.734 },
+      'JPY/CAD': { from: 0.0085, to: 0.0085 },
+      'EUR/USD': { from: 1.10, to: 1.10 },
+    };
+
     const rows = calculateStrength(prices);
-    expect(rows[0].currency).toBe('JPY');
-    expect(rows.at(-1).currency).toBe('CAD');
+    expect(rows[0].currency).toBe('GBP');
     const total = rows.reduce((sum, row) => sum + row.strength, 0);
     expect(total).toBeCloseTo(0, 10);
   });
 
-  it('ranks the most separated currencies without assigning trade direction', () => {
-    const rows = calculateStrength(prices);
+  it('ranks separation without assigning trade direction', () => {
+    const rows = calculateStrength({
+      'GBP/JPY': { from: 200, to: 204 },
+      'GBP/CAD': { from: 1.70, to: 1.734 },
+      'JPY/CAD': { from: 0.0085, to: 0.0085 },
+    });
     const separations = calculatePairSeparations(rows);
     expect(separations[0].separation).toBeGreaterThan(0);
     expect(separations[0]).not.toHaveProperty('direction');
