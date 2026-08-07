@@ -1,18 +1,18 @@
 import React from 'react';
 
-// Strong, instantly readable market glyphs for the compact instrument pills.
-// Keep these monochrome/currentColor so they inherit the pill state and work in
-// both themes. No flags, no emoji, no extra labels outside the icon tile.
+// Compact coloured market marks for the instrument pills. These are deliberately
+// recognisable at mobile size while the instrument name remains the primary label.
+// No flags or emoji; colour is confined to the artwork inside the existing tile.
 
-const FX_LABEL = {
-  USD: '$',
-  EUR: '€',
-  JPY: '¥',
-  GBP: '£',
-  CHF: 'Fr',
-  AUD: 'A$',
-  CAD: 'C$',
-  NZD: 'NZ$',
+const FX = {
+  USD: { label: '$', colour: '#16A34A' },
+  EUR: { label: '€', colour: '#2563EB' },
+  JPY: { label: '¥', colour: '#DC2626' },
+  GBP: { label: '£', colour: '#7C3AED' },
+  CHF: { label: 'Fr', colour: '#E11D48' },
+  AUD: { label: 'A$', colour: '#0891B2' },
+  CAD: { label: 'C$', colour: '#EA580C' },
+  NZD: { label: 'NZ$', colour: '#0F766E' },
 };
 
 const METALS = new Set(['GOLD', 'GOLD/USD', 'Copper', 'Aluminum', 'Zinc', 'Lead', 'Carbon']);
@@ -20,81 +20,73 @@ const CRYPTO = new Set(['BITCOIN', 'ETHUSDT']);
 const ENERGY = new Set(['OIL', 'GAS']);
 const INDICES = new Set(['DAX', 'FTSE', 'DOW', 'SP500', 'US100', 'CAC40', 'JAP225', 'Hong HS50', 'AUD200', 'SMI', 'Dollar']);
 
-// Bold gold-bar silhouette. At 18px this reads as an ingot rather than a
-// briefcase or generic stacked-bars icon.
-const Ingot = (
-  <g stroke="currentColor" strokeLinejoin="round">
-    <path d="M6.2 10.2h11.6l2.1 6.2H4.1z" fill="currentColor" opacity="0.9" />
-    <path d="M8.2 10.2 9.5 7.1h5l1.3 3.1" fill="none" strokeWidth="1.8" />
-    <path d="M7.2 13.5h9.6" fill="none" strokeWidth="1.2" opacity="0.45" />
+const Gold = (
+  <g stroke="#A16207" strokeLinejoin="round">
+    <path d="M6 10.2h12l2.1 6.3H3.9z" fill="#FBBF24" strokeWidth="1.2" />
+    <path d="M8.2 10.2 9.5 7h5l1.3 3.2" fill="#FDE68A" strokeWidth="1.3" />
+    <path d="M7.2 13.5h9.6" fill="none" strokeWidth="1" opacity=".55" />
   </g>
 );
 
 const Bitcoin = (
-  <text x="12" y="18.6" fontSize="17" fontWeight="900" fill="currentColor" textAnchor="middle">₿</text>
-);
-
-const EthDiamond = (
-  <g fill="currentColor" stroke="currentColor" strokeLinejoin="round">
-    <path d="M12 3.8 17.6 12 12 15.2 6.4 12z" opacity="0.9" />
-    <path d="M6.8 13.4 12 20.2l5.2-6.8L12 16.5z" opacity="0.65" />
+  <g>
+    <circle cx="12" cy="12" r="9" fill="#F7931A" />
+    <text x="12" y="17" fontSize="13.5" fontWeight="900" fill="#fff" textAnchor="middle">₿</text>
   </g>
 );
 
-const Droplet = (
-  <path
-    d="M12 4.3c3 4 4.9 6.6 4.9 9a4.9 4.9 0 0 1-9.8 0c0-2.4 1.9-5 4.9-9z"
-    fill="currentColor"
-    opacity="0.9"
-  />
+const Ethereum = (
+  <g strokeLinejoin="round">
+    <path d="M12 3.2 17.8 12 12 15.1 6.2 12z" fill="#627EEA" />
+    <path d="M6.7 13.2 12 20.4l5.3-7.2L12 16.4z" fill="#8A9DF0" />
+    <path d="M12 3.2v11.9L6.2 12z" fill="#8A9DF0" opacity=".9" />
+  </g>
 );
 
-// Stronger market/index mark: rising line over three bars. This is visually
-// distinct from FX and commodity glyphs at pill size.
-const MarketChart = (
-  <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5.2 18.4V14h3v4.4M10.5 18.4V10.8h3v7.6M15.8 18.4V7.5h3v10.9" strokeWidth="1.7" />
-    <path d="m5.5 11.2 4-3 3.3 1.6 5.2-4.4" strokeWidth="1.8" />
+const Oil = (
+  <g>
+    <path d="M12 3.8c3.2 4.2 5.2 7 5.2 9.5a5.2 5.2 0 0 1-10.4 0c0-2.5 2-5.3 5.2-9.5z" fill="#111827" />
+    <path d="M9.2 14.2c.5 1.4 1.5 2.1 3 2.2" fill="none" stroke="#64748B" strokeWidth="1.2" strokeLinecap="round" />
+  </g>
+);
+
+const Index = (
+  <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 18.5V14h3v4.5M10.5 18.5v-7.8h3v7.8M16 18.5V8h3v10.5" stroke="#64748B" strokeWidth="1.55" />
+    <path d="m5.2 11.5 4-3.1 3.4 1.7 5.8-5" stroke="#0D9488" strokeWidth="2" />
+    <path d="m15.8 5.2 2.6-.1-.1 2.6" stroke="#0D9488" strokeWidth="1.7" />
   </g>
 );
 
 function fxPair(base, quote) {
-  const baseLabel = FX_LABEL[base];
-  const quoteLabel = FX_LABEL[quote];
-
-  // No tiny diagonal slash: it was visual noise at this size. Put the two
-  // currency marks side-by-side as a compact monogram instead.
-  const combined = `${baseLabel}${quoteLabel}`;
-  const fontSize = combined.length >= 5 ? 6.1 : combined.length >= 4 ? 7 : combined.length >= 3 ? 8.2 : 10.2;
+  const a = FX[base];
+  const b = FX[quote];
+  const aSize = a.label.length > 1 ? 7 : 10;
+  const bSize = b.label.length > 1 ? 7 : 10;
 
   return (
-    <text
-      x="12"
-      y="16.1"
-      fontSize={fontSize}
-      fontWeight="900"
-      letterSpacing="-0.45"
-      fill="currentColor"
-      textAnchor="middle"
-    >
-      {combined}
-    </text>
+    <>
+      <circle cx="8.2" cy="9.2" r="6.3" fill={a.colour} />
+      <circle cx="15.8" cy="14.8" r="6.3" fill={b.colour} stroke="#fff" strokeWidth="1.25" />
+      <text x="8.2" y="12.1" fontSize={aSize} fontWeight="900" fill="#fff" textAnchor="middle">{a.label}</text>
+      <text x="15.8" y="17.7" fontSize={bSize} fontWeight="900" fill="#fff" textAnchor="middle">{b.label}</text>
+    </>
   );
 }
 
 function resolveGlyph(instrument) {
-  if (!instrument) return MarketChart;
-  if (METALS.has(instrument)) return Ingot;
-  if (CRYPTO.has(instrument)) return instrument === 'BITCOIN' ? Bitcoin : EthDiamond;
-  if (ENERGY.has(instrument)) return Droplet;
-  if (INDICES.has(instrument)) return MarketChart;
+  if (!instrument) return Index;
+  if (METALS.has(instrument)) return Gold;
+  if (CRYPTO.has(instrument)) return instrument === 'BITCOIN' ? Bitcoin : Ethereum;
+  if (ENERGY.has(instrument)) return Oil;
+  if (INDICES.has(instrument)) return Index;
 
   if (instrument.includes('/')) {
     const [base, quote] = instrument.split('/');
-    if (FX_LABEL[base] && FX_LABEL[quote]) return fxPair(base, quote);
+    if (FX[base] && FX[quote]) return fxPair(base, quote);
   }
 
-  return MarketChart;
+  return Index;
 }
 
 export default function MarketIcon({ instrument, size = 18, className }) {
