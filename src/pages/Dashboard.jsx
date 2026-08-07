@@ -19,6 +19,7 @@ import ExtendedCautionPill, { isExtendedCaution } from '@/components/bias/Extend
 import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 import { InstallBanner } from '@/components/InstallApp';
+import { separationLabel } from '@/lib/strengthContext';
 
 const ACTIONABLE = ['TRADE', 'BUY', 'SELL'];
 const WAITING = ['WAIT', 'PENDING'];
@@ -47,9 +48,11 @@ function getSeparationBadge(instrument, snapshot) {
 
   const maxSeparation = snapshot.separations[0]?.separation || 0;
   if (!maxSeparation) return null;
-  const ratio = row.separation / maxSeparation;
-  if (ratio >= 0.75) return { label: 'VERY HIGH', separation: row.separation };
-  if (ratio >= 0.50) return { label: 'HIGH', separation: row.separation };
+  // Summary only surfaces the notable separations. The shared label keeps the
+  // HIGH / VERY HIGH thresholds identical to the Strength page and the full
+  // decision view's Strength Context.
+  const label = separationLabel(row.separation, maxSeparation);
+  if (label === 'VERY HIGH' || label === 'HIGH') return { label, separation: row.separation };
   return null;
 }
 
@@ -439,7 +442,7 @@ export default function Dashboard() {
       )}
 
       {selectedAnalysis && (
-        <AssetDetailModal analysis={selectedAnalysis} settings={settings} onClose={() => setSelectedAnalysis(null)} onEdit={() => handleEditInstrument(selectedAnalysis.instrument)} />
+        <AssetDetailModal analysis={selectedAnalysis} settings={settings} strengthData={strengthData} onClose={() => setSelectedAnalysis(null)} onEdit={() => handleEditInstrument(selectedAnalysis.instrument)} />
       )}
 
       {completeAnalysis && <CompleteTradeModal analysis={completeAnalysis} onClose={() => setCompleteAnalysis(null)} onCompleted={handleTradeCompleted} />}

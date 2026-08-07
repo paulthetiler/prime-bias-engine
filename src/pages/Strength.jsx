@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, ArrowLeftRight, Zap, TrendingUp, TrendingDown, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { interpretation, rankChange, separationLabel, strongerAndWeaker } from '@/lib/strengthContext';
 
 const WINDOWS = [
   { key: '1h', label: '1H' },
@@ -11,50 +12,10 @@ const WINDOWS = [
 
 const STRENGTH_API_VERSION = '4';
 
-function rankMap(rows = []) {
-  return Object.fromEntries(rows.map((row, index) => [row.currency, index + 1]));
-}
-
-function rankChange(currency, currentRows, referenceRows) {
-  const current = rankMap(currentRows)[currency];
-  const previous = rankMap(referenceRows)[currency];
-  if (!current || !previous) return null;
-  return previous - current;
-}
-
 function movementLabel(change) {
   if (change == null || change === 0) return { text: '—', className: 'text-muted-foreground' };
   if (change > 0) return { text: `↑${change}`, className: 'text-emerald-600 dark:text-emerald-400' };
   return { text: `↓${Math.abs(change)}`, className: 'text-red-600 dark:text-red-400' };
-}
-
-function interpretation(row, change) {
-  const strong = row?.strength >= 0;
-  if (change > 0) return strong
-    ? { state: 'STRONG · CLIMBING', helper: 'Strengthening — strength has momentum', className: 'text-emerald-600 dark:text-emerald-400' }
-    : { state: 'WEAK · CLIMBING', helper: 'Weak but recovering', className: 'text-amber-600 dark:text-amber-400' };
-  if (change < 0) return strong
-    ? { state: 'STRONG · FALLING', helper: 'Strong but fading', className: 'text-amber-600 dark:text-amber-400' }
-    : { state: 'WEAK · FALLING', helper: 'Weakening further', className: 'text-red-600 dark:text-red-400' };
-  return strong
-    ? { state: 'STRONG · FLAT', helper: 'Strong — established', className: 'text-emerald-600 dark:text-emerald-400' }
-    : { state: 'WEAK · FLAT', helper: 'Weak — established', className: 'text-red-600 dark:text-red-400' };
-}
-
-function separationLabel(value, maxSeparation) {
-  if (!Number.isFinite(value) || maxSeparation <= 0) return 'LOW';
-  const ratio = value / maxSeparation;
-  if (ratio >= 0.75) return 'VERY HIGH';
-  if (ratio >= 0.50) return 'HIGH';
-  if (ratio >= 0.25) return 'MED';
-  return 'LOW';
-}
-
-function strongerAndWeaker(row) {
-  const first = row?.first;
-  const second = row?.second;
-  if (!first || !second) return { stronger: null, weaker: null };
-  return first.strength >= second.strength ? { stronger: first, weaker: second } : { stronger: second, weaker: first };
 }
 
 function StrengthBar({ row, maxAbs, change, showInterpretation }) {

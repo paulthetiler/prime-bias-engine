@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { X, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhyThisTrade from './WhyThisTrade';
+import StrengthContext from './StrengthContext';
 import { calcAlignment, alignmentColor } from '@/lib/alignmentUtils';
 import { formatWithUnit } from '@/lib/biasEngine';
 import { blockBg, blockText, actionBadge, actionLabel, extraCheckStyle } from '@/lib/gradeStyles';
@@ -35,7 +36,7 @@ function TrendPill({ label, dir, strength }) {
   );
 }
 
-export default function AssetDetailModal({ analysis, onClose, onEdit, settings }) {
+export default function AssetDetailModal({ analysis, onClose, onEdit, settings, strengthData }) {
   if (!analysis) return null;
   const { instrument, results, targetInfo } = analysis;
   if (!results) return null;
@@ -141,6 +142,10 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings }
 
           {/* Why this trade */}
           {showWhy && <WhyThisTrade results={results} defaultOpen />}
+
+          {/* Strength Context — informational only. Never alters the engine's
+              score, grade, direction, readiness or trade action. */}
+          <StrengthContext instrument={instrument} strengthData={strengthData} />
 
           {/* Warnings */}
           {warnings?.length > 0 && (
