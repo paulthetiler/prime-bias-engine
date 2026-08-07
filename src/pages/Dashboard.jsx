@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight, Crosshair, BookOpen } from 'lucide-react';
+import { Trash2, SlidersHorizontal, CheckCircle2, ChevronRight, Crosshair, BookOpen, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -20,14 +20,9 @@ import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 import { InstallBanner } from '@/components/InstallApp';
 
-
-
-// Action buckets. A/B/C/D grades give TRADE / WAIT; an Extended / grade-F setup
-// shows its Action directionally (BUY / SELL) straight from the main bias.
-// "Actionable" = an aligned A–D trade or a directional Extended/F BUY/SELL;
-// "waiting" = WAIT (PENDING is legacy-only, kept so old saved rows still bucket).
 const ACTIONABLE = ['TRADE', 'BUY', 'SELL'];
 const WAITING = ['WAIT', 'PENDING'];
+const STRENGTH_API_VERSION = '4';
 
 function TrendPill({ label, dir, strength }) {
   return (
@@ -39,7 +34,26 @@ function TrendPill({ label, dir, strength }) {
   );
 }
 
-function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
+function getSeparationBadge(instrument, snapshot) {
+  if (!instrument?.includes('/') || !snapshot?.separations?.length) return null;
+  const [base, quote] = instrument.split('/');
+  if (!base || !quote) return null;
+
+  const row = snapshot.separations.find(item => {
+    const [a, b] = String(item.pair || '').split('/');
+    return (a === base && b === quote) || (a === quote && b === base);
+  });
+  if (!row) return null;
+
+  const maxSeparation = snapshot.separations[0]?.separation || 0;
+  if (!maxSeparation) return null;
+  const ratio = row.separation / maxSeparation;
+  if (ratio >= 0.75) return { label: 'VERY HIGH', separation: row.separation };
+  if (ratio >= 0.50) return { label: 'HIGH', separation: row.separation };
+  return null;
+}
+
+function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSnapshot }) {
   const { instrument, results, targetInfo } = analysis;
   const [pressed, setPressed] = useState(false);
   if (!results) return null;
@@ -60,8 +74,8 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
     ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
     : 'bg-secondary text-muted-foreground border-border';
 
-  // `targetInfo.target` is the ATR-derived Minimum Safe Move (legacy storage key).
   const minSafeMoveDisplay = formatWithUnit(targetInfo?.target, instrument) || '—';
+  const separationBadge = getSeparationBadge(instrument, strengthSnapshot);
 
   return (
     <div
@@ -75,7 +89,6 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
       onTouchStart={() => setPressed(true)}
       onTouchEnd={() => setPressed(false)}
     >
-      {/* Asset name + Direction row */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <span className="font-bold text-sm tracking-tight text-foreground">{instrument}</span>
         <div className="flex items-center gap-2">
@@ -84,26 +97,29 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
         </div>
       </div>
 
-      {/* Split layout */}
       <div className="flex min-h-[90px] border-t border-border/50">
-        {/* Left — Grade */}
         <div className="flex flex-col items-center justify-center px-4 py-3 bg-secondary/50 border-r border-border/50 min-w-[72px]">
           <span className={cn('text-3xl font-black tracking-tight leading-none', gradeText(grade))}>{grade}</span>
           <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight">{gradeLabel}</span>
         </div>
 
-        {/* Right — Decision info */}
         <div className="flex flex-col justify-center px-4 py-3 flex-1 gap-2">
-          {/* Status badge (+ amber caution when Extended — quick awareness only,
-              a valid setup that needs extra care, never a danger / no-trade) */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
               {status}
             </span>
             {isExtendedCaution(results) && <ExtendedCautionPill />}
+            {separationBadge && (
+              <span
+                className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
+                title={`Currency strength separation ${separationBadge.separation.toFixed(2)}%. Movement potential only — not direction.`}
+              >
+                <Zap className="w-3 h-3" />
+                {separationBadge.label} SEP
+              </span>
+            )}
           </div>
 
-          {/* Grid rows */}
           <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '1fr minmax(90px, auto)', columnGap: '12px' }}>
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Direction</span>
             <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
@@ -123,7 +139,6 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
         </div>
       </div>
 
-      {/* Block breakdown */}
       {!compact && (
         <div className="flex gap-1.5 px-3 py-2.5 border-t border-border/40 bg-secondary/20">
           <TrendPill label="Deep" dir={deepTrend} strength={deepStrength} />
@@ -132,7 +147,6 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact }) {
         </div>
       )}
 
-      {/* Bottom bar — hint + complete */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-border/40 bg-secondary/10">
         <span className="text-xs font-semibold text-primary" onClick={(e) => { e.stopPropagation(); onOpen(analysis); }}>View full details →</span>
         <button
@@ -180,11 +194,12 @@ export default function Dashboard() {
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [completeAnalysis, setCompleteAnalysis] = useState(null);
   const [lastCompletedTrade, setLastCompletedTrade] = useState(null);
-  const [journalTrade, setJournalTrade] = useState(null);       // record to journal
-  const [journalPrompt, setJournalPrompt] = useState(null);     // record awaiting journal decision
+  const [journalTrade, setJournalTrade] = useState(null);
+  const [journalPrompt, setJournalPrompt] = useState(null);
   const [settings, setSettings] = useState(getSettings());
   const [showFilters, setShowFilters] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [strengthData, setStrengthData] = useState(null);
   const [filters, setFilters] = useState(() => {
     const s = getSettings();
     return {
@@ -200,13 +215,9 @@ export default function Dashboard() {
       const opts = engineOptionsFromSettings(getSettings());
       const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
       Object.keys(active).forEach(key => {
-        if (active[key]?.inputs) {
-          active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null, opts);
-        }
+        if (active[key]?.inputs) active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null, opts);
       });
       setActiveAssets(active);
-
-      // Close modal if the instrument is no longer active or is locked (completed)
       setCompleteAnalysis(prev => {
         if (!prev) return null;
         if (!(prev.instrument in active)) return null;
@@ -217,7 +228,6 @@ export default function Dashboard() {
     window.addEventListener('biasUpdated', load);
     window.addEventListener('storage', load);
     window.addEventListener('settingsUpdated', load);
-    // Re-render in the saved pill order when it's changed in the Bias Tool.
     window.addEventListener('instrumentOrderUpdated', load);
     return () => {
       window.removeEventListener('biasUpdated', load);
@@ -225,6 +235,22 @@ export default function Dashboard() {
       window.removeEventListener('settingsUpdated', load);
       window.removeEventListener('instrumentOrderUpdated', load);
     };
+  }, []);
+
+  useEffect(() => {
+    const loadStrength = async () => {
+      try {
+        const response = await fetch(`/api/currency-strength?v=${STRENGTH_API_VERSION}`);
+        if (!response.ok) return;
+        const body = await response.json();
+        setStrengthData(body);
+      } catch {
+        // Strength is supplemental UX only. Summary must remain fully usable if it is unavailable.
+      }
+    };
+    loadStrength();
+    const interval = setInterval(loadStrength, 15 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -238,9 +264,7 @@ export default function Dashboard() {
       const now = new Date();
       const nextHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0, 0);
       const diff = nextHour.getTime() - now.getTime();
-      const mins = Math.floor(diff / 60000);
-      const secs = Math.floor((diff % 60000) / 1000);
-      setTimeToNextHour(`${mins}m ${secs}s`);
+      setTimeToNextHour(`${Math.floor(diff / 60000)}m ${Math.floor((diff % 60000) / 1000)}s`);
     };
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
@@ -248,13 +272,11 @@ export default function Dashboard() {
   }, []);
 
   const handleOpenComplete = (analysis) => {
-    const active = JSON.parse(localStorage.getItem("primebias_active") || "{}");
+    const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
     const latest = active[analysis.instrument];
-
     const latestAnalysis = Array.isArray(latest)
       ? latest.find(a => a.analysisId === analysis.analysisId) || latest[0]
       : latest;
-
     setCompleteAnalysis(latestAnalysis || analysis);
   };
 
@@ -267,19 +289,15 @@ export default function Dashboard() {
   const handleTradeCompleted = (record) => {
     setCompleteAnalysis(null);
     setLastCompletedTrade(record);
-    setJournalPrompt(record); // offer to journal the trade
-    // Reload active assets to reflect the removed analysis
+    setJournalPrompt(record);
     const opts = engineOptionsFromSettings(getSettings());
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
     Object.keys(active).forEach(key => {
-      if (active[key]?.inputs) {
-        active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null, opts);
-      }
+      if (active[key]?.inputs) active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null, opts);
     });
     setActiveAssets(active);
   };
 
-  // Modals that must render regardless of which layout branch is active.
   const journalModals = (
     <>
       {journalPrompt && (
@@ -300,10 +318,7 @@ export default function Dashboard() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setJournalPrompt(null)}>Skip</Button>
-              <Button
-                className="flex-1 gap-1.5"
-                onClick={() => { setJournalTrade(journalPrompt); setJournalPrompt(null); }}
-              >
+              <Button className="flex-1 gap-1.5" onClick={() => { setJournalTrade(journalPrompt); setJournalPrompt(null); }}>
                 <BookOpen className="w-4 h-4" /> Journal
               </Button>
             </div>
@@ -311,20 +326,12 @@ export default function Dashboard() {
         </div>
       )}
       {journalTrade && (
-        <TradeJournalFlow
-          trade={journalTrade}
-          onClose={() => setJournalTrade(null)}
-          onDone={() => setJournalTrade(null)}
-        />
+        <TradeJournalFlow trade={journalTrade} onClose={() => setJournalTrade(null)} onDone={() => setJournalTrade(null)} />
       )}
     </>
   );
 
-  // Match the favourite-instrument pill order from the Bias Tool so the Summary
-  // reads top-to-bottom in the same sequence the trader arranged their pills.
-  let analyses = orderAnalyses(
-    Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId)),
-  );
+  let analyses = orderAnalyses(Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId)));
 
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
   if (filters.filterHideWait) analyses = analyses.filter(a => !WAITING.includes(a.results?.tradeAction));
@@ -338,7 +345,6 @@ export default function Dashboard() {
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
-  // Show trade completion success card if last trade was just completed
   if (Object.values(activeAssets).length === 0 && lastCompletedTrade) {
     return (
       <>
@@ -352,29 +358,17 @@ export default function Dashboard() {
               {lastCompletedTrade.instrument} saved as <span className="font-semibold text-foreground">{lastCompletedTrade.result.toUpperCase()}</span>
             </p>
             <div className="flex flex-col gap-2 w-full max-w-xs">
-              <Button variant="default" className="rounded-full" onClick={() => navigate('/trade-history')}>
-                View Trade History
-              </Button>
-
-              <Button variant="outline" className="rounded-full" onClick={() => navigate('/input')}>
-                New Analysis
-              </Button>
+              <Button variant="default" className="rounded-full" onClick={() => navigate('/trade-history')}>View Trade History</Button>
+              <Button variant="outline" className="rounded-full" onClick={() => navigate('/input')}>New Analysis</Button>
             </div>
           </div>
         </div>
-        {completeAnalysis && (
-          <CompleteTradeModal
-            analysis={completeAnalysis}
-            onClose={() => setCompleteAnalysis(null)}
-            onCompleted={handleTradeCompleted}
-          />
-        )}
+        {completeAnalysis && <CompleteTradeModal analysis={completeAnalysis} onClose={() => setCompleteAnalysis(null)} onCompleted={handleTradeCompleted} />}
         {journalModals}
       </>
     );
   }
 
-  // Show empty state only if no active trades and no recently completed trade
   if (Object.values(activeAssets).length === 0) {
     return (
       <>
@@ -384,18 +378,9 @@ export default function Dashboard() {
           </div>
           <h1 className="text-xl font-bold mb-2">No Active Analyses</h1>
           <p className="text-muted-foreground text-sm mb-6">Add new assets in the Bias Tool to continue.</p>
-          <div className="flex gap-3">
-
-            <Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button>
-          </div>
+          <div className="flex gap-3"><Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button></div>
         </div>
-        {completeAnalysis && (
-          <CompleteTradeModal
-            analysis={completeAnalysis}
-            onClose={() => setCompleteAnalysis(null)}
-            onCompleted={handleTradeCompleted}
-          />
-        )}
+        {completeAnalysis && <CompleteTradeModal analysis={completeAnalysis} onClose={() => setCompleteAnalysis(null)} onCompleted={handleTradeCompleted} />}
         {journalModals}
       </>
     );
@@ -403,7 +388,6 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 space-y-4 pb-24">
-      {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <div>
           <h1 className="text-lg font-bold tracking-tight">Summary</h1>
@@ -412,56 +396,32 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-xs font-semibold">
-            ↻ {timeToNextHour}
-          </div>
+          <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-xs font-semibold">↻ {timeToNextHour}</div>
           <button
             onClick={() => setShowFilters(f => !f)}
-            className={cn(
-              'relative p-2 rounded-lg border transition-colors',
-              showFilters ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50'
-            )}
+            className={cn('relative p-2 rounded-lg border transition-colors', showFilters ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50')}
           >
             <SlidersHorizontal className="w-4 h-4" />
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">
-                {activeFilterCount}
-              </span>
-            )}
+            {activeFilterCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">{activeFilterCount}</span>}
           </button>
-          <Button
-            variant="ghost" size="icon"
-            onClick={() => setConfirmClear(true)}
-            aria-label="Clear all analyses"
-            title="Clear all analyses"
-            className="h-9 w-9 text-destructive hover:text-destructive"
-          >
+          <Button variant="ghost" size="icon" onClick={() => setConfirmClear(true)} aria-label="Clear all analyses" title="Clear all analyses" className="h-9 w-9 text-destructive hover:text-destructive">
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
       <InstallBanner />
-
       {showFilters && <FilterBar filters={filters} onChange={setFilters} />}
 
-      {/* Stats */}
       <div className="flex gap-2 text-xs text-muted-foreground">
         <span>{analyses.length} assets</span>
         {activeFilterCount > 0 && <span className="text-primary">(filtered)</span>}
-        <span className="ml-auto text-emerald-600 dark:text-emerald-400 font-semibold">
-          {analyses.filter(a => ACTIONABLE.includes(a.results?.tradeAction)).length} TRADE
-        </span>
-        <span className="text-yellow-700 dark:text-yellow-400 font-semibold">
-          {analyses.filter(a => WAITING.includes(a.results?.tradeAction)).length} WAIT
-        </span>
+        <span className="ml-auto text-emerald-600 dark:text-emerald-400 font-semibold">{analyses.filter(a => ACTIONABLE.includes(a.results?.tradeAction)).length} TRADE</span>
+        <span className="text-yellow-700 dark:text-yellow-400 font-semibold">{analyses.filter(a => WAITING.includes(a.results?.tradeAction)).length} WAIT</span>
       </div>
 
-      {/* Cards */}
       {analyses.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">
-          No assets match the current filters
-        </div>
+        <div className="text-center py-12 text-muted-foreground text-sm">No assets match the current filters</div>
       ) : (
         <div className="space-y-3">
           {analyses.map(a => (
@@ -472,27 +432,17 @@ export default function Dashboard() {
               onComplete={handleOpenComplete}
               settings={settings}
               compact={settings.compactMode}
+              strengthSnapshot={strengthData?.windows?.today}
             />
           ))}
         </div>
       )}
 
       {selectedAnalysis && (
-        <AssetDetailModal
-          analysis={selectedAnalysis}
-          settings={settings}
-          onClose={() => setSelectedAnalysis(null)}
-          onEdit={() => handleEditInstrument(selectedAnalysis.instrument)}
-        />
+        <AssetDetailModal analysis={selectedAnalysis} settings={settings} onClose={() => setSelectedAnalysis(null)} onEdit={() => handleEditInstrument(selectedAnalysis.instrument)} />
       )}
 
-      {completeAnalysis && (
-        <CompleteTradeModal
-          analysis={completeAnalysis}
-          onClose={() => setCompleteAnalysis(null)}
-          onCompleted={handleTradeCompleted}
-        />
-      )}
+      {completeAnalysis && <CompleteTradeModal analysis={completeAnalysis} onClose={() => setCompleteAnalysis(null)} onCompleted={handleTradeCompleted} />}
       {journalModals}
 
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
@@ -500,8 +450,7 @@ export default function Dashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Clear all analyses?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes every active analysis from the Summary on this device. Your completed
-              trades, journals and history are not affected.
+              This removes every active analysis from the Summary on this device. Your completed trades, journals and history are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
