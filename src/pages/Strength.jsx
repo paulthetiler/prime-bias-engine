@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, ArrowLeftRight, Zap } from 'lucide-react';
+import { RefreshCw, ArrowLeftRight, Zap, TrendingUp, TrendingDown, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +19,6 @@ function rankChange(currency, currentRows, referenceRows) {
   const current = rankMap(currentRows)[currency];
   const previous = rankMap(referenceRows)[currency];
   if (!current || !previous) return null;
-  // Positive = currency has climbed the ranking table.
   return previous - current;
 }
 
@@ -36,6 +35,15 @@ function separationLabel(value, maxSeparation) {
   if (ratio >= 0.50) return 'HIGH';
   if (ratio >= 0.25) return 'MED';
   return 'LOW';
+}
+
+function strongerAndWeaker(row) {
+  const first = row?.first;
+  const second = row?.second;
+  if (!first || !second) return { stronger: null, weaker: null };
+  return first.strength >= second.strength
+    ? { stronger: first, weaker: second }
+    : { stronger: second, weaker: first };
 }
 
 function StrengthBar({ row, maxAbs, change }) {
@@ -80,11 +88,23 @@ export default function Strength() {
   const strengths = snapshot?.strengths || [];
   const separations = snapshot?.separations || [];
   const referenceStrengths = data?.windows?.['4h']?.strengths || [];
+  const todayStrengths = data?.windows?.today?.strengths || [];
   const maxAbs = useMemo(() => strengths.reduce((max, row) => Math.max(max, Math.abs(row.strength)), 0), [strengths]);
   const maxSeparation = separations[0]?.separation || 0;
   const strongest = strengths[0];
   const weakest = strengths[strengths.length - 1];
   const activeLabel = WINDOWS.find((item) => item.key === windowKey)?.label || windowKey;
+
+  const positionChanges = useMemo(() => todayStrengths
+    .map(row => ({ currency: row.currency, change: rankChange(row.currency, todayStrengths, referenceStrengths) || 0 }))
+    .sort((a, b) => b.change - a.change), [todayStrengths, referenceStrengths]);
+  const biggestClimber = positionChanges.find(row => row.change > 0) || null;
+  const biggestFaller = [...positionChanges].reverse().find(row => row.change < 0) || null;
+
+  const marketPicks = useMemo(() => separations.slice(0, 3).map(row => {
+    const { stronger, weaker } = strongerAndWeaker(row);
+    return { ...row, stronger, weaker, label: separationLabel(row.separation, maxSeparation) };
+  }), [separations, maxSeparation]);
 
   return (
     <div className="px-3 py-4 space-y-3">
@@ -110,8 +130,39 @@ export default function Strength() {
           <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-right"><div className="text-[10px] uppercase tracking-widest text-muted-foreground">Weakest</div><div className="text-xl font-black text-red-600 dark:text-red-400 mt-1">{weakest.currency}</div><div className="text-xs font-mono">{weakest.strength.toFixed(2)}%</div></div>
         </div>}
 
+        {marketPicks.length > 0 && <div className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+          <div className="flex items-center gap-2 mb-1"><Target className="w-4 h-4 text-primary" /><h2 className="text-sm font-bold">Market picks</h2></div>
+          <p className="text-[11px] text-muted-foreground mb-3">Top strongest-vs-weakest pairings by separation. Pair selection only — direction still comes from Prime Bias.</p>
+          <div className="space-y-2">
+            {marketPicks.map((row, index) => <div key={row.pair} className="rounded-lg border border-border/60 bg-card px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0"><span className="text-[10px] text-muted-foreground w-4">{index + 1}</span><span className="text-sm font-black">{row.stronger?.currency} ↔ {row.weaker?.currency}</span></div>
+                <span className={cn('text-[9px] font-black tracking-wide', row.label === 'VERY HIGH' ? 'text-primary' : 'text-foreground')}>{row.label}</span>
+              </div>
+              <div className="flex items-center justify-between mt-1 pl-6 text-[10px]">
+                <span><span className="text-emerald-600 dark:text-emerald-400 font-bold">STRONG {row.stronger?.currency}</span> <span className="text-muted-foreground">vs</span> <span className="text-red-600 dark:text-red-400 font-bold">WEAK {row.weaker?.currency}</span></span>
+                <span className="font-mono font-bold text-primary">{row.separation.toFixed(2)}%</span>
+              </div>
+            </div>)}
+          </div>
+        </div>}
+
+        {(biggestClimber || biggestFaller) && <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-emerald-500/20 bg-card p-3">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Biggest climb</div>
+            <div className="mt-1 text-lg font-black">{biggestClimber?.currency || '—'}</div>
+            <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{biggestClimber ? `↑${biggestClimber.change} places` : 'No climb'}</div>
+          </div>
+          <div className="rounded-xl border border-red-500/20 bg-card p-3 text-right">
+            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">Biggest drop <TrendingDown className="w-3.5 h-3.5 text-red-600 dark:text-red-400" /></div>
+            <div className="mt-1 text-lg font-black">{biggestFaller?.currency || '—'}</div>
+            <div className="text-xs font-bold text-red-600 dark:text-red-400">{biggestFaller ? `↓${Math.abs(biggestFaller.change)} places` : 'No drop'}</div>
+          </div>
+          <div className="col-span-2 text-center text-[9px] text-muted-foreground -mt-1">Position change: Today rank vs 4H rank</div>
+        </div>}
+
         <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between mb-1"><h2 className="text-sm font-bold">Strength ranking</h2><span className="text-[10px] uppercase tracking-wider text-muted-foreground">{activeLabel}</span></div>
+          <div className="flex items-center justify-between mb-1"><h2 className="text-sm font-bold">Current strength</h2><span className="text-[10px] uppercase tracking-wider text-muted-foreground">{activeLabel}</span></div>
           <div className="text-right text-[9px] text-muted-foreground mb-1">↑↓ rank vs 4H</div>
           <div>{strengths.map(row => <StrengthBar key={row.currency} row={row} maxAbs={maxAbs} change={windowKey === '4h' ? 0 : rankChange(row.currency, strengths, referenceStrengths)} />)}</div>
         </div>
