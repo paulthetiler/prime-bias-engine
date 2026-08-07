@@ -49,22 +49,31 @@ function buildPairPrices(payload, barsAgo) {
   return { pairPrices, missing };
 }
 
+function dateKey(datetime) {
+  const value = String(datetime || '');
+  const match = value.match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : null;
+}
+
 function buildTodayPairPrices(payload) {
   const pairPrices = {};
   const missing = [];
-  const now = new Date();
-  const day = now.toISOString().slice(0, 10);
 
   for (const symbol of STRENGTH_SYMBOLS) {
     const series = symbolPayload(payload, symbol);
-    const values = series?.values || [];
+    const values = Array.isArray(series?.values) ? series.values : [];
     const current = values[0];
-    const todayBars = values.filter((bar) => String(bar?.datetime || '').startsWith(day));
+
+    // Do not use the Vercel server's calendar date here. The provider is the
+    // authority for the candle/session date, and server/provider timezone
+    // differences can otherwise make every pair look "missing".
+    const currentDay = dateKey(current?.datetime);
+    const todayBars = currentDay
+      ? values.filter((bar) => dateKey(bar?.datetime) === currentDay)
+      : [];
     const firstToday = todayBars.at(-1);
 
     const to = Number(current?.close);
-    // Session/day strength should start at the day's first available OPEN, not a
-    // rolling 24-hour close. This matches how "today" strength meters are read.
     const from = Number(firstToday?.open);
 
     if (!Number.isFinite(to) || !Number.isFinite(from) || to <= 0 || from <= 0) {
