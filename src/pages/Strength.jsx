@@ -10,6 +10,12 @@ const WINDOWS = [
   { key: '24h', label: '24H' },
 ];
 
+// Bump this whenever the server-side strength methodology changes. Vercel's CDN
+// intentionally caches the API route for an hour to protect the Twelve Data free
+// allowance; versioning the URL prevents a newly deployed UI from receiving an
+// old cached response shape/result from the previous methodology.
+const STRENGTH_API_VERSION = '3';
+
 function StrengthBar({ row, maxAbs }) {
   const positive = row.strength >= 0;
   const width = maxAbs > 0 ? Math.max(4, (Math.abs(row.strength) / maxAbs) * 100) : 4;
@@ -44,7 +50,7 @@ export default function Strength() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/currency-strength');
+      const response = await fetch(`/api/currency-strength?v=${STRENGTH_API_VERSION}`);
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error || 'Unable to load strength data');
       setData(body);
