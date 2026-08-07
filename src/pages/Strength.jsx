@@ -7,7 +7,6 @@ const WINDOWS = [
   { key: '1h', label: '1H' },
   { key: '4h', label: '4H' },
   { key: 'today', label: 'Today' },
-  { key: '24h', label: '24H' },
 ];
 
 // Bump whenever server-side methodology changes so Vercel cannot serve a stale
@@ -68,7 +67,7 @@ export default function Strength() {
           </div>
           <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={load} disabled={loading} aria-label="Refresh strength"><RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} /></Button>
         </div>
-        <div className="grid grid-cols-4 gap-2 mt-4">
+        <div className="grid grid-cols-3 gap-2 mt-4">
           {WINDOWS.map(item => <button key={item.key} type="button" onClick={() => setWindowKey(item.key)} className={cn('rounded-lg border py-2 text-xs font-bold transition-colors', windowKey === item.key ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary/60 text-muted-foreground border-border')}>{item.label}</button>)}
         </div>
       </div>
