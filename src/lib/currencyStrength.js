@@ -1,69 +1,59 @@
-// Currency Strength proof of concept.
+// Currency Strength engine.
 // IMPORTANT: informational/pair-selection only. This module must not alter the
 // Prime Bias score, grade, direction, readiness or trade action.
 
 export const STRENGTH_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD'];
 
-// Seven USD crosses are sufficient to place all eight currencies on one common
-// relative-performance scale. This keeps API usage small enough for prototyping.
-export const STRENGTH_SYMBOLS = [
-  'EUR/USD',
-  'GBP/USD',
-  'AUD/USD',
-  'NZD/USD',
-  'USD/JPY',
-  'USD/CHF',
-  'USD/CAD',
-];
+// Use the complete 8-currency basket: 28 unique crosses. A currency's strength
+// is the average of its return against each of the other seven currencies.
+// This removes the USD-anchor distortion from the original proof of concept.
+export const STRENGTH_SYMBOLS = STRENGTH_CURRENCIES.flatMap((base, i) =>
+  STRENGTH_CURRENCIES.slice(i + 1).map((quote) => `${base}/${quote}`),
+);
 
 function pctChange(from, to) {
   const a = Number(from);
   const b = Number(to);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0) return null;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
   return ((b / a) - 1) * 100;
 }
 
-// Converts each USD cross into a currency-vs-USD return. For XXX/USD, a rising
-// pair means XXX is stronger. For USD/XXX, a rising pair means XXX is weaker,
-// so the return is inverted by using the reciprocal prices.
-export function returnsVsUsd(pairPrices) {
-  const result = { USD: 0 };
+// Every pair contributes equally and symmetrically:
+//   pair rises  -> base gets +return, quote gets the inverse return
+//   pair falls  -> base gets -return, quote gets the inverse positive return
+// Using the exact reciprocal return avoids sign/magnitude drift on larger moves.
+export function calculateStrength(pairPrices) {
+  const totals = Object.fromEntries(STRENGTH_CURRENCIES.map((c) => [c, 0]));
+  const counts = Object.fromEntries(STRENGTH_CURRENCIES.map((c) => [c, 0]));
 
-  for (const symbol of STRENGTH_SYMBOLS) {
-    const prices = pairPrices[symbol];
-    if (!prices) continue;
-
+  for (const [symbol, prices] of Object.entries(pairPrices || {})) {
     const [base, quote] = symbol.split('/');
-    let change;
+    if (!(base in totals) || !(quote in totals)) continue;
 
-    if (quote === 'USD') {
-      change = pctChange(prices.from, prices.to);
-      if (change != null) result[base] = change;
-    } else if (base === 'USD') {
-      // Reciprocal return gives the quote currency's performance versus USD.
-      change = pctChange(1 / Number(prices.from), 1 / Number(prices.to));
-      if (change != null) result[quote] = change;
-    }
+    const baseReturn = pctChange(prices?.from, prices?.to);
+    const quoteReturn = pctChange(1 / Number(prices?.from), 1 / Number(prices?.to));
+    if (baseReturn == null || quoteReturn == null) continue;
+
+    totals[base] += baseReturn;
+    counts[base] += 1;
+    totals[quote] += quoteReturn;
+    counts[quote] += 1;
   }
 
-  return result;
-}
-
-// Centre the basket around zero. Scores remain percentage-like and deliberately
-// unweighted in phase one; 1H/4H/24H should be inspected independently before
-// we invent a composite formula.
-export function calculateStrength(pairPrices) {
-  const vsUsd = returnsVsUsd(pairPrices);
-  const available = STRENGTH_CURRENCIES.filter((currency) => Number.isFinite(vsUsd[currency]));
-  if (available.length < 2) return [];
-
-  const mean = available.reduce((sum, currency) => sum + vsUsd[currency], 0) / available.length;
-
-  return available
+  const rows = STRENGTH_CURRENCIES
+    .filter((currency) => counts[currency] > 0)
     .map((currency) => ({
       currency,
-      strength: vsUsd[currency] - mean,
-    }))
+      strength: totals[currency] / counts[currency],
+      samples: counts[currency],
+    }));
+
+  if (rows.length < 2) return [];
+
+  // Centre the complete basket around zero so positive/negative reads naturally.
+  const mean = rows.reduce((sum, row) => sum + row.strength, 0) / rows.length;
+  return rows
+    .map((row) => ({ ...row, strength: row.strength - mean }))
     .sort((a, b) => b.strength - a.strength);
 }
 
