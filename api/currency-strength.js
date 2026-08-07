@@ -2,23 +2,24 @@ import { buildStrengthSnapshot, STRENGTH_SYMBOLS } from '../src/lib/currencyStre
 
 const TWELVE_DATA_URL = 'https://api.twelvedata.com/time_series';
 const INTERVAL = '15min';
-const OUTPUT_SIZE = 100;
+const OUTPUT_SIZE = 120;
 const WINDOW_BARS = { '1h': 4, '4h': 16, '24h': 96 };
-const CACHE_MS = 15 * 60 * 1000;
+
+// 28 symbols × 24 hourly refreshes = 672 credits/day, within the 800/day
+// Twelve Data free-tier prototype allowance. CDN + in-memory caching prevent
+// every page open / manual refresh from burning another 28 credits.
+const CACHE_MS = 60 * 60 * 1000;
 
 let cache = null;
 
 function json(res, status, body) {
   res.status(status);
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=900');
+  res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=1800');
   return res.json(body);
 }
 
 function symbolPayload(payload, symbol) {
-  // Twelve Data returns a keyed object for multi-symbol requests. Keep a small
-  // fallback for a single-symbol-shaped response so this fails gracefully if
-  // their response wrapper changes.
   return payload?.[symbol] ?? (payload?.meta?.symbol === symbol ? payload : null);
 }
 
@@ -38,6 +39,35 @@ function buildPairPrices(payload, barsAgo) {
     const from = closeAt(values, barsAgo);
 
     if (to == null || from == null) {
+      missing.push(symbol);
+      continue;
+    }
+
+    pairPrices[symbol] = { from, to };
+  }
+
+  return { pairPrices, missing };
+}
+
+function buildTodayPairPrices(payload) {
+  const pairPrices = {};
+  const missing = [];
+  const now = new Date();
+  const day = now.toISOString().slice(0, 10);
+
+  for (const symbol of STRENGTH_SYMBOLS) {
+    const series = symbolPayload(payload, symbol);
+    const values = series?.values || [];
+    const current = values[0];
+    const todayBars = values.filter((bar) => String(bar?.datetime || '').startsWith(day));
+    const firstToday = todayBars.at(-1);
+
+    const to = Number(current?.close);
+    // Session/day strength should start at the day's first available OPEN, not a
+    // rolling 24-hour close. This matches how "today" strength meters are read.
+    const from = Number(firstToday?.open);
+
+    if (!Number.isFinite(to) || !Number.isFinite(from) || to <= 0 || from <= 0) {
       missing.push(symbol);
       continue;
     }
@@ -93,21 +123,22 @@ export default async function handler(req, res) {
 
     for (const [window, barsAgo] of Object.entries(WINDOW_BARS)) {
       const { pairPrices, missing } = buildPairPrices(payload, barsAgo);
-      const snapshot = buildStrengthSnapshot(pairPrices);
-
-      windows[window] = snapshot;
+      windows[window] = buildStrengthSnapshot(pairPrices);
       if (missing.length) warnings.push(`${window}: missing ${missing.join(', ')}`);
     }
 
+    const today = buildTodayPairPrices(payload);
+    windows.today = buildStrengthSnapshot(today.pairPrices);
+    if (today.missing.length) warnings.push(`today: missing ${today.missing.join(', ')}`);
+
     const body = {
       source: 'Twelve Data',
+      methodology: '28-pair basket average',
       interval: INTERVAL,
       symbols: STRENGTH_SYMBOLS,
       fetchedAt: new Date().toISOString(),
       windows,
       warnings,
-      // Explicit architectural contract: this endpoint is a scanner/selection
-      // aid only and has no authority over Prime Bias trade decisions.
       informationalOnly: true,
       cached: false,
     };
