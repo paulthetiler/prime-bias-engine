@@ -4,56 +4,63 @@
 
 export const STRENGTH_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD'];
 
-// Use the complete 8-currency basket: 28 unique crosses. A currency's strength
-// is the average of its return against each of the other seven currencies.
-// This removes the USD-anchor distortion from the original proof of concept.
-export const STRENGTH_SYMBOLS = STRENGTH_CURRENCIES.flatMap((base, i) =>
-  STRENGTH_CURRENCIES.slice(i + 1).map((quote) => `${base}/${quote}`),
-);
+// Seven USD crosses form a complete connected graph for the eight currencies.
+// Using LOG returns means every other cross can be derived exactly as a relative
+// move: log(A/B) = log(A/USD) - log(B/USD). This gives us the same mathematical
+// full-basket relationship without paying 28 API credits in one minute.
+export const STRENGTH_SYMBOLS = [
+  'EUR/USD',
+  'GBP/USD',
+  'AUD/USD',
+  'NZD/USD',
+  'USD/JPY',
+  'USD/CHF',
+  'USD/CAD',
+];
 
-function pctChange(from, to) {
+function logReturn(from, to) {
   const a = Number(from);
   const b = Number(to);
   if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
-  return ((b / a) - 1) * 100;
+  return Math.log(b / a) * 100;
 }
 
-// Every pair contributes equally and symmetrically:
-//   pair rises  -> base gets +return, quote gets the inverse return
-//   pair falls  -> base gets -return, quote gets the inverse positive return
-// Using the exact reciprocal return avoids sign/magnitude drift on larger moves.
-export function calculateStrength(pairPrices) {
-  const totals = Object.fromEntries(STRENGTH_CURRENCIES.map((c) => [c, 0]));
-  const counts = Object.fromEntries(STRENGTH_CURRENCIES.map((c) => [c, 0]));
+// Convert the seven quoted pairs into one common currency-vs-USD log-return
+// scale. USD itself is zero before centring.
+export function currencyReturnsVsUsd(pairPrices) {
+  const returns = { USD: 0 };
 
-  for (const [symbol, prices] of Object.entries(pairPrices || {})) {
+  for (const symbol of STRENGTH_SYMBOLS) {
+    const prices = pairPrices?.[symbol];
+    if (!prices) continue;
     const [base, quote] = symbol.split('/');
-    if (!(base in totals) || !(quote in totals)) continue;
+    const r = logReturn(prices.from, prices.to);
+    if (r == null) continue;
 
-    const baseReturn = pctChange(prices?.from, prices?.to);
-    const quoteReturn = pctChange(1 / Number(prices?.from), 1 / Number(prices?.to));
-    if (baseReturn == null || quoteReturn == null) continue;
-
-    totals[base] += baseReturn;
-    counts[base] += 1;
-    totals[quote] += quoteReturn;
-    counts[quote] += 1;
+    if (quote === 'USD') returns[base] = r;
+    else if (base === 'USD') returns[quote] = -r;
   }
 
-  const rows = STRENGTH_CURRENCIES
-    .filter((currency) => counts[currency] > 0)
+  return returns;
+}
+
+// With a common numeraire, each currency's average performance versus ALL other
+// seven currencies equals its centred log return. So this is a mathematically
+// full 8-currency basket, not a "USD strength meter" despite using seven source
+// quotes to reconstruct it.
+export function calculateStrength(pairPrices) {
+  const vsUsd = currencyReturnsVsUsd(pairPrices);
+  const available = STRENGTH_CURRENCIES.filter((currency) => Number.isFinite(vsUsd[currency]));
+  if (available.length < 2) return [];
+
+  const mean = available.reduce((sum, currency) => sum + vsUsd[currency], 0) / available.length;
+
+  return available
     .map((currency) => ({
       currency,
-      strength: totals[currency] / counts[currency],
-      samples: counts[currency],
-    }));
-
-  if (rows.length < 2) return [];
-
-  // Centre the complete basket around zero so positive/negative reads naturally.
-  const mean = rows.reduce((sum, row) => sum + row.strength, 0) / rows.length;
-  return rows
-    .map((row) => ({ ...row, strength: row.strength - mean }))
+      strength: vsUsd[currency] - mean,
+      samples: available.length - 1,
+    }))
     .sort((a, b) => b.strength - a.strength);
 }
 
@@ -66,7 +73,6 @@ export function calculatePairSeparations(strengthRows) {
       const a = STRENGTH_CURRENCIES[i];
       const b = STRENGTH_CURRENCIES[j];
       if (!Number.isFinite(strengths[a]) || !Number.isFinite(strengths[b])) continue;
-
       rows.push({
         pair: `${a}/${b}`,
         separation: Math.abs(strengths[a] - strengths[b]),
@@ -81,8 +87,5 @@ export function calculatePairSeparations(strengthRows) {
 
 export function buildStrengthSnapshot(pairPrices) {
   const strengths = calculateStrength(pairPrices);
-  return {
-    strengths,
-    separations: calculatePairSeparations(strengths),
-  };
+  return { strengths, separations: calculatePairSeparations(strengths) };
 }
