@@ -7,60 +7,52 @@ import ExtendedCautionPill, { isExtendedCaution } from './ExtendedCautionPill';
 export default function BiasResult({ results, settings }) {
   if (!results) return null;
 
-  const { mainDirection, grade, gradeLabel, tradeAction, status, deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength, winningScore, warnings, targetNote, extraCheckConfirmation } = results;
+  const {
+    mainDirection, grade, gradeLabel, tradeAction, readiness, status,
+    deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength,
+    winningScore, warnings, targetNote, extraCheckConfirmation,
+    extraDirection, extraQuality,
+  } = results;
   const extraCheck = extraCheckStyle(extraCheckConfirmation);
 
-  const dirColor = mainDirection === 'BUY' ? 'text-primary' : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
+  const dirColor = mainDirection === 'BUY' ? 'text-primary'
+    : mainDirection === 'SELL' ? 'text-destructive'
+    : 'text-muted-foreground';
 
-  const gradeColors = {
-    A: 'text-primary bg-primary/15 border-primary/30',
-    B: 'text-foreground bg-secondary border-border',
-    C: 'text-yellow-700 dark:text-yellow-400 bg-yellow-500/15 border-yellow-500/30',
-    D: 'text-orange-600 dark:text-orange-400 bg-orange-500/15 border-orange-500/30',
-    F: 'text-destructive bg-destructive/15 border-destructive/30',
-  };
-
-  const statusBadge = status === 'Ready' || status === 'Scalp'
+  const statusBadge = status === 'YES' || status === 'Scalp'
     ? 'bg-primary/15 text-primary border-primary/30'
-    : status === 'Wait' || status === 'Weak'
+    : status === 'Wait'
     ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
     : 'bg-secondary text-muted-foreground border-border';
 
   return (
     <div className="space-y-2.5">
-
-      {/* ── MAIN RESULT CARD ── Split layout */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
         <div className="flex min-h-[100px]">
-
-          {/* Left — Grade */}
           <div className="flex flex-col items-center justify-center px-4 py-3 bg-secondary/40 border-r border-border min-w-[76px]">
             <span className="text-4xl font-black tracking-tight text-foreground leading-none">{grade}</span>
             <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight">{gradeLabel}</span>
           </div>
 
-          {/* Right — Decision info */}
           <div className="flex flex-col justify-center px-3 py-3 flex-1 gap-2">
-            {/* Status badge (+ amber caution when Extended — a valid setup that
-                just needs extra care, NOT a danger / no-trade state) */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
-                {status}
+                {status || '—'}
               </span>
               {isExtendedCaution(results) && <ExtendedCautionPill />}
             </div>
 
-            {/* Grid: label → value */}
             <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '80px 1fr' }}>
               <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Direction</span>
               <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
 
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Action</span>
-              <span className="flex flex-col items-start gap-0.5">
-                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>
-                  {actionLabel(tradeAction)}
-                </span>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Trade</span>
+              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>
+                {actionLabel(tradeAction)}
               </span>
+
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Readiness</span>
+              <span className="text-[11px] font-semibold text-foreground">{readiness || '—'}</span>
 
               <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Extra Check</span>
               <span className={cn('text-[9px] font-semibold px-2 py-0.5 rounded self-start w-fit', extraCheck.badge)}>
@@ -69,12 +61,18 @@ export default function BiasResult({ results, settings }) {
 
               <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Setup Quality</span>
               <span className="text-[11px] font-mono font-semibold text-foreground">{targetNote || '—'}</span>
+
+              {(extraDirection || extraQuality) && <>
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">MACD Extra</span>
+                <span className="text-[11px] font-mono font-semibold text-foreground">
+                  {[extraQuality, extraDirection].filter(Boolean).join(' ')}
+                </span>
+              </>}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── BLOCK BREAKDOWN ── */}
       <div>
         <div className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1.5">Block Breakdown</div>
         <div className="grid grid-cols-3 gap-1.5">
@@ -84,7 +82,6 @@ export default function BiasResult({ results, settings }) {
         </div>
       </div>
 
-      {/* ── BACKEND SCORE (optional) ── */}
       {settings?.showBackendScore && (
         <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
           <div className="flex items-center justify-between text-xs">
@@ -94,7 +91,6 @@ export default function BiasResult({ results, settings }) {
         </div>
       )}
 
-      {/* ── WARNINGS ── */}
       {warnings?.length > 0 && (
         <div className="space-y-1">
           {warnings.map((w, i) => (
