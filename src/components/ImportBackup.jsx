@@ -5,7 +5,7 @@ import { Upload, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Entity name (in the backup file) -> { table, columns we accept }.
-// We whitelist columns so Base44 system fields (created_by, is_sample, …) that
+// We whitelist columns so legacy system fields (created_by, is_sample, …) that
 // don't exist in our Supabase tables are simply dropped instead of erroring.
 const IMPORT_MAP = {
   BiasAnalysis: {
@@ -107,7 +107,7 @@ export default function ImportBackup() {
       <div className="min-w-0">
         <div className="text-sm font-semibold">Import / Restore Data</div>
         <div className="text-xs text-muted-foreground">
-          Load a PrimeBias backup JSON (e.g. your export from Base44) into this account. Safe to re-run.
+          Load a PrimeBias backup JSON into this account. Safe to re-run.
         </div>
       </div>
       <input
