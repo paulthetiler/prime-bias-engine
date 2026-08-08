@@ -21,9 +21,14 @@ import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 import { InstallBanner } from '@/components/InstallApp';
 import { separationLabel } from '@/lib/strengthContext';
 
-const ACTIONABLE = ['TRADE', 'BUY', 'SELL'];
-const WAITING = ['WAIT', 'PENDING'];
 const STRENGTH_API_VERSION = '4';
+
+function statusClass(status) {
+  if (status === 'YES' || status === 'Scalp') return 'bg-primary/15 text-primary border-primary/30';
+  if (status === 'Wait') return 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
+  if (status === 'NO' || status === 'No') return 'bg-destructive/10 text-destructive border-destructive/25';
+  return 'bg-secondary text-muted-foreground border-border';
+}
 
 function TrendPill({ label, dir, strength }) {
   return (
@@ -38,22 +43,15 @@ function TrendPill({ label, dir, strength }) {
 function getSeparationBadge(instrument, snapshot) {
   if (!instrument?.includes('/') || !snapshot?.separations?.length) return null;
   const [base, quote] = instrument.split('/');
-  if (!base || !quote) return null;
-
   const row = snapshot.separations.find(item => {
     const [a, b] = String(item.pair || '').split('/');
     return (a === base && b === quote) || (a === quote && b === base);
   });
   if (!row) return null;
-
   const maxSeparation = snapshot.separations[0]?.separation || 0;
   if (!maxSeparation) return null;
-  // Summary only surfaces the notable separations. The shared label keeps the
-  // HIGH / VERY HIGH thresholds identical to the Strength page and the full
-  // decision view's Strength Context.
   const label = separationLabel(row.separation, maxSeparation);
-  if (label === 'VERY HIGH' || label === 'HIGH') return { label, separation: row.separation };
-  return null;
+  return label === 'VERY HIGH' || label === 'HIGH' ? { label, separation: row.separation } : null;
 }
 
 function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSnapshot }) {
@@ -62,7 +60,7 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSn
   if (!results) return null;
 
   const {
-    mainDirection, grade, gradeLabel, tradeAction, status,
+    mainDirection, grade, gradeLabel, tradeAction, status, readiness,
     deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength,
   } = results;
 
@@ -70,13 +68,6 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSn
     : mainDirection === 'SELL' ? 'text-destructive' : 'text-muted-foreground';
   const dirBorder = mainDirection === 'BUY' ? 'border-primary/30'
     : mainDirection === 'SELL' ? 'border-destructive/30' : 'border-border';
-
-  const statusBadge = status === 'Ready' || status === 'Scalp'
-    ? 'bg-primary/15 text-primary border-primary/30'
-    : status === 'Wait' || status === 'Weak'
-    ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
-    : 'bg-secondary text-muted-foreground border-border';
-
   const minSafeMoveDisplay = formatWithUnit(targetInfo?.target, instrument) || '—';
   const separationBadge = getSeparationBadge(instrument, strengthSnapshot);
 
@@ -85,8 +76,7 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSn
       className={cn(
         'rounded-xl border bg-card cursor-pointer transition-all select-none overflow-hidden',
         'hover:border-primary/40 active:scale-[0.98] active:opacity-90',
-        pressed ? 'scale-[0.98] opacity-90' : '',
-        dirBorder
+        pressed ? 'scale-[0.98] opacity-90' : '', dirBorder
       )}
       onClick={() => onOpen(analysis)}
       onTouchStart={() => setPressed(true)}
@@ -108,29 +98,24 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSn
 
         <div className="flex flex-col justify-center px-4 py-3 flex-1 gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
-              {status}
-            </span>
+            <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusClass(status))}>{status}</span>
             {isExtendedCaution(results) && <ExtendedCautionPill />}
             {separationBadge && (
               <span
                 className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
                 title={`Currency strength separation ${separationBadge.separation.toFixed(2)}%. Movement potential only — not direction.`}
               >
-                <Zap className="w-3 h-3" />
-                {separationBadge.label} SEP
+                <Zap className="w-3 h-3" /> {separationBadge.label} SEP
               </span>
             )}
           </div>
 
           <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '1fr minmax(90px, auto)', columnGap: '12px' }}>
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Direction</span>
-            <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Trade</span>
+            <span className={cn('text-xs font-bold px-1.5 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>{actionLabel(tradeAction)}</span>
 
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Action</span>
-            <span className={cn('text-xs font-bold px-1.5 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>
-              {actionLabel(tradeAction)}
-            </span>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Readiness</span>
+            <span className="text-xs font-semibold text-foreground">{readiness || '—'}</span>
 
             {settings.showTarget && (
               <>
@@ -156,8 +141,7 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSn
           onClick={(e) => { e.stopPropagation(); onComplete(analysis); }}
           className="flex items-center gap-1 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors"
         >
-          <CheckCircle2 className="w-3 h-3" />
-          Complete
+          <CheckCircle2 className="w-3 h-3" /> Complete
         </button>
       </div>
     </div>
@@ -165,26 +149,21 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSn
 }
 
 function FilterBar({ filters, onChange }) {
+  const items = [
+    { key: 'filterABOnly', label: 'A/B Only' },
+    { key: 'filterHideWait', label: 'Hide WAIT' },
+    { key: 'filterHideExtended', label: 'Hide Extended' },
+    { key: 'filterAlignedOnly', label: 'Aligned Only' },
+  ];
   return (
     <div className="flex gap-2 flex-wrap">
-      {[
-        { key: 'filterABOnly', label: 'A/B Only' },
-        { key: 'filterHideWait', label: 'Hide WAIT' },
-        { key: 'filterHideExtended', label: 'Hide Extended' },
-        { key: 'filterAlignedOnly', label: 'Aligned Only' },
-      ].map(f => (
+      {items.map(f => (
         <button
           key={f.key}
           onClick={() => onChange({ ...filters, [f.key]: !filters[f.key] })}
-          className={cn(
-            'px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors',
-            filters[f.key]
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-secondary text-muted-foreground border-border hover:border-primary/50'
-          )}
-        >
-          {f.label}
-        </button>
+          className={cn('px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors',
+            filters[f.key] ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-muted-foreground border-border hover:border-primary/50')}
+        >{f.label}</button>
       ))}
     </div>
   );
@@ -221,35 +200,19 @@ export default function Dashboard() {
         if (active[key]?.inputs) active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null, opts);
       });
       setActiveAssets(active);
-      setCompleteAnalysis(prev => {
-        if (!prev) return null;
-        if (!(prev.instrument in active)) return null;
-        return prev;
-      });
+      setCompleteAnalysis(prev => (!prev || !(prev.instrument in active)) ? null : prev);
     };
     load();
-    window.addEventListener('biasUpdated', load);
-    window.addEventListener('storage', load);
-    window.addEventListener('settingsUpdated', load);
-    window.addEventListener('instrumentOrderUpdated', load);
-    return () => {
-      window.removeEventListener('biasUpdated', load);
-      window.removeEventListener('storage', load);
-      window.removeEventListener('settingsUpdated', load);
-      window.removeEventListener('instrumentOrderUpdated', load);
-    };
+    ['biasUpdated', 'storage', 'settingsUpdated', 'instrumentOrderUpdated'].forEach(e => window.addEventListener(e, load));
+    return () => ['biasUpdated', 'storage', 'settingsUpdated', 'instrumentOrderUpdated'].forEach(e => window.removeEventListener(e, load));
   }, []);
 
   useEffect(() => {
     const loadStrength = async () => {
       try {
         const response = await fetch(`/api/currency-strength?v=${STRENGTH_API_VERSION}`);
-        if (!response.ok) return;
-        const body = await response.json();
-        setStrengthData(body);
-      } catch {
-        // Strength is supplemental UX only. Summary must remain fully usable if it is unavailable.
-      }
+        if (response.ok) setStrengthData(await response.json());
+      } catch { /* supplemental only */ }
     };
     loadStrength();
     const interval = setInterval(loadStrength, 15 * 60 * 1000);
@@ -305,172 +268,62 @@ export default function Dashboard() {
     <>
       {journalPrompt && (
         <div className="fixed inset-0 z-[65] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setJournalPrompt(null)}>
-          <div
-            className="w-full max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl p-5 text-center space-y-4"
-            style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center mx-auto">
-              <BookOpen className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <div className="text-base font-bold">Journal this trade?</div>
-              <div className="text-sm text-muted-foreground mt-1">
-                {journalPrompt.instrument} saved. Capture what happened while it's fresh.
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setJournalPrompt(null)}>Skip</Button>
-              <Button className="flex-1 gap-1.5" onClick={() => { setJournalTrade(journalPrompt); setJournalPrompt(null); }}>
-                <BookOpen className="w-4 h-4" /> Journal
-              </Button>
-            </div>
+          <div className="w-full max-w-sm bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-2xl p-5 text-center space-y-4" style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))' }} onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center mx-auto"><BookOpen className="w-6 h-6 text-primary" /></div>
+            <div><div className="text-base font-bold">Journal this trade?</div><div className="text-sm text-muted-foreground mt-1">{journalPrompt.instrument} saved. Capture what happened while it's fresh.</div></div>
+            <div className="flex gap-2"><Button variant="outline" className="flex-1" onClick={() => setJournalPrompt(null)}>Skip</Button><Button className="flex-1 gap-1.5" onClick={() => { setJournalTrade(journalPrompt); setJournalPrompt(null); }}><BookOpen className="w-4 h-4" /> Journal</Button></div>
           </div>
         </div>
       )}
-      {journalTrade && (
-        <TradeJournalFlow trade={journalTrade} onClose={() => setJournalTrade(null)} onDone={() => setJournalTrade(null)} />
-      )}
+      {journalTrade && <TradeJournalFlow trade={journalTrade} onClose={() => setJournalTrade(null)} onDone={() => setJournalTrade(null)} />}
     </>
   );
 
   let analyses = orderAnalyses(Object.values(activeAssets).filter(a => !isAnalysisLocked(a.analysisId)));
-
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
-  if (filters.filterHideWait) analyses = analyses.filter(a => !WAITING.includes(a.results?.tradeAction));
-  if (filters.filterHideExtended) analyses = analyses.filter(a => !(a.results?.winningScore >= 90));
-  if (filters.filterAlignedOnly) {
-    analyses = analyses.filter(a => {
-      const al = calcAlignment(a.results);
-      return al.label === 'HIGH' || al.label === 'MEDIUM';
-    });
-  }
+  if (filters.filterHideWait) analyses = analyses.filter(a => a.results?.status !== 'Wait');
+  if (filters.filterHideExtended) analyses = analyses.filter(a => a.results?.status !== 'Extended');
+  if (filters.filterAlignedOnly) analyses = analyses.filter(a => ['HIGH', 'MEDIUM'].includes(calcAlignment(a.results).label));
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const waitCount = analyses.filter(a => a.results?.status === 'Wait').length;
+  const directionalCount = analyses.filter(a => ['BUY', 'SELL'].includes(a.results?.tradeAction)).length;
 
   if (Object.values(activeAssets).length === 0 && lastCompletedTrade) {
-    return (
-      <>
-        <div className="p-4 space-y-4 pb-24">
-          <div className="pt-8 flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 flex items-center justify-center mb-4 border border-emerald-500/30">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h1 className="text-lg font-bold mb-1">Trade Saved</h1>
-            <p className="text-sm text-muted-foreground mb-6">
-              {lastCompletedTrade.instrument} saved as <span className="font-semibold text-foreground">{lastCompletedTrade.result.toUpperCase()}</span>
-            </p>
-            <div className="flex flex-col gap-2 w-full max-w-xs">
-              <Button variant="default" className="rounded-full" onClick={() => navigate('/trade-history')}>View Trade History</Button>
-              <Button variant="outline" className="rounded-full" onClick={() => navigate('/input')}>New Analysis</Button>
-            </div>
-          </div>
-        </div>
-        {completeAnalysis && <CompleteTradeModal analysis={completeAnalysis} onClose={() => setCompleteAnalysis(null)} onCompleted={handleTradeCompleted} />}
-        {journalModals}
-      </>
-    );
+    return <>{journalModals}<div className="p-4 space-y-4 pb-24"><div className="pt-8 flex flex-col items-center justify-center min-h-[60vh] text-center"><CheckCircle2 className="w-10 h-10 text-emerald-500 mb-4" /><h1 className="text-lg font-bold mb-1">Trade Saved</h1><p className="text-sm text-muted-foreground mb-6">{lastCompletedTrade.instrument} saved as <span className="font-semibold text-foreground">{lastCompletedTrade.result.toUpperCase()}</span></p><div className="flex flex-col gap-2 w-full max-w-xs"><Button onClick={() => navigate('/trade-history')}>View Trade History</Button><Button variant="outline" onClick={() => navigate('/input')}>New Analysis</Button></div></div></div></>;
   }
 
   if (Object.values(activeAssets).length === 0) {
-    return (
-      <>
-        <div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center">
-          <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-            <Crosshair className="w-10 h-10 text-muted-foreground" />
-          </div>
-          <h1 className="text-xl font-bold mb-2">No Active Analyses</h1>
-          <p className="text-muted-foreground text-sm mb-6">Add new assets in the Bias Tool to continue.</p>
-          <div className="flex gap-3"><Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button></div>
-        </div>
-        {completeAnalysis && <CompleteTradeModal analysis={completeAnalysis} onClose={() => setCompleteAnalysis(null)} onCompleted={handleTradeCompleted} />}
-        {journalModals}
-      </>
-    );
+    return <><div className="p-6 flex flex-col items-center justify-center min-h-[80vh] text-center"><div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mb-4"><Crosshair className="w-10 h-10 text-muted-foreground" /></div><h1 className="text-xl font-bold mb-2">No Active Analyses</h1><p className="text-muted-foreground text-sm mb-6">Add new assets in the Bias Tool to continue.</p><Button className="rounded-full" onClick={() => navigate('/input')}>Bias Tool</Button></div>{journalModals}</>;
   }
 
   return (
     <div className="p-4 space-y-4 pb-24">
       <div className="flex items-center justify-between pt-2">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Summary</h1>
-          <p className="text-xs text-muted-foreground">
-            {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-          </p>
-        </div>
+        <div><h1 className="text-lg font-bold tracking-tight">Summary</h1><p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</p></div>
         <div className="flex items-center gap-2">
           <div className="bg-secondary rounded px-2 py-1 font-mono text-primary text-xs font-semibold">↻ {timeToNextHour}</div>
-          <button
-            onClick={() => setShowFilters(f => !f)}
-            className={cn('relative p-2 rounded-lg border transition-colors', showFilters ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50')}
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            {activeFilterCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">{activeFilterCount}</span>}
-          </button>
-          <Button variant="ghost" size="icon" onClick={() => setConfirmClear(true)} aria-label="Clear all analyses" title="Clear all analyses" className="h-9 w-9 text-destructive hover:text-destructive">
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <button onClick={() => setShowFilters(f => !f)} className={cn('relative p-2 rounded-lg border transition-colors', showFilters ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50')}><SlidersHorizontal className="w-4 h-4" />{activeFilterCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">{activeFilterCount}</span>}</button>
+          <Button variant="ghost" size="icon" onClick={() => setConfirmClear(true)} aria-label="Clear all analyses" className="h-9 w-9 text-destructive hover:text-destructive"><Trash2 className="w-4 h-4" /></Button>
         </div>
       </div>
 
       <InstallBanner />
       {showFilters && <FilterBar filters={filters} onChange={setFilters} />}
+      <div className="flex gap-2 text-xs text-muted-foreground"><span>{analyses.length} assets</span>{activeFilterCount > 0 && <span className="text-primary">(filtered)</span>}<span className="ml-auto font-semibold">{directionalCount} directional</span><span className="text-yellow-700 dark:text-yellow-400 font-semibold">{waitCount} WAIT</span></div>
 
-      <div className="flex gap-2 text-xs text-muted-foreground">
-        <span>{analyses.length} assets</span>
-        {activeFilterCount > 0 && <span className="text-primary">(filtered)</span>}
-        <span className="ml-auto text-emerald-600 dark:text-emerald-400 font-semibold">{analyses.filter(a => ACTIONABLE.includes(a.results?.tradeAction)).length} TRADE</span>
-        <span className="text-yellow-700 dark:text-yellow-400 font-semibold">{analyses.filter(a => WAITING.includes(a.results?.tradeAction)).length} WAIT</span>
-      </div>
-
-      {analyses.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">No assets match the current filters</div>
-      ) : (
-        <div className="space-y-3">
-          {analyses.map(a => (
-            <AssetCard
-              key={a.instrument}
-              analysis={a}
-              onOpen={setSelectedAnalysis}
-              onComplete={handleOpenComplete}
-              settings={settings}
-              compact={settings.compactMode}
-              strengthSnapshot={strengthData?.windows?.today}
-            />
-          ))}
-        </div>
+      {analyses.length === 0 ? <div className="text-center py-12 text-muted-foreground text-sm">No assets match the current filters</div> : (
+        <div className="space-y-3">{analyses.map(a => <AssetCard key={a.instrument} analysis={a} onOpen={setSelectedAnalysis} onComplete={handleOpenComplete} settings={settings} compact={settings.compactMode} strengthSnapshot={strengthData?.windows?.today} />)}</div>
       )}
 
-      {selectedAnalysis && (
-        <AssetDetailModal analysis={selectedAnalysis} settings={settings} strengthData={strengthData} onClose={() => setSelectedAnalysis(null)} onEdit={() => handleEditInstrument(selectedAnalysis.instrument)} />
-      )}
-
+      {selectedAnalysis && <AssetDetailModal analysis={selectedAnalysis} settings={settings} strengthData={strengthData} onClose={() => setSelectedAnalysis(null)} onEdit={() => handleEditInstrument(selectedAnalysis.instrument)} />}
       {completeAnalysis && <CompleteTradeModal analysis={completeAnalysis} onClose={() => setCompleteAnalysis(null)} onCompleted={handleTradeCompleted} />}
       {journalModals}
 
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Clear all analyses?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes every active analysis from the Summary on this device. Your completed trades, journals and history are not affected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                localStorage.removeItem('primebias_active');
-                setActiveAssets({});
-                window.dispatchEvent(new Event('biasUpdated'));
-                toast.success('Analyses cleared');
-                setConfirmClear(false);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Clear all
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Clear all analyses?</AlertDialogTitle><AlertDialogDescription>This removes every active analysis from the Summary on this device. Your completed trades, journals and history are not affected.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { localStorage.removeItem('primebias_active'); setActiveAssets({}); window.dispatchEvent(new Event('biasUpdated')); toast.success('Analyses cleared'); setConfirmClear(false); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Clear all</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

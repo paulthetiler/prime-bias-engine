@@ -4,245 +4,98 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 const sections = [
   {
     title: '🔍 Overview',
-    content: `PrimeBias is a multi-timeframe bias engine that gives you a fast, structured read on market direction — designed for minimal thinking and quick decisions.
+    content: `PrimeBias reproduces the Prime Bias Excel workbook logic in app form. The workbook is the source of truth.
 
-It scores indicators across 7 timeframes grouped into three blocks:
-• Deep (Broadstroke) — The big-picture macro trend
-• DD (Daily Driver) — The medium-term execution bias
-• Now (Momentum) — What the market is doing right now
+It calculates seven timeframe results, then the Deep, DD and Now blocks, weighted BUY/SELL scores, grade, status, trade direction, readiness and setup quality.
 
-The result is a directional bias (BUY / SELL), a grade (A–F), a status (e.g. Ready / Extended), a target quality, and a block alignment indicator (HIGH / MEDIUM / LOW).
-
-For most grades (A–D) the Action is a readiness verdict (TRADE / WAIT). An Extended / grade-F setup shows its Action directionally (BUY / SELL) straight from the main bias — it is never gated by the Extra Check and is never marked "No Trade" just for being Extended.`
+The app may present those results more clearly than the spreadsheet, but it must not reinterpret the workbook maths.`
   },
   {
-    title: '📋 Step 1 — Add an Instrument',
-    content: `Tap the "Bias Tool" tab and tap "Select instrument..." to choose an asset (e.g. EUR/USD, GOLD, US100).
+    title: '🎛️ Enter Your Indicators',
+    content: `For each timeframe, enter the same indicator states you would enter in the spreadsheet:
 
-The asset is immediately added to your active set and appears as a card on the Summary dashboard.
+— = Neutral
++1 = Bullish
+−1 = Bearish
 
-You can have multiple instruments active at once. Switch between them using the quick-switch tabs at the top of the Bias Tool.
-
-To remove an instrument, select it and tap the trash icon in the top-right of the Bias Tool, then confirm.
-
-To clear all active analyses at once, tap the trash icon in the top-right of the Summary.`
+The timeframe result is calculated from the workbook's indicator weights and ±35 threshold. Deep, DD and Now are then calculated from those timeframe results.`
   },
   {
-    title: '🎛️ Step 2 — Enter Your Indicators',
-    content: `For each timeframe row, score the four indicators:
+    title: '🚦 Extra Check',
+    content: `The manual Extra Check uses 1H and 15m:
 
-  — (grey) = Neutral / no signal
-  +1 (green) = Bullish
-  −1 (red) = Bearish
+Both +1 → BUY
+Both −1 → SELL
+Mixed → No Trade
 
-Default (Tap-cycle): each tap cycles → neutral → +1 → −1 → neutral.
-Button style: explicit BUY / NEUTRAL / SELL buttons. Change in Settings → Input Style.
+Important: the workbook also gives a matching Extra Check +5 points to that side's score. That means it can change the final grade around a threshold. For example, 75 is A, but a confirming +5 can make the score 80, which is C/Risky in the workbook.
 
-The four indicators per row:
-• Close — price above or below a key level
-• MACD — bullish or bearish momentum
-• RSI — overbought or oversold territory
-• Boli — price above or below Bollinger midline
-
-Note: H1, M15, and M5 rows don't use Close (it's greyed out). These rows use the three oscillators only.`
+The displayed confirmation badge simply tells you whether the Extra Check agrees with the main Trade direction.`
   },
   {
-    title: '⚡ Live Result Banner',
-    content: `As you enter data, a live result banner appears below the instrument selector showing:
-• Main direction (BUY / SELL)
-• Deep / DD / Now block summary with strengths
-• Grade and trade action
+    title: '🎓 Grade',
+    content: `The workbook grade bands are:
 
-The decision is always visible as you work — no need to scroll down.`
+92+ = F
+80–91 = C (Risky)
+75–79 = A
+55–74 = B
+45–54 = C
+Below 45 = D
+
+The block-trend cap can force the displayed grade to C when the workbook's block-weighted trend disagrees with the score direction.`
   },
   {
-    title: '🚦 Extra Check (Red / Green Light)',
-    content: `Below the timeframe rows is the Extra Check — a standalone confirmation using H1 and M15. It is a SECONDARY layer: it confirms (or conflicts with) the analysis the engine has already made. It never calculates the grade and never gives permission to trade.
+    title: '📍 Status',
+    content: `Status comes directly from the workbook P10 formula. It is not generated from the grade by the app.
 
-Set each to +1 or −1:
-• Both +1 → Green Light ✅ BUY
-• Both −1 → Red Light 🔴 SELL
-• They conflict → No Trade
+Possible workbook outputs include:
+Extended
+NO
+YES
+Wait
+Scalp
+No
 
-The Extra Check result is then compared against the main direction and shown as confirmation info:
-• Main BUY + Extra Check BUY (or Main SELL + SELL) → CONFIRMS
-• Extra Check opposes the main direction, or is a No Trade → CONFLICTS
-• Nothing entered → NOT CHECKED
-
-It applies the same way on every grade — including Extended / grade-F. The Action always comes from the main bias; a blank Extra Check never blocks a trade. (It also still adds +5 pts to the winning side when both agree, as in the original sheet.)`
+Scalp is therefore a specific workbook condition. C grade does not automatically mean Scalp.`
   },
   {
-    title: '📁 Summary Dashboard',
-    content: `The Summary tab shows all your active analyses as cards.
+    title: '↕️ Trade & Readiness',
+    content: `Trade and Readiness are separate workbook outputs.
 
-Each card shows:
-• Direction and trade action badge
-• Grade and status
-• Deep / DD / Now block breakdown
-• Score, Target, and Alignment (each toggleable in Settings)
-• "Why this trade?" explanation (toggleable in Settings)
+Trade comes from AC34 and is BUY, SELL or NILL. A tied score uses the 1H direction; if 1H is neutral the result is NILL.
 
-Tap any card to open the full Detail Modal — all metrics in one view with the full block breakdown and warnings.
+Readiness comes from the workbook's separate readiness formula and is shown independently, for example Ready or Trend Off.
 
-Inside the modal, tap "Edit" to jump directly to that instrument in the Bias Tool.
-
-Filter your card list using the filter button (top-right). Active filter count is shown on the badge.
-
-When a trade is done, tap "Complete Trade" on the card to log it instantly.`
+PrimeBias does not turn A/B/C/D into an invented TRADE/WAIT verdict.`
   },
   {
-    title: '✅ Completing a Trade',
-    content: `Tap "Complete Trade" on any Summary card to log the outcome.
+    title: '🎯 Setup Quality',
+    content: `Setup Quality comes from the workbook O11 formula and is based on Deep/DD/Now alignment, not directly on the grade.
 
-Quick Mode (default — one tap):
-1. A bottom sheet appears with four large buttons: WIN / LOSS / BREAK EVEN / NOT TAKEN
-2. Tap your result — the trade is instantly saved and removed from Summary
-3. A toast appears: "Trade saved → Undo" — tap Undo within 6 seconds to restore it
-4. Optionally tap "Add details" to enter entry/exit price, P&L, or notes after saving
+The workbook outputs GOOD, MED or Min. PrimeBias displays that result with the Trade direction where appropriate.
 
-Detailed Mode (full form before saving):
-• Prompts for result, entry, exit, P&L, and notes before saving
-• Switch between modes in Settings → Trade Completion
-
-What is always saved automatically (no input needed):
-• Asset, direction, grade, status
-• Deep / DD / Now blocks and strengths
-• Score, target, alignment
-• Date/time created and completed
-• Full inputs snapshot`
+A C-grade setup can therefore still have GOOD setup quality if the workbook's block conditions produce GOOD.`
   },
   {
-    title: '🔎 Alignment Indicator',
-    content: `Each card shows an alignment indicator reflecting how many of the three blocks agree with the main direction:
+    title: '⚡ MACD Extra',
+    content: `The workbook also contains a separate MACD Extra calculation using 4H, 1H, 15m and 5m MACD conditions.
 
-• HIGH — all three blocks aligned (Deep, DD, Now)
-• MEDIUM — two of three blocks aligned
-• LOW — only one or none aligned
-
-Use this alongside the grade to assess conviction. A B-grade with HIGH alignment is often more reliable than an A-grade with LOW alignment.`
+PrimeBias preserves that separate result and quality classification instead of folding it into the manual Extra Check.`
   },
   {
-    title: '🧠 Why This Trade?',
-    content: `The "Why this trade?" section explains the engine's reasoning in plain language — one bullet per block plus score and alignment summary.
+    title: '📁 Summary',
+    content: `The Summary shows the canonical workbook outputs for every active instrument: grade, status, Trade direction, readiness, Deep/DD/Now and other selected display information.
 
-Example bullets:
-• "Deep trend is bearish and strong"
-• "DD confirms sell but is medium strength"
-• "Now is currently neutral — not yet aligned"
-• "Weighted score favours sell (60 pts)"
-• "Two of three blocks aligned — medium confidence"
-
-Enable or disable this in Settings → Display → Why this trade?`
+Hide WAIT filters the workbook Status = Wait result. Hide Extended filters Status = Extended.`
   },
   {
-    title: '🎓 Grades, Status & Trade Actions',
-    content: `Grade (A–F) reflects how well the bias is confirmed across blocks and weighted score:
-
-  A = Very Good — strong alignment, high score
-  B = Good — minor conflict, well-weighted
-  C = Risky — some mixed signals
-  D = Dangerous — significant conflict
-  F = Extended — top score band (>91), extremely one-sided
-
-  Status "Extended" = Score >90 — extremely one-sided; a timing-risk flag, not a No-Trade verdict.
-  C (Risky) = Score 80–90 — approaching extended territory. Use caution.
-
-  Note: If the block trend conflicts with the score direction, the grade is capped at C regardless of score.
-
-Grade, status and target quality describe the MARKET. They never say No Trade on their own — even an Extended / grade-F setup keeps its direction and a GOOD target.
-
-Action (Trade):
-  A–D grades — a readiness verdict from grade + block alignment:
-    TRADE = aligned setup, ready to act
-    WAIT = signals present but not fully aligned yet
-  Extended / grade-F — the top score band shows its Action directionally,
-  straight from the main bias (never gated by the Extra Check):
-    BUY = main direction is up
-    SELL = main direction is down
-
-The Extra Check (1H + 15M) is a separate confirmation shown alongside the Action —
-CONFIRMS / CONFLICTS / NOT CHECKED — and never blocks the trade.`
+    title: '📏 Minimum Safe Move',
+    content: `Minimum Safe Move is the ATR-derived room-to-breathe figure used by PrimeBias. It is not a take-profit. Your actual target still comes from market structure.`
   },
   {
-    title: '🔧 Filters',
-    content: `Use the filter button (top-right of Summary) to narrow your card list:
-
-• A/B Only — hide C, D, F grades
-• Hide WAIT — hide setups that aren't actionable yet (WAIT)
-• Hide Extended — remove overextended setups
-• Aligned Only — show only HIGH or MEDIUM alignment
-
-Active filter count is shown on the filter button badge.
-
-Set default filters in Settings → Default Filters so they're pre-applied every session.`
-  },
-  {
-    title: '📏 ATR Setup',
-    content: `Go to the ATR tab to set custom ATR values for your assets.
-
-The ATR (Average True Range) is used to calculate the price target shown on cards and in the Bias Tool.
-
-If no custom ATR is set, the engine uses a built-in default per asset.
-
-How to set it:
-1. Select your asset from the dropdown
-2. Enter the current ATR (from your chart, e.g. Daily or H4 ATR indicator)
-3. Tap Save
-
-The target on the Summary and Bias Tool updates automatically. You can add up to 5 top assets plus additional extras.`
-  },
-  {
-    title: '📒 Trade History',
-    content: `The Trades tab is your completed trade journal.
-
-When you complete a trade from Summary, it moves here with the full engine snapshot automatically saved.
-
-From Trade History you can:
-• Browse and filter by Result, Grade, Direction, or Asset
-• View analytics — win rate, total trades, best grade, best and worst asset
-• Open any trade for the full detail view
-• Restore a trade back to Summary (e.g. if completed by mistake)
-• Archive a trade to remove it from the list`
-  },
-  {
-    title: '💾 Auto-Save',
-    content: `The Bias Tool auto-saves your analysis to the database 1.5 seconds after you stop making changes.
-
-A small "Saving…" spinner and a green "Saved ✓" indicator appear in the header to confirm.
-
-Inputs are also persisted to local storage on every change, so switching instruments or refreshing never loses your work.`
-  },
-  {
-    title: '⚙️ Settings',
-    content: `Display — Toggle what appears on each Summary card:
-  Why this trade?, Alignment, Score, Target, Notes, Compact mode.
-
-Input Style — Tap-cycle (default) or Button input.
-
-Trade Completion — Quick Mode (one tap, default) or Detailed Mode (full form).
-
-Default Filters — Pre-applied filters on the Summary dashboard.
-
-Advanced Logic — Experimental overrides (M5 override, NOW weakness downgrade, require alignment for A).
-
-Scoring Weights — Adjust the points each timeframe contributes to the grade.
-
-Grade Thresholds — Set the minimum score for each grade.
-
-Tap "Reset" at the top of Settings to restore all defaults.`
-  },
-  {
-    title: '⚠️ Warnings',
-    content: `Yellow warning banners appear when the engine detects conflicting signals:
-
-• Block trend conflicts with score direction — grade capped at C
-• NOW momentum is OPPOSITE to DD — momentum conflict
-• DD block is NEUTRAL — no clear execution trend
-• Deep Trend is NEUTRAL — no macro direction confirmed
-• Extended conditions — valid setup, but use extra caution
-• Score 80–90 — approaching extended territory, use caution
-
-Warnings don't mean "don't trade" — they flag elevated risk. Always apply your own judgment and proper risk management.`
+    title: '💾 Engine Versioning',
+    content: `Completed trades store the engine version used to calculate them. When the canonical engine changes, a new version is used so performance statistics do not mix trades produced by different rulesets.`
   },
 ];
 
@@ -250,18 +103,11 @@ function Section({ title, content }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-secondary/50 transition-colors"
-      >
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-secondary/50 transition-colors">
         <span className="text-sm font-semibold">{title}</span>
         {open ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
       </button>
-      {open && (
-        <div className="px-4 pb-4 pt-1 text-xs text-muted-foreground leading-relaxed whitespace-pre-line border-t border-border bg-secondary/20">
-          {content}
-        </div>
-      )}
+      {open && <div className="px-4 pb-4 pt-1 text-xs text-muted-foreground leading-relaxed whitespace-pre-line border-t border-border bg-secondary/20">{content}</div>}
     </div>
   );
 }
@@ -272,22 +118,10 @@ export default function HowToGuide({ open, onClose }) {
     <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm overflow-y-auto">
       <div className="max-w-lg mx-auto p-4 pb-24">
         <div className="flex items-center justify-between pt-4 pb-4 sticky top-0 bg-background/95 backdrop-blur-sm">
-          <div>
-            <h2 className="text-lg font-bold">How to Use PrimeBias</h2>
-            <p className="text-xs text-muted-foreground">Tap any section to expand</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-xs font-semibold text-primary border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/10 transition-colors"
-          >
-            Close
-          </button>
+          <div><h2 className="text-lg font-bold">How to Use PrimeBias</h2><p className="text-xs text-muted-foreground">Canonical Excel rules</p></div>
+          <button onClick={onClose} className="text-xs font-semibold text-primary border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/10 transition-colors">Close</button>
         </div>
-        <div className="space-y-2">
-          {sections.map(s => (
-            <Section key={s.title} title={s.title} content={s.content} />
-          ))}
-        </div>
+        <div className="space-y-2">{sections.map(s => <Section key={s.title} title={s.title} content={s.content} />)}</div>
       </div>
     </div>
   );
