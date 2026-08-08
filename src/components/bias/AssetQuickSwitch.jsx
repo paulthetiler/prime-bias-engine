@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, GripHorizontal } from 'lucide-react';
-import MarketIcon from './MarketIcon';
+import { GripHorizontal } from 'lucide-react';
 import {
   orderAnalyses,
   saveInstrumentOrder,
@@ -139,9 +138,7 @@ function ReorderablePill({ analysis, isActive, reordering, onSelect, onReorderSt
     onSelect();
   };
 
-  const { instrument, results } = analysis;
-  const isTradeReady = ['TRADE', 'BUY', 'SELL'].includes(results?.tradeAction);
-  const isIncomplete = !results || !results.mainDirection;
+  const { instrument } = analysis;
 
   return (
     <Reorder.Item
@@ -169,33 +166,14 @@ function ReorderablePill({ analysis, isActive, reordering, onSelect, onReorderSt
         // fire pointercancel, killing both the reorder and our manual scroll.
         style={{ touchAction: 'pan-y' }}
         className={cn(
-          'relative flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-[13px] border transition-colors whitespace-nowrap select-none w-full',
+          'relative flex items-center gap-1.5 px-3 py-1.5 rounded-[13px] border transition-colors whitespace-nowrap select-none w-full',
           isActive
             ? 'border-transparent bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_6px_16px_-6px_rgba(20,184,166,0.35)]'
             : 'bg-card border-border/70 shadow-sm hover:border-primary/40',
           reordering && 'cursor-grab'
         )}
       >
-        {/* Monochrome supporting icon — inherits the pill's colour */}
-        <span
-          className={cn(
-            'grid place-items-center w-[22px] h-[22px] rounded-[7px]',
-            isActive ? 'bg-white/20 text-white' : 'bg-foreground/[0.05] text-foreground/60'
-          )}
-        >
-          <MarketIcon instrument={instrument} />
-        </span>
-
         <span className="text-sm font-semibold">{instrument}</span>
-
-        {/* Status indicators — hidden during reorder so the row reads as "handles" */}
-        {!reordering && isTradeReady && (
-          <CheckCircle2 className={cn('w-3.5 h-3.5', isActive ? 'text-white' : 'text-primary')} />
-        )}
-
-        {!reordering && isIncomplete && (
-          <div className={cn('w-2 h-2 rounded-full', isActive ? 'bg-primary-foreground/50' : 'bg-yellow-400')} />
-        )}
 
         {/* Grip affordance while reordering — reinforces "these can be moved" */}
         {reordering && (
@@ -307,7 +285,7 @@ export default function AssetQuickSwitch({ analyses, currentInstrument, onInstru
           axis="x"
           values={items}
           onReorder={handleReorder}
-          className="flex gap-2 pt-0.5 pb-2 min-w-min"
+          className="flex gap-1.5 pt-0.5 pb-2 min-w-min"
         >
           {items.map((inst) => (
             <ReorderablePill
