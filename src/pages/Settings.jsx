@@ -51,25 +51,6 @@ function Toggle({ label, sub, value, onChange }) {
   );
 }
 
-function NumInput({ label, value, onChange, min = 0, max = 100 }) {
-  return (
-    <div className="flex items-center justify-between py-2">
-      <span className="text-sm text-foreground flex-1">{label}</span>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => onChange(Math.max(min, value - 1))}
-          className="w-7 h-7 rounded bg-secondary border border-border text-sm font-bold"
-        >−</button>
-        <span className="w-8 text-center font-mono text-sm font-semibold">{value}</span>
-        <button
-          onClick={() => onChange(Math.min(max, value + 1))}
-          className="w-7 h-7 rounded bg-secondary border border-border text-sm font-bold"
-        >+</button>
-      </div>
-    </div>
-  );
-}
-
 export default function Settings() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
@@ -77,22 +58,12 @@ export default function Settings() {
   const [showGuide, setShowGuide] = useState(false);
   const [s, setS] = useState(getSettings());
   const [openSections, setOpenSections] = useState({
-    display: true, input: false, completion: false, filters: false, advanced: false, weights: false, thresholds: false
+    display: true, input: false, completion: false, filters: false
   });
 
   const toggle = (key) => setOpenSections(o => ({ ...o, [key]: !o[key] }));
   const update = (key, value) => {
     const next = { ...s, [key]: value };
-    setS(next);
-    saveSettings(next);
-  };
-  const updateWeight = (key, value) => {
-    const next = { ...s, weights: { ...s.weights, [key]: value } };
-    setS(next);
-    saveSettings(next);
-  };
-  const updateThreshold = (key, value) => {
-    const next = { ...s, gradeThresholds: { ...s.gradeThresholds, [key]: value } };
     setS(next);
     saveSettings(next);
   };
@@ -121,6 +92,14 @@ export default function Settings() {
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           {theme === 'dark' ? 'Light' : 'Dark'}
         </Button>
+      </div>
+
+      {/* Prime Bias engine */}
+      <div className="border border-border rounded-xl p-4">
+        <div className="text-sm font-semibold">Prime Bias Engine</div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Locked to the verified production ruleset. Scoring weights, grade thresholds and block logic cannot be changed from Settings.
+        </div>
       </div>
 
       {/* Install App */}
@@ -217,85 +196,6 @@ export default function Settings() {
             <Toggle label="Hide WAIT trades" value={s.filterHideWait} onChange={v => update('filterHideWait', v)} />
             <Toggle label="Hide EXTENDED trades" value={s.filterHideExtended} onChange={v => update('filterHideExtended', v)} />
             <Toggle label="Aligned only" value={s.filterAlignedOnly} onChange={v => update('filterAlignedOnly', v)} />
-          </div>
-        )}
-      </div>
-
-      {/* Advanced Logic */}
-      <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
-        <SectionHeader title="Advanced Logic" sub="Experimental — use with caution" open={openSections.advanced} onToggle={() => toggle('advanced')} />
-        {openSections.advanced && (
-          <div className="pb-2 divide-y divide-border/30">
-            <div className="py-2">
-              <div className="text-[10px] uppercase tracking-widest text-orange-400 font-semibold">⚠ Advanced</div>
-            </div>
-            <Toggle label="M5 override logic" sub="Use M5 to override Now block direction" value={s.useM5Override} onChange={v => update('useM5Override', v)} />
-            <Toggle label="Downgrade on NOW weakness" sub="Cap grade if Now is WEAK" value={s.downgradeOnNowWeakness} onChange={v => update('downgradeOnNowWeakness', v)} />
-            <Toggle label="Require alignment for A grade" sub="A grade needs all blocks aligned" value={s.requireAlignmentForA} onChange={v => update('requireAlignmentForA', v)} />
-          </div>
-        )}
-      </div>
-
-      {/* Scoring Weights */}
-      <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
-        <div className="flex items-center py-3">
-          <button onClick={() => toggle('weights')} className="flex-1 flex items-center justify-between text-left">
-            <div>
-              <div className="text-sm font-semibold">Scoring Weights</div>
-              <div className="text-xs text-muted-foreground">Points per timeframe in grade calculation</div>
-            </div>
-            {openSections.weights ? <ChevronUp className="w-4 h-4 text-muted-foreground mr-2" /> : <ChevronDown className="w-4 h-4 text-muted-foreground mr-2" />}
-          </button>
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); const next = { ...s, weights: { ...DEFAULTS.weights } }; setS(next); saveSettings(next); }} className="gap-1.5 text-xs text-muted-foreground shrink-0">
-            <RotateCcw className="w-3.5 h-3.5" /> Reset
-          </Button>
-        </div>
-        {openSections.weights && (
-          <div className="py-2 divide-y divide-border/30">
-            <div className="py-1">
-              <div className="text-[10px] uppercase tracking-widest text-orange-400 font-semibold">⚠ Advanced — affects engine</div>
-            </div>
-            {[
-              { key: 'month', label: 'Month' }, { key: 'week', label: 'Week' },
-              { key: 'day', label: 'Day' },     { key: 'h4', label: 'H4' },
-              { key: 'h1', label: 'H1' },       { key: 'm15', label: 'M15' },
-              { key: 'm5', label: 'M5' },
-            ].map(tf => (
-              <NumInput key={tf.key} label={tf.label} value={s.weights[tf.key]} onChange={v => updateWeight(tf.key, v)} max={99} />
-            ))}
-            <div className="py-1 text-xs text-muted-foreground">
-              Total: {Object.values(s.weights).reduce((a, b) => a + b, 0)} pts (base)
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Grade Thresholds */}
-      <div className="border border-border rounded-xl px-4 divide-y divide-border/50">
-        <div className="flex items-center py-3">
-          <button onClick={() => toggle('thresholds')} className="flex-1 flex items-center justify-between text-left">
-            <div>
-              <div className="text-sm font-semibold">Grade Thresholds</div>
-              <div className="text-xs text-muted-foreground">Min score for each grade</div>
-            </div>
-            {openSections.thresholds ? <ChevronUp className="w-4 h-4 text-muted-foreground mr-2" /> : <ChevronDown className="w-4 h-4 text-muted-foreground mr-2" />}
-          </button>
-          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); const next = { ...s, gradeThresholds: { ...DEFAULTS.gradeThresholds } }; setS(next); saveSettings(next); }} className="gap-1.5 text-xs text-muted-foreground shrink-0">
-            <RotateCcw className="w-3.5 h-3.5" /> Reset
-          </Button>
-        </div>
-        {openSections.thresholds && (
-          <div className="py-2 divide-y divide-border/30">
-            <div className="py-1">
-              <div className="text-[10px] uppercase tracking-widest text-orange-400 font-semibold">⚠ Advanced — affects engine</div>
-            </div>
-            {[
-              { key: 'extended', label: 'Extended (F)' }, { key: 'risky', label: 'Risky (C→)' },
-              { key: 'A', label: 'A grade' },             { key: 'B', label: 'B grade' },
-              { key: 'C', label: 'C grade' },             { key: 'D', label: 'D grade' },
-            ].map(t => (
-              <NumInput key={t.key} label={t.label} value={s.gradeThresholds[t.key]} onChange={v => updateThreshold(t.key, v)} max={100} />
-            ))}
           </div>
         )}
       </div>
