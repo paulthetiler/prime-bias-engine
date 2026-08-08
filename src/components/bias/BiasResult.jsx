@@ -100,7 +100,7 @@ export default function BiasResult({ results, settings }) {
       {warnings?.length > 0 && (
         <div className="space-y-1">
           {warnings.map((w, i) => (
-            <div key={i} className="flex items-start gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-500/8 border border-amber-200/60 dark:border-amber-500/15 p-2.5 text-xs text-amber-800 dark:text-amber-300 backdrop-blur-sm">
+            <div key={i} className="flex items-start gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/30 p-2.5 text-xs text-amber-800 dark:text-amber-400 backdrop-blur-sm">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-70" />
               <span className="leading-snug">{userFacingWarning(w)}</span>
             </div>
