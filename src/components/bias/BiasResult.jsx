@@ -4,6 +4,12 @@ import { AlertTriangle } from 'lucide-react';
 import { blockBg, blockText, actionBadge, actionLabel, extraCheckStyle } from '@/lib/gradeStyles';
 import ExtendedCautionPill, { isExtendedCaution } from './ExtendedCautionPill';
 
+function userFacingWarning(warning) {
+  if (warning === 'Workbook status is Wait — monitor 15m') return 'WAIT — monitor 15m before entry';
+  if (warning === 'Workbook readiness is Trend Off') return 'TREND OFF — conditions aren’t fully aligned';
+  return warning;
+}
+
 export default function BiasResult({ results, settings }) {
   if (!results) return null;
 
@@ -96,7 +102,7 @@ export default function BiasResult({ results, settings }) {
           {warnings.map((w, i) => (
             <div key={i} className="flex items-start gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-500/8 border border-amber-200/60 dark:border-amber-500/15 p-2.5 text-xs text-amber-800 dark:text-amber-300 backdrop-blur-sm">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-70" />
-              <span className="leading-snug">{w}</span>
+              <span className="leading-snug">{userFacingWarning(w)}</span>
             </div>
           ))}
         </div>
