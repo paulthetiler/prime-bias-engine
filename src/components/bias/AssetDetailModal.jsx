@@ -17,6 +17,12 @@ const gradeColors = {
   F: 'text-destructive bg-destructive/15 border-destructive/30',
 };
 
+function userFacingWarning(warning) {
+  if (warning === 'Workbook status is Wait — monitor 15m') return 'WAIT — monitor 15m before entry';
+  if (warning === 'Workbook readiness is Trend Off') return 'TREND OFF — conditions aren’t fully aligned';
+  return warning;
+}
+
 function Row({ label, value, valueClass }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
@@ -108,7 +114,7 @@ export default function AssetDetailModal({ analysis, onClose, onEdit, settings, 
           {warnings?.length > 0 && (
             <div className="space-y-1.5">
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Warnings</div>
-              {warnings.map((w, i) => <div key={i} className="flex items-start gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-500/8 border border-amber-200/60 dark:border-amber-500/15 p-2.5 text-xs text-amber-800 dark:text-amber-300 backdrop-blur-sm"><span>⚠</span><span>{w}</span></div>)}
+              {warnings.map((w, i) => <div key={i} className="flex items-start gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-500/8 border border-amber-200/60 dark:border-amber-500/15 p-2.5 text-xs text-amber-800 dark:text-amber-300 backdrop-blur-sm"><span>⚠</span><span>{userFacingWarning(w)}</span></div>)}
             </div>
           )}
         </div>
