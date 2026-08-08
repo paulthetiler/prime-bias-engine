@@ -2,6 +2,11 @@
 // (tabs: "Bias Tool", B1–B4). Every rule below is transcribed from a specific
 // Excel formula so the app reproduces the spreadsheet exactly.
 //
+// IMPORTANT: this production ruleset is intentionally IMMUTABLE. Weights,
+// thresholds, block rules and grade logic cannot be changed at runtime. Any
+// future maths change must be made deliberately in code, regression-tested
+// against the workbook and accompanied by an engine-version bump.
+//
 // ── TIMEFRAME DIRECTION (Excel J = AE, driven by AD) ─────────────────────────
 //   Each indicator contributes  input(-1/0/+1) × weight  (Excel cols Z..AC).
 //   AD is NOT a net sum — it is the DOMINANT side:
@@ -192,17 +197,17 @@ function calcAnchoredStrength(anchor, other1, other2) {
 
 // ─── Grade (Excel AC35) ───────────────────────────────────────────────────────
 //   >91 → F · ≥80 → C · ≥75 → A · ≥55 → B · ≥45 → C · ≥40 → D · <40 → D
-// Thresholds can be overridden via user settings (Settings → Grade Thresholds).
+// These thresholds are part of the locked workbook ruleset and are not runtime
+// configuration.
 const DEFAULT_THRESHOLDS = { extended: 92, risky: 80, A: 75, B: 55, C: 45, D: 40 };
 
-function calcGrade(score, thresholds = DEFAULT_THRESHOLDS) {
-  const t = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) };
-  if (score >= t.extended) return 'F';
-  if (score >= t.risky)    return 'C';
-  if (score >= t.A)        return 'A';
-  if (score >= t.B)        return 'B';
-  if (score >= t.C)        return 'C';
-  if (score >= t.D)        return 'D';
+function calcGrade(score) {
+  if (score >= DEFAULT_THRESHOLDS.extended) return 'F';
+  if (score >= DEFAULT_THRESHOLDS.risky)    return 'C';
+  if (score >= DEFAULT_THRESHOLDS.A)        return 'A';
+  if (score >= DEFAULT_THRESHOLDS.B)        return 'B';
+  if (score >= DEFAULT_THRESHOLDS.C)        return 'C';
+  if (score >= DEFAULT_THRESHOLDS.D)        return 'D';
   return 'D'; // Excel floor is D, not F
 }
 
@@ -224,7 +229,7 @@ function calcGradeLabel(grade, score, extendedScore = EXTENDED_SCORE) {
 // "extended" is a timing risk, not a downgrade of the target itself.
 function targetQuality(grade) {
   switch (grade) {
-    case 'F': return 'GOOD';   // top score band — strong, reliable target
+    case 'F': return 'GOOD';
     case 'A': return 'GOOD';
     case 'B': return 'MED';
     case 'C': return 'SCALP';
@@ -234,14 +239,6 @@ function targetQuality(grade) {
 }
 
 // ─── Extra Check result (Excel K12) ───────────────────────────────────────────
-// =IF(AND(1H=-1,15M=-1),"SELL",IF(AND(1H=1,15M=1),"BUY","No Trade"))
-// A SECONDARY confirmation layer, fully independent of the grade / direction /
-// action. It reads the manual 1H/15M Extra Check inputs, never gates a trade and
-// never changes the grade. Returns:
-//   'NOT_CHECKED' — 1H or 15M not entered yet (blank)
-//   'SELL'        — both -1
-//   'BUY'         — both +1
-//   'NO_TRADE'    — both entered but mixed/opposing
 function calcExtraCheckResult(extraCheck) {
   const h1  = extraCheck ? extraCheck.h1  : null;
   const m15 = extraCheck ? extraCheck.m15 : null;
@@ -251,11 +248,6 @@ function calcExtraCheckResult(extraCheck) {
   return 'NO_TRADE';
 }
 
-// Compare the Extra Check result against the MAIN trade direction and express it
-// as confirmation information (never a trade gate):
-//   'NOT_CHECKED' — no check entered
-//   'CONFIRMS'    — the check agrees with the main direction
-//   'CONFLICTS'   — the check opposes it, or resolved to NO_TRADE (mixed)
 function calcExtraCheckConfirmation(extraCheckResult, mainDirection) {
   if (extraCheckResult === 'NOT_CHECKED') return 'NOT_CHECKED';
   if (extraCheckResult === mainDirection) return 'CONFIRMS';
@@ -263,13 +255,12 @@ function calcExtraCheckConfirmation(extraCheckResult, mainDirection) {
 }
 
 // ─── Main calculation ─────────────────────────────────────────────────────────
-function calculateBias(inputs, extraCheck = null, options = {}) {
-  // Optional overrides (from user settings). Defaults preserve the Excel engine.
-  const scoreWeights = options.scoreWeights || TF_SCORE_WEIGHTS;
-  const thresholds   = options.thresholds   || DEFAULT_THRESHOLDS;
-  const useM5Override          = !!options.useM5Override;
-  const downgradeOnNowWeakness = !!options.downgradeOnNowWeakness;
-  const requireAlignmentForA   = !!options.requireAlignmentForA;
+function calculateBias(inputs, extraCheck = null, _options = {}) {
+  // Runtime engine overrides are deliberately ignored. Keeping the third
+  // argument preserves call-site compatibility while guaranteeing that every
+  // production calculation uses exactly the same workbook-verified rules.
+  const scoreWeights = TF_SCORE_WEIGHTS;
+  const thresholds = DEFAULT_THRESHOLDS;
 
   // 1. TF directions
   const tfResults = {};
@@ -279,7 +270,7 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
     const result = total <= -DIRECTION_THRESHOLD ? -1 : total >= DIRECTION_THRESHOLD ? 1 : 0;
     tfResults[tf.key] = {
       result,
-      total, // Excel AD (dominant-side value)
+      total,
       indicators: { close: ind.close, macd: ind.macd, rsi: ind.rsi, boli: ind.boli },
       bias: result === 1 ? 'BUY' : result === -1 ? 'SELL' : 'Neutral',
     };
@@ -297,18 +288,15 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   const ddStrength = calcAnchoredStrength(r('h1'), r('day'), r('h4'));
 
   // 4. NOW block [1hr, 15m, 5m] — anchor = 1hr
-  // Advanced (opt-in): let M5 dictate the NOW direction when it has a signal.
-  const nowDir      = (useM5Override && r('m5') !== 0)
-    ? r('m5')
-    : calcBlockDir(r('h1'), r('m15'), r('m5'));
+  const nowDir      = calcBlockDir(r('h1'), r('m15'), r('m5'));
   const nowBias     = nowDir === 1 ? 'BUY' : nowDir === -1 ? 'SELL' : 'NEUTRAL';
   const nowStrength = calcAnchoredStrength(r('h1'), r('m15'), r('m5'));
 
-  // 5. Grade score — individual TF weights (overridable via settings)
+  // 5. Grade score — canonical workbook weights only.
   let buyScore = 0, sellScore = 0;
   TIMEFRAMES.forEach(tf => {
     const res = r(tf.key);
-    const w   = scoreWeights[tf.key] ?? TF_SCORE_WEIGHTS[tf.key];
+    const w = scoreWeights[tf.key];
     if (res === 1)  buyScore  += w;
     if (res === -1) sellScore += w;
   });
@@ -318,8 +306,8 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   if (extraCheck && extraCheck.h1 != null && extraCheck.m15 != null &&
       extraCheck.h1 !== 0 && extraCheck.h1 === extraCheck.m15) {
     lightsActive = true;
-    if (extraCheck.h1 === 1) buyScore  += LIGHTS_WEIGHT;
-    else                      sellScore += LIGHTS_WEIGHT;
+    if (extraCheck.h1 === 1) buyScore += LIGHTS_WEIGHT;
+    else sellScore += LIGHTS_WEIGHT;
   }
 
   // 6. Score direction = main direction (Excel AC34; tie broken by 1hr)
@@ -338,10 +326,9 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   const dir           = mainDirection === 'BUY' ? 1 : -1;
 
   // 7. Raw grade
-  const rawGrade = calcGrade(winningScore, thresholds);
+  const rawGrade = calcGrade(winningScore);
 
   // 8. Grade cap (Excel Q10 = IF(P9 = Q11, AC35, "C")).
-  // P9 is the block-weighted trend (DEEP 10 / DD 49 / NOW 41).
   const blockBuy  = (deepDir === 1 ? BLOCK_TREND_WEIGHTS.deep : 0)
                   + (ddDir   === 1 ? BLOCK_TREND_WEIGHTS.dd   : 0)
                   + (nowDir  === 1 ? BLOCK_TREND_WEIGHTS.now  : 0);
@@ -350,36 +337,19 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
                   + (nowDir  === -1 ? BLOCK_TREND_WEIGHTS.now  : 0);
   const blockTrend = blockBuy > blockSell ? 'BUY' : blockSell > blockBuy ? 'SELL' : 'NEUTRAL';
   const trendMatchesScore = blockTrend === scoreDirection;
-  let effectiveGrade = trendMatchesScore ? rawGrade : 'C';
+  const effectiveGrade = trendMatchesScore ? rawGrade : 'C';
 
-  // Deep-vs-score alignment (used by warnings + status heuristics).
   const deepMatchesScore =
     deepDir === 0 ||
     (deepDir === 1  && scoreDirection === 'BUY') ||
     (deepDir === -1 && scoreDirection === 'SELL');
 
-  // Block alignment vs. the score direction (needed for advanced logic + status)
   const nowMatchesScore = nowDir === dir;
   const ddMatchesScore  = ddDir  === dir;
 
-  // 8b. Advanced (opt-in) grade adjustments — default OFF preserves the base engine.
-  const GRADE_ORDER = ['A', 'B', 'C', 'D', 'F'];
-  const capGrade = (g, floor) =>
-    GRADE_ORDER.indexOf(g) < GRADE_ORDER.indexOf(floor) ? floor : g;
-  // Cap to C when the NOW block is WEAK.
-  if (downgradeOnNowWeakness && nowStrength === 'WEAK' && (effectiveGrade === 'A' || effectiveGrade === 'B')) {
-    effectiveGrade = 'C';
-  }
-  // Require all three blocks aligned for an A — otherwise drop to B.
-  if (requireAlignmentForA && effectiveGrade === 'A' &&
-      !(deepMatchesScore && ddMatchesScore && nowMatchesScore)) {
-    effectiveGrade = capGrade(effectiveGrade, 'B');
-  }
-
   const isExtended = winningScore > EXTENDED_SCORE;
 
-  // 9. Status — a DESCRIPTIVE read of the market/readiness state. It must never
-  // encode a "No Trade" verdict: "Extended" and grade "F" are market states.
+  // 9. Status — descriptive market/readiness state, never a trade prohibition.
   let status;
   if (isExtended || effectiveGrade === 'F') {
     status = 'Extended';
@@ -390,35 +360,24 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   } else if (effectiveGrade === 'B') {
     status = nowMatchesScore ? 'Ready' : 'Monitor';
   } else {
-    // C
     if (!deepMatchesScore)    status = 'Wait';
     else if (!ddMatchesScore) status = 'Trend Off';
     else                      status = 'Scalp';
   }
 
-  // Target quality — derived from the winning grade only, INDEPENDENT of block
-  // alignment and of the trade gate. An Extended/F setup keeps a GOOD target.
   const targetNote = `${targetQuality(effectiveGrade)} ${mainDirection}`;
 
-  // Action / Trade (Excel "Trade" col = AC34, the score direction):
-  //  • Extended / grade-F → the top score band shows its Action DIRECTIONALLY
-  //    (BUY / SELL) straight from the main bias, exactly as the workbook's Trade
-  //    cell does. It is NOT gated by the Extra Check and is never PENDING.
-  //  • A/B/C/D → readiness verdict (TRADE / WAIT) from grade + block alignment.
   let tradeAction;
   if (effectiveGrade === 'F') {
-    tradeAction = mainDirection; // 'BUY' | 'SELL'
+    tradeAction = mainDirection;
   } else if (effectiveGrade === 'A' || effectiveGrade === 'B') {
     tradeAction = nowMatchesScore ? 'TRADE' : 'WAIT';
   } else if (effectiveGrade === 'C') {
     tradeAction = (deepMatchesScore && ddMatchesScore) ? 'TRADE' : 'WAIT';
   } else {
-    // D
     tradeAction = 'WAIT';
   }
 
-  // Extra Check — a SEPARATE confirmation layer (Excel K12). It is compared with
-  // the main direction purely as confirmation info; it never gates the Action.
   const extraCheckResult = calcExtraCheckResult(extraCheck);
   const extraCheckConfirmation = calcExtraCheckConfirmation(extraCheckResult, mainDirection);
 
@@ -432,9 +391,6 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
     warnings.push('DD block is NEUTRAL — execution zone has no clear trend');
   if (deepDir === 0)
     warnings.push('Deep Trend is NEUTRAL — no macro direction confirmed');
-  // Extended is a VALID directional setup that simply needs extra care — not a
-  // "no trade" / danger state. The wording deliberately avoids "high risk". This
-  // condition mirrors the 'Extended' status exactly so the two never contradict.
   if (isExtended || effectiveGrade === 'F')
     warnings.push('Extended conditions — valid setup, but use extra caution');
   else if (winningScore >= 80)
@@ -445,24 +401,15 @@ function calculateBias(inputs, extraCheck = null, options = {}) {
   const confidenceScore = Math.round((alignedCount / TIMEFRAMES.length) * 100);
   const gradeLabel      = calcGradeLabel(effectiveGrade, winningScore);
 
-  // Resolved options ACTUALLY applied to this analysis, captured as concrete
-  // values (never references to the user's mutable settings) so a completed trade
-  // can freeze exactly what produced it. This mirrors, per-key, the same
-  // fallbacks the scoring/grading above used — it does not change any maths.
-  const resolvedScoreWeights = {};
-  TIMEFRAMES.forEach(tf => {
-    resolvedScoreWeights[tf.key] = scoreWeights[tf.key] ?? TF_SCORE_WEIGHTS[tf.key];
-  });
-  const resolvedThresholds = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) };
+  // Snapshot the one canonical ruleset actually applied.
   const resolvedOptions = {
-    scoreWeights: resolvedScoreWeights,
-    thresholds: resolvedThresholds,
-    useM5Override,
-    downgradeOnNowWeakness,
-    requireAlignmentForA,
+    scoreWeights: { ...TF_SCORE_WEIGHTS },
+    thresholds: { ...DEFAULT_THRESHOLDS },
+    useM5Override: false,
+    downgradeOnNowWeakness: false,
+    requireAlignmentForA: false,
   };
 
-  // Extra-check (red-light/green-light) outcome as a concrete result.
   const lightsResult = lightsActive
     ? (extraCheck && extraCheck.h1 === 1 ? 'buy' : 'sell')
     : 'none';
@@ -491,122 +438,58 @@ function getATRForAsset(asset, topAssets) {
   return BASE_ATR[asset] || 0;
 }
 
-// Minimum Safe Move — the ATR-derived FLOOR a trade needs to breathe, scaled by
-// grade: (ATR ÷ 9) × grade weight. This is a minimum, NOT a take-profit. The
-// actual take-profit is the trader's decision from market structure and is
-// usually further out — the app does not compute a market-structure target.
-//
-// Returns { value, grade }, with `target`/`targetType` kept as aliases so
-// already-persisted analyses and completed trades (which stored those keys) keep
-// resolving. Do not read the aliases in new code — use `value`/`grade`.
 function calculateMinSafeMove(atr, grade) {
   if (!atr) return null;
   const value = parseFloat(((atr * (TARGET_WEIGHTS[grade] || 0.5)) / TARGET_DIVISOR).toFixed(4));
   return { value, grade, target: value, targetType: grade };
 }
 
-// ─── ATR display units ────────────────────────────────────────────────────────
-// The ATR is stored as a raw count (128, 245, …) but the unit that count means
-// depends on the instrument: forex trades in PIPS, everything else (indices,
-// metals, commodities, crypto) in POINTS. We derive the unit from the symbol so
-// the user never has to pick it.
-
-// ISO currency codes that make up a tradeable forex pair.
 const FOREX_CURRENCIES = new Set([
   'AUD', 'CAD', 'CHF', 'CNH', 'DKK', 'EUR', 'GBP', 'HKD', 'JPY', 'MXN',
   'NOK', 'NZD', 'PLN', 'SEK', 'SGD', 'TRY', 'USD', 'ZAR',
 ]);
 
-// Metal codes that look like currencies (XAUUSD, XAG/USD) but trade in points.
 const METAL_CURRENCIES = new Set(['XAU', 'XAG', 'XPT', 'XPD']);
 
-/**
- * The trading unit the ATR count is expressed in for an instrument.
- * Forex pairs → 'pips'; indices, metals, commodities and crypto → 'points'.
- *
- * @param {string} instrument  e.g. 'EUR/USD', 'US100', 'XAUUSD', 'GOLD'.
- * @returns {'pips'|'points'}
- */
 function atrUnitForInstrument(instrument) {
   if (!instrument) return 'points';
   const sym = String(instrument).toUpperCase().replace(/\s+/g, '');
-  // Split a possible pair with or without a separator (EUR/USD or EURUSD).
   const [base, quote] = sym.includes('/') ? sym.split('/') : [sym.slice(0, 3), sym.slice(3)];
-  // A metal quoted against a currency (XAUUSD) trades in points, not pips.
   if (METAL_CURRENCIES.has(base) || METAL_CURRENCIES.has(quote)) return 'points';
   if (FOREX_CURRENCIES.has(base) && FOREX_CURRENCIES.has(quote)) return 'pips';
   return 'points';
 }
 
-/**
- * Format an ATR count for display: no trailing zeros, whole numbers where the
- * value is whole (128 → "128"), otherwise at most one decimal place
- * (128.04 → "128"; 128.45 → "128.5"). Returns null when there is no value.
- *
- * @param {number|null|undefined} value
- * @returns {string|null}
- */
 function formatAtrValue(value) {
   if (value == null || !Number.isFinite(Number(value))) return null;
-  const rounded = Math.round(Number(value) * 10) / 10; // clamp to one decimal
+  const rounded = Math.round(Number(value) * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
-/**
- * Format a value in the instrument's trading unit, e.g. "128 pips" or
- * "14.2 points". Used for both the raw ATR ("ATR Used") and the ATR-derived
- * "Minimum Safe Move", so the unit always matches the instrument. Returns null
- * when there is no value to show.
- *
- * @param {number|null|undefined} value
- * @param {string} instrument
- * @returns {string|null}
- */
 function formatWithUnit(value, instrument) {
   const formatted = formatAtrValue(value);
   if (formatted == null) return null;
   const unit = atrUnitForInstrument(instrument);
-  const label = formatted === '1' ? unit.slice(0, -1) : unit; // 1 pip / 128 pips
+  const label = formatted === '1' ? unit.slice(0, -1) : unit;
   return `${formatted} ${label}`;
 }
 
-// Build engine options from a user-settings object (see lib/userSettings.js).
-// Missing/invalid values fall back to the Excel defaults.
-function engineOptionsFromSettings(settings) {
-  if (!settings) return {};
-  return {
-    scoreWeights: settings.weights || undefined,
-    thresholds:   settings.gradeThresholds || undefined,
-    useM5Override:          !!settings.useM5Override,
-    downgradeOnNowWeakness: !!settings.downgradeOnNowWeakness,
-    requireAlignmentForA:   !!settings.requireAlignmentForA,
-  };
+// Legacy compatibility for callers that still ask the Settings object for engine
+// options. Returning an empty object is intentional: runtime settings cannot
+// alter Prime Bias maths anymore.
+function engineOptionsFromSettings(_settings) {
+  return {};
 }
 
 /**
  * Build the immutable engine snapshot persisted with a completed trade.
- *
- * Pure and JSON-serialisable: it copies RESOLVED values out of a calculateBias()
- * result (and the resolved options that produced it) so the trade can be
- * reproduced later no matter how the user's live settings change afterwards. It
- * NEVER reads global settings and NEVER recomputes the grade — it only records
- * what the engine already decided.
- *
- * @param {any} results  a calculateBias() result object.
- * @param {any} [resolvedOptions]  the resolved options used; defaults to
- *   `results.resolvedOptions`, then to engine defaults when neither is present.
- * @param {{ extraCheck?: any, timestamp?: string|null }} [context]  extra-check
- *   inputs and the analysis timestamp, which live on the analysis rather than the
- *   engine result.
- * @returns {object} a plain, serialisable snapshot of resolved values.
+ * The snapshot always records the canonical locked ruleset; caller-provided
+ * override objects are intentionally ignored.
  */
-function createEngineSnapshot(results = {}, resolvedOptions = null, context = {}) {
-  const opts = resolvedOptions || results.resolvedOptions || {};
-  const scoreWeights = { ...(opts.scoreWeights || TF_SCORE_WEIGHTS) };
-  const thresholds = { ...DEFAULT_THRESHOLDS, ...(opts.thresholds || {}) };
+function createEngineSnapshot(results = {}, _resolvedOptions = null, context = {}) {
+  const scoreWeights = { ...TF_SCORE_WEIGHTS };
+  const thresholds = { ...DEFAULT_THRESHOLDS };
 
-  // Per-timeframe calculated results + the raw indicator inputs already on them,
-  // so a breakdown never has to be recomputed under later settings.
   const timeframes = {};
   const src = results.timeframes || {};
   for (const tf of TIMEFRAMES) {
@@ -629,9 +512,9 @@ function createEngineSnapshot(results = {}, resolvedOptions = null, context = {}
     engine_settings: {
       score_weights: scoreWeights,
       grade_thresholds: thresholds,
-      use_m5_override: !!opts.useM5Override,
-      downgrade_on_now_weakness: !!opts.downgradeOnNowWeakness,
-      require_alignment_for_a: !!opts.requireAlignmentForA,
+      use_m5_override: false,
+      downgrade_on_now_weakness: false,
+      require_alignment_for_a: false,
     },
     direction: results.mainDirection ?? null,
     raw_grade: results.rawGrade ?? null,
