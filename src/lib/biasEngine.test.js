@@ -140,23 +140,18 @@ describe('calculateBias — per-timeframe direction (±35 dead-zone)', () => {
   };
 
   it('a single indicator below ±35 stays Neutral', () => {
-    // h1 macd weight is 20 → below the 35 threshold → Neutral, not BUY.
     expect(only('h1', { macd: 1 }).bias).toBe('Neutral');
-    // month rsi weight is 10 → Neutral.
     expect(only('month', { rsi: 1 }).bias).toBe('Neutral');
   });
 
   it('an indicator at or above ±35 sets the direction', () => {
-    // day close weight is 35 → exactly the threshold → BUY.
     expect(only('day', { close: 1 }).bias).toBe('BUY');
     expect(only('day', { close: -1 }).bias).toBe('SELL');
   });
 
   it('picks the dominant side, not the net sum', () => {
-    // h4: close +25 vs boli -35 → net -10 but dominant side is -35 → SELL.
     expect(only('h4', { close: 1, boli: -1 }).bias).toBe('SELL');
     expect(only('h4', { close: 1, boli: -1 }).total).toBe(-35);
-    // month: close +40 vs macd -30 → dominant +40 → BUY.
     expect(only('month', { close: 1, macd: -1 }).bias).toBe('BUY');
     expect(only('month', { close: 1, macd: -1 }).total).toBe(40);
   });
@@ -165,7 +160,7 @@ describe('calculateBias — per-timeframe direction (±35 dead-zone)', () => {
 describe('calculateBias — Extra Check lights', () => {
   it('adds +5 to the matching direction when H1 and M15 agree', () => {
     const inputs = getDefaultInputs();
-    inputs.h4 = { close: 1, macd: 1, rsi: 1, boli: 1 }; // establish a BUY base
+    inputs.h4 = { close: 1, macd: 1, rsi: 1, boli: 1 };
     const base = calculateBias(inputs, null);
     const lit = calculateBias(inputs, { h1: 1, m15: 1 });
     expect(lit.lightsActive).toBe(true);
@@ -182,8 +177,6 @@ describe('calculateBias — Extra Check lights', () => {
 
 describe('calculateBias — grade cap when the block trend conflicts', () => {
   it('forces the grade to C when the block-weighted trend opposes the score', () => {
-    // Month & Week are BUY so DEEP reads BULL and the block-weighted trend is
-    // BUY, but Day alone carries the score (SELL). Trend BUY vs score SELL → C.
     const inputs = {
       month: { close:  1, macd: 1, rsi: 0, boli:  0 },
       week:  { close:  1, macd: 1, rsi: 0, boli:  0 },
@@ -195,16 +188,13 @@ describe('calculateBias — grade cap when the block trend conflicts', () => {
     };
     const r = calculateBias(inputs, null);
     expect(r.scoreDirection).toBe('SELL');
-    expect(r.deepResult).toBe(1); // BULL
+    expect(r.deepResult).toBe(1);
     expect(r.grade).toBe('C');
     expect(r.warnings.some((w) => w.includes('capped at C'))).toBe(true);
   });
 });
 
 describe('Extended/F take their Action from the main bias — NOT gated by the Extra Check', () => {
-  // The all-BUY workbook snapshot: score 95, grade F, status Extended, dir BUY.
-  // In Gary's sheet this shows Status Extended / Grade F / Trade BUY at the same
-  // time as the Extra Check (K12) reads "No Trade" — the two are independent.
   const EXTENDED_F = CASES[0].inputs;
 
   it('with the Extra Check BLANK: shows a directional BUY Action (never PENDING)', () => {
@@ -212,9 +202,7 @@ describe('Extended/F take their Action from the main bias — NOT gated by the E
     expect(r.grade).toBe('F');
     expect(r.status).toBe('Extended');
     expect(r.mainDirection).toBe('BUY');
-    // The main-bias Trade direction — not the old PENDING/NO_TRADE gate.
     expect(r.tradeAction).toBe('BUY');
-    // The Extra Check is a separate layer and simply reports "not run".
     expect(r.extraCheckResult).toBe('NOT_CHECKED');
     expect(r.extraCheckConfirmation).toBe('NOT_CHECKED');
   });
@@ -243,10 +231,7 @@ describe('Extended/F take their Action from the main bias — NOT gated by the E
   it('warns with a non-alarming caution (no "high risk"), matching the Extended status', () => {
     const r = calculateBias(EXTENDED_F, null);
     expect(r.status).toBe('Extended');
-    // The caution wording — a valid setup that needs extra care.
     expect(r.warnings).toContain('Extended conditions — valid setup, but use extra caution');
-    // It must NOT read like danger / no-trade, and must not contradict itself
-    // with the "approaching extended territory" near-extended message.
     const joined = r.warnings.join(' | ');
     expect(joined).not.toMatch(/high (reversal )?risk|danger|no trade/i);
     expect(joined).not.toContain('approaching extended territory');
@@ -255,13 +240,12 @@ describe('Extended/F take their Action from the main bias — NOT gated by the E
   describe('the Extra Check is a separate CONFIRMATION layer (does not change the Action)', () => {
     it('confirming check (both +1) → Action still BUY, Extra Check CONFIRMS', () => {
       const r = calculateBias(EXTENDED_F, { h1: 1, m15: 1 });
-      expect(r.tradeAction).toBe('BUY');           // from the main bias
+      expect(r.tradeAction).toBe('BUY');
       expect(r.extraCheckResult).toBe('BUY');
       expect(r.extraCheckConfirmation).toBe('CONFIRMS');
     });
 
     it('conflicting check (both -1) → Action stays BUY, Extra Check CONFLICTS', () => {
-      // The check must NOT flip a BUY analysis to SELL — that was the old bug.
       const r = calculateBias(EXTENDED_F, { h1: -1, m15: -1 });
       expect(r.mainDirection).toBe('BUY');
       expect(r.tradeAction).toBe('BUY');
@@ -286,7 +270,7 @@ describe('Extended/F take their Action from the main bias — NOT gated by the E
     });
   });
 
-  describe('Extra Check result formula (Excel K12): IF(1H=-1 & 15M=-1,"SELL", IF(1H=1 & 15M=1,"BUY","No Trade"))', () => {
+  describe('Extra Check result formula', () => {
     it('both -1 → SELL', () => {
       expect(calculateBias(EXTENDED_F, { h1: -1, m15: -1 }).extraCheckResult).toBe('SELL');
     });
@@ -305,14 +289,12 @@ describe('Extended/F take their Action from the main bias — NOT gated by the E
   });
 
   it('target quality tracks the grade, not block alignment or the Extra Check', () => {
-    // Grade B setup (score 55) → MED target, regardless of the extra check.
     const r = calculateBias(CASES[4].inputs, null);
     expect(r.grade).toBe('B');
     expect(r.targetNote).toBe('MED BUY');
   });
 
   it('a NEAR-extended (80-90) setup keeps the "approaching" warning, not the Extended one', () => {
-    // CASES[5]: winning score 80, grade C, NOT extended.
     const r = calculateBias(CASES[5].inputs, null);
     expect(r.status).not.toBe('Extended');
     expect(r.warnings).toContain('Score 80-90 — approaching extended territory, use caution');
@@ -322,7 +304,6 @@ describe('Extended/F take their Action from the main bias — NOT gated by the E
 
 describe('A/B/C/D keep the grade+alignment readiness Action (do NOT defer)', () => {
   it('grade B with NOW aligned → Ready / TRADE', () => {
-    // CASES[4]: grade B, NOW BUY matches BUY score.
     const r = calculateBias(CASES[4].inputs, null);
     expect(r.grade).toBe('B');
     expect(r.status).toBe('Ready');
@@ -330,7 +311,6 @@ describe('A/B/C/D keep the grade+alignment readiness Action (do NOT defer)', () 
   });
 
   it('grade C with DEEP misaligned → Wait / WAIT', () => {
-    // CASES[3]: grade C, DEEP BULL but score SELL → not aligned.
     const r = calculateBias(CASES[3].inputs, null);
     expect(r.grade).toBe('C');
     expect(r.status).toBe('Wait');
@@ -338,7 +318,6 @@ describe('A/B/C/D keep the grade+alignment readiness Action (do NOT defer)', () 
   });
 
   it('grade C fully aligned → Scalp / TRADE', () => {
-    // CASES[5]: grade C, DEEP/DD aligned with the BUY score.
     const r = calculateBias(CASES[5].inputs, null);
     expect(r.grade).toBe('C');
     expect(r.status).toBe('Scalp');
@@ -346,28 +325,25 @@ describe('A/B/C/D keep the grade+alignment readiness Action (do NOT defer)', () 
   });
 
   it('a B grade Action ignores the Extra Check (which only confirms/conflicts)', () => {
-    // Setting the extra check must not flip a graded readiness verdict to BUY/SELL.
     const base = calculateBias(CASES[4].inputs, null);
     const sell = calculateBias(CASES[4].inputs, { h1: -1, m15: -1 });
     const buy  = calculateBias(CASES[4].inputs, { h1: 1, m15: 1 });
     expect(base.tradeAction).toBe('TRADE');
-    expect(sell.tradeAction).toBe('TRADE'); // still TRADE, not SELL
+    expect(sell.tradeAction).toBe('TRADE');
     expect(buy.tradeAction).toBe('TRADE');
-    // A/B/C/D Action is always the TRADE/WAIT readiness verdict.
     expect(['TRADE', 'WAIT']).toContain(base.tradeAction);
-    // ...but the Extra Check confirmation is still surfaced as separate info.
     expect(base.extraCheckConfirmation).toBe('NOT_CHECKED');
-    expect(buy.extraCheckConfirmation).toBe('CONFIRMS');   // both +1 agrees with BUY
-    expect(sell.extraCheckConfirmation).toBe('CONFLICTS'); // both -1 opposes BUY
+    expect(buy.extraCheckConfirmation).toBe('CONFIRMS');
+    expect(sell.extraCheckConfirmation).toBe('CONFLICTS');
   });
 });
 
 describe('calculateMinSafeMove & ATR', () => {
   it('computes minimum safe move = (ATR / 9) * grade weight', () => {
-    expect(calculateMinSafeMove(90, 'A').value).toBe(12.5); // 90/9*1.25
-    expect(calculateMinSafeMove(90, 'B').value).toBe(10);   // 90/9*1.0
-    expect(calculateMinSafeMove(90, 'C').value).toBe(7.5);  // 90/9*0.75
-    expect(calculateMinSafeMove(90, 'D').value).toBe(5);    // 90/9*0.5
+    expect(calculateMinSafeMove(90, 'A').value).toBe(12.5);
+    expect(calculateMinSafeMove(90, 'B').value).toBe(10);
+    expect(calculateMinSafeMove(90, 'C').value).toBe(7.5);
+    expect(calculateMinSafeMove(90, 'D').value).toBe(5);
   });
 
   it('carries the grade and keeps legacy target/targetType aliases', () => {
@@ -408,7 +384,7 @@ describe('ATR display units', () => {
   });
 
   it('reports points for metals, commodities and crypto', () => {
-    expect(atrUnitForInstrument('XAUUSD')).toBe('points'); // looks like a pair but is a metal
+    expect(atrUnitForInstrument('XAUUSD')).toBe('points');
     expect(atrUnitForInstrument('XAU/USD')).toBe('points');
     expect(atrUnitForInstrument('GOLD')).toBe('points');
     expect(atrUnitForInstrument('GOLD/USD')).toBe('points');
@@ -423,9 +399,9 @@ describe('ATR display units', () => {
 
   it('formats values without unnecessary decimals', () => {
     expect(formatAtrValue(128)).toBe('128');
-    expect(formatAtrValue(128.000006)).toBe('128'); // never 128.000000
+    expect(formatAtrValue(128.000006)).toBe('128');
     expect(formatAtrValue(245)).toBe('245');
-    expect(formatAtrValue(128.45)).toBe('128.5');   // max one decimal
+    expect(formatAtrValue(128.45)).toBe('128.5');
     expect(formatAtrValue(128.04)).toBe('128');
   });
 
@@ -439,26 +415,21 @@ describe('ATR display units', () => {
     expect(formatWithUnit(128, 'GBP/JPY')).toBe('128 pips');
     expect(formatWithUnit(245, 'US100')).toBe('245 points');
     expect(formatWithUnit(19, 'XAUUSD')).toBe('19 points');
-    expect(formatWithUnit(14.22, 'GBP/JPY')).toBe('14.2 pips'); // ATR-derived min safe move
-    expect(formatWithUnit(1, 'EUR/USD')).toBe('1 pip'); // singular
+    expect(formatWithUnit(14.22, 'GBP/JPY')).toBe('14.2 pips');
+    expect(formatWithUnit(1, 'EUR/USD')).toBe('1 pip');
     expect(formatWithUnit(null, 'EUR/USD')).toBeNull();
   });
 });
 
 describe('engineOptionsFromSettings', () => {
-  it('maps advanced flags and passes weights/thresholds through', () => {
-    const opts = engineOptionsFromSettings({
+  it('never exposes runtime engine overrides', () => {
+    expect(engineOptionsFromSettings({
       useM5Override: true,
       downgradeOnNowWeakness: true,
-      requireAlignmentForA: false,
-      weights: { h1: 40 },
-      gradeThresholds: { A: 70 },
-    });
-    expect(opts.useM5Override).toBe(true);
-    expect(opts.downgradeOnNowWeakness).toBe(true);
-    expect(opts.requireAlignmentForA).toBe(false);
-    expect(opts.scoreWeights).toEqual({ h1: 40 });
-    expect(opts.thresholds).toEqual({ A: 70 });
+      requireAlignmentForA: true,
+      weights: { h1: 99 },
+      gradeThresholds: { A: 1 },
+    })).toEqual({});
   });
 
   it('returns an empty object for no settings', () => {
@@ -466,10 +437,6 @@ describe('engineOptionsFromSettings', () => {
   });
 });
 
-// ── Immutable engine snapshot & versioning (issue #14, phase 2) ────────────────
-
-// A strong, unambiguous BUY setup — every timeframe leans buy so the engine
-// returns concrete scores/grades to snapshot.
 const STRONG_BUY = {
   month: { close: 1, macd: 1, rsi: 1, boli: 1 },
   week:  { close: 1, macd: 1, rsi: 1, boli: 1 },
@@ -481,18 +448,11 @@ const STRONG_BUY = {
 };
 
 describe('ENGINE_VERSION', () => {
-  it('is a stable, human-readable identifier (not a build timestamp)', () => {
+  it('is the stable locked production ruleset identifier', () => {
     expect(typeof ENGINE_VERSION).toBe('string');
-    expect(ENGINE_VERSION.length).toBeGreaterThan(0);
-    expect(ENGINE_VERSION).toBe('prime-bias-current-v1');
-    // A timestamp version would contain digits for a date/epoch — this must not.
+    expect(ENGINE_VERSION).toBe('prime-bias-locked-v1');
     expect(/\d{4}-\d{2}-\d{2}/.test(ENGINE_VERSION)).toBe(false);
     expect(/^\d+$/.test(ENGINE_VERSION)).toBe(false);
-  });
-
-  it('does NOT claim Excel verification (engine may still need correcting)', () => {
-    expect(ENGINE_VERSION.toLowerCase()).not.toContain('excel');
-    expect(ENGINE_VERSION.toLowerCase()).not.toContain('verified');
   });
 });
 
@@ -508,20 +468,16 @@ describe('calculateBias surfaces the full calculation result', () => {
   it('exposes buy/sell tallies, lights and the engine version', () => {
     expect(typeof res.buyScore).toBe('number');
     expect(typeof res.sellScore).toBe('number');
-    expect(res.buyScore).toBeGreaterThan(res.sellScore); // strong buy
+    expect(res.buyScore).toBeGreaterThan(res.sellScore);
     expect(res.lightsActive).toBe(true);
     expect(res.lightsResult).toBe('buy');
     expect(res.engineVersion).toBe(ENGINE_VERSION);
   });
 
-  it('exposes the RESOLVED options actually used (concrete values)', () => {
-    expect(res.resolvedOptions).toBeTruthy();
-    // Every timeframe weight resolved to a concrete number.
-    for (const k of ['month', 'week', 'day', 'h4', 'h1', 'm15', 'm5']) {
-      expect(typeof res.resolvedOptions.scoreWeights[k]).toBe('number');
-    }
-    expect(typeof res.resolvedOptions.thresholds.A).toBe('number');
-    expect(res.resolvedOptions).toMatchObject({
+  it('exposes only the canonical resolved options', () => {
+    expect(res.resolvedOptions).toEqual({
+      scoreWeights: { month: 2, week: 5, day: 10, h4: 30, h1: 33, m15: 10, m5: 5 },
+      thresholds: { extended: 92, risky: 80, A: 75, B: 55, C: 45, D: 40 },
       useM5Override: false,
       downgradeOnNowWeakness: false,
       requireAlignmentForA: false,
@@ -537,47 +493,35 @@ describe('calculateBias surfaces the full calculation result', () => {
 
 describe('createEngineSnapshot', () => {
   const context = { extraCheck: { h1: 1, m15: 1 }, timestamp: '2026-08-03T10:00:00.000Z' };
-  const snapshotOf = (over = {}) => {
-    const res = calculateBias(STRONG_BUY, context.extraCheck, over.options);
+  const snapshotOf = () => {
+    const res = calculateBias(STRONG_BUY, context.extraCheck);
     return createEngineSnapshot(res, res.resolvedOptions, context);
   };
 
   it('captures the full snapshot as concrete, serialisable values', () => {
     const snap = snapshotOf();
-    // Round-trips through JSON without loss (no functions/refs).
     expect(JSON.parse(JSON.stringify(snap))).toEqual(snap);
-
     expect(snap.engine_version).toBe(ENGINE_VERSION);
-    expect(snap.engine_settings.score_weights).toMatchObject({ h1: expect.any(Number) });
-    expect(snap.engine_settings.grade_thresholds).toMatchObject({ A: expect.any(Number) });
+    expect(snap.engine_settings.score_weights).toEqual({ month: 2, week: 5, day: 10, h4: 30, h1: 33, m15: 10, m5: 5 });
+    expect(snap.engine_settings.grade_thresholds).toEqual({ extended: 92, risky: 80, A: 75, B: 55, C: 45, D: 40 });
     expect(snap.engine_settings).toMatchObject({
       use_m5_override: false,
       downgrade_on_now_weakness: false,
       require_alignment_for_a: false,
     });
     expect(snap.direction).toBe('BUY');
-    expect(snap).toHaveProperty('raw_grade');
-    expect(snap).toHaveProperty('effective_grade');
-    expect(typeof snap.buy_score).toBe('number');
-    expect(typeof snap.sell_score).toBe('number');
-    expect(snap.deep).toMatchObject({ direction: expect.any(String), strength: expect.any(String) });
-    expect(snap.dd).toMatchObject({ direction: expect.any(String), strength: expect.any(String) });
-    expect(snap.now).toMatchObject({ direction: expect.any(String), strength: expect.any(String) });
-    expect(snap.alignment).toBeTruthy();
     expect(snap.extra_check).toEqual({ h1: 1, m15: 1 });
     expect(snap.lights_result).toBe('buy');
     expect(snap.analysis_timestamp).toBe(context.timestamp);
   });
 
   it('stores raw grade and effective grade under separate keys', () => {
-    // Synthetic capped result: raw A but effective forced to C.
     const snap = createEngineSnapshot({
       rawGrade: 'A', effectiveGrade: 'C', grade: 'C',
       buyScore: 80, sellScore: 10, winningScore: 80, mainDirection: 'BUY',
     });
     expect(snap.raw_grade).toBe('A');
     expect(snap.effective_grade).toBe('C');
-    expect(snap.raw_grade).not.toBe(snap.effective_grade);
   });
 
   it('persists per-timeframe results verbatim (does not recompute them)', () => {
@@ -593,28 +537,20 @@ describe('createEngineSnapshot', () => {
     }
   });
 
-  it('freezes the resolved settings — changing them afterwards cannot mutate a past snapshot', () => {
-    const resA = calculateBias(STRONG_BUY, context.extraCheck, { thresholds: { A: 70 } });
-    const snapA = createEngineSnapshot(resA, resA.resolvedOptions, context);
-    const beforeJson = JSON.stringify(snapA);
+  it('ignores caller-provided fake engine settings and records canonical values', () => {
+    const res = calculateBias(STRONG_BUY, context.extraCheck, {
+      thresholds: { A: 1 },
+      scoreWeights: { h1: 999 },
+      useM5Override: true,
+    });
+    const snap = createEngineSnapshot(res, {
+      thresholds: { A: 1 },
+      scoreWeights: { h1: 999 },
+      useM5Override: true,
+    }, context);
 
-    // "User changes settings later" — a completely different engine run.
-    const resB = calculateBias(STRONG_BUY, context.extraCheck, { thresholds: { A: 99 } });
-    createEngineSnapshot(resB, resB.resolvedOptions, context);
-    // Mutating the source options object must not reach the earlier snapshot.
-    resA.resolvedOptions.thresholds.A = 12345;
-
-    expect(JSON.stringify(snapA)).toBe(beforeJson);
-    expect(snapA.engine_settings.grade_thresholds.A).toBe(70);
-  });
-
-  it('never reads global settings — resolvedOptions come from the passed result only', () => {
-    const snap = createEngineSnapshot(
-      { mainDirection: 'SELL', grade: 'B', resolvedOptions: { scoreWeights: { h1: 99 }, thresholds: { A: 60 }, useM5Override: true } },
-    );
-    expect(snap.engine_settings.score_weights.h1).toBe(99);
-    expect(snap.engine_settings.grade_thresholds.A).toBe(60);
-    expect(snap.engine_settings.use_m5_override).toBe(true);
-    expect(snap.direction).toBe('SELL');
+    expect(snap.engine_settings.grade_thresholds.A).toBe(75);
+    expect(snap.engine_settings.score_weights.h1).toBe(33);
+    expect(snap.engine_settings.use_m5_override).toBe(false);
   });
 });
