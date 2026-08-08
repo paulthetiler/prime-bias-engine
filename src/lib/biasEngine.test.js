@@ -110,9 +110,10 @@ describe('Prime Bias — canonical workbook parity', () => {
   it('P10 Scalp is formula-driven, not synonymous with grade C', () => {
     const inputs = getDefaultInputs();
     inputs.h4.boli = 1;
-    inputs.h1.rsi = 1;
-    inputs.m15.rsi = -1;
-    inputs.m5.rsi = 1;
+    inputs.m15.rsi = 1;
+    inputs.m5.boli = 1;
+    // 1H result = Neutral, 5m RSI raw input = Neutral, while NOW/trade = BUY.
+    // This makes the workbook fall through to its explicit Scalp branch.
     const r = calculateBias(inputs, null);
     expect(r.scoreDirection).toBe('BUY');
     expect(r.status).toBe('Scalp');
