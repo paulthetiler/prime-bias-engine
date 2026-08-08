@@ -18,14 +18,15 @@
 
 import { LEGACY_ENGINE_VERSION } from './tradeCompat';
 
-// Stable identifier of the engine implementation currently in production. Bump
-// this whenever the engine maths — weights, thresholds, grade caps or block
-// rules — changes, so every completed trade keeps an honest record of which
-// ruleset produced it. This is deliberately NOT a build timestamp. It is named
-// "current" (not "excel-verified") because the engine may still need correcting
-// against the Prime Bias workbook; only rename it once the formulas have been
-// corrected and independently verified.
-export const CURRENT_ENGINE_VERSION = 'prime-bias-current-v1';
+// Stable identifier of the locked, workbook-verified Prime Bias ruleset.
+//
+// `prime-bias-current-v1` allowed runtime changes to score weights, grade
+// thresholds and advanced logic. Even when users left those controls at their
+// defaults, that version could not guarantee that two trades were produced by
+// identical maths. The production engine is now immutable: any future change to
+// weights, thresholds, block rules or grading must happen deliberately in code,
+// be regression-tested, and receive a new engine version.
+export const CURRENT_ENGINE_VERSION = 'prime-bias-locked-v1';
 
 // Re-exported for callers that only need the legacy sentinel alongside the
 // current version, so both live behind one import.
