@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { X, Crosshair, SlidersHorizontal, LayoutGrid, BookOpen, ChevronRight, ChevronLeft, Wallet } from 'lucide-react';
+import { X, Crosshair, SlidersHorizontal, LayoutGrid, BookOpen, ChevronRight, ChevronLeft, Wallet, ShieldCheck } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { activeAccounts } from '@/lib/accounts';
 import { tap } from '@/lib/haptics';
@@ -11,6 +11,11 @@ const KEY = 'primebias_onboarded';
 const CURRENCIES = ['USD', 'GBP', 'EUR', 'AUD', 'CAD', 'JPY', 'CHF', 'NZD', 'BTC', 'USDT'];
 
 const GUIDE_STEPS = [
+  {
+    icon: ShieldCheck,
+    title: 'A decision tool, not a signal service',
+    body: 'Prime Bias is designed to support your own market analysis — not replace it. A strong bias or TRADE result does not mean you should blindly enter a position. Always read the chart, assess market structure, choose your own entry, stop and target, and manage your own risk. There is no holy grail. Prime Bias adds structure and confirmation to your analysis — the trading decision remains yours.',
+  },
   {
     icon: Crosshair,
     title: 'Welcome to PrimeBias',
