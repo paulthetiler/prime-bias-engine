@@ -182,57 +182,58 @@ export default function ATR() {
                             {a}
                           </button>
                         ))}
-                      </div>
-                    )}
-                  </div>
-                  <Input
-                    type="number"
-                    step="0.00001"
-                    placeholder="ATR"
-                    value={item.atr || ''}
-                    onChange={(e) => {
-                      const updated = [...extraAssets];
-                      updated[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
-                      setExtraAssets(updated);
-                    }}
-                    className="w-28 h-9 text-sm"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 text-destructive hover:text-destructive shrink-0"
-                    onClick={() => setExtraAssets(prev => prev.filter((_, i) => i !== idx))}
-                  >
-                    ×
-                  </Button>
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-        <Button
-          variant="outline"
-          className="w-full gap-2"
-          onClick={() => setExtraAssets(prev => [...prev, { asset: '', atr: null }])}
-        >
-          <Plus className="w-4 h-4" /> Add New
-        </Button>
-      </div>
-
-      {/* Info */}
-      <div className="text-xs text-muted-foreground bg-accent/20 rounded-lg p-3 border border-border space-y-1">
-        <div className="font-semibold">How ATR is used:</div>
-        <ul className="list-disc list-inside space-y-0.5">
-          <li>Minimum Safe Move = (ATR ÷ 9) × grade weight</li>
-          <li>Grade weights: A (1.25), B (1.0), C (0.75), D (0.5)</li>
-          <li>Custom values override base ATR for selected assets</li>
-        </ul>
-        <div className="pt-1">
-          This is the minimum room a trade needs to breathe — a floor, not a
-          take-profit. Your actual target comes from market structure (support,
-          resistance, liquidity) and is often further out.
+                <Input
+                  type="number"
+                  step="0.00001"
+                  placeholder="ATR"
+                  value={item.atr || ''}
+                  onChange={(e) => {
+                    const updated = [...extraAssets];
+                    updated[idx].atr = e.target.value ? parseFloat(e.target.value) : null;
+                    setExtraAssets(updated);
+                  }}
+                  className="w-28 h-9 text-sm"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-destructive hover:text-destructive shrink-0"
+                  onClick={() => setExtraAssets(prev => prev.filter((_, i) => i !== idx))}
+                >
+                  ×
+                </Button>
+              </div>
+            );
+          })}
         </div>
+      )}
+      <Button
+        variant="outline"
+        className="w-full gap-2"
+        onClick={() => setExtraAssets(prev => [...prev, { asset: '', atr: null }])}
+      >
+        <Plus className="w-4 h-4" /> Add New
+      </Button>
+    </div>
+
+    {/* Info */}
+    <div className="text-xs text-muted-foreground bg-accent/20 rounded-lg p-3 border border-border space-y-1">
+      <div className="font-semibold">How ATR is used:</div>
+      <ul className="list-disc list-inside space-y-0.5">
+        <li>Minimum Safe Move = (ATR ÷ 9) × grade weight</li>
+        <li>Grade weights: A (1.25), B (1.0), C (0.75), D (0.5)</li>
+        <li>Custom values override base ATR for selected assets</li>
+        <li>Review and update custom ATR values around once a month, or sooner if market volatility changes significantly</li>
+      </ul>
+      <div className="pt-1">
+        This is the minimum room a trade needs to breathe — a floor, not a
+        take-profit. Your actual target comes from market structure (support,
+        resistance, liquidity) and is often further out.
       </div>
     </div>
-  );
+  </div>
+);
 }
