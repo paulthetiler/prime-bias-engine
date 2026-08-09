@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
-import { X, ChevronRight, CheckCircle2, BookOpen, Loader2 } from 'lucide-react';
+import { X, ChevronRight, CheckCircle2, BookOpen, Loader2, ImagePlus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import {
+  MAX_JOURNAL_SCREENSHOTS,
+  removeJournalScreenshots,
+  uploadJournalScreenshots,
+  validateJournalScreenshots,
+} from '@/lib/journalScreenshots';
 
 const FOLLOWED_PLAN_OPTIONS = [
   { value: 'followed',    label: 'Followed Plan',  emoji: '✅', color: 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
@@ -71,12 +77,15 @@ function TagButton({ label, selected, onToggle }) {
 export default function TradeJournalFlow({ trade, onClose, onDone }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const fileInputRef = useRef(null);
   const [step, setStep] = useState(0); // 0,1,2,3 = what happened, plan, lesson, done
   const [whatHappened, setWhatHappened] = useState('');
   const [followedPlan, setFollowedPlan] = useState('');
   const [mistakeTags, setMistakeTags] = useState([]);
   const [lessonTags, setLessonTags] = useState([]);
   const [lesson, setLesson] = useState('');
+  const [screenshots, setScreenshots] = useState([]);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const [saving, setSaving] = useState(false);
 
   if (!trade) return null;
@@ -84,9 +93,38 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
   const toggleTag = (setter, tag) =>
     setter(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
 
+  const addScreenshots = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    if (!incoming.length) return;
+    const combinedFiles = [...screenshots.map(item => item.file), ...incoming];
+    const validationError = validateJournalScreenshots(combinedFiles);
+    if (validationError) {
+      toast.error(validationError);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    const added = incoming.map(file => ({
+      id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+      file,
+      url: URL.createObjectURL(file),
+    }));
+    setScreenshots(prev => [...prev, ...added]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeScreenshot = (id) => {
+    setScreenshots(prev => {
+      const item = prev.find(s => s.id === id);
+      if (item) URL.revokeObjectURL(item.url);
+      return prev.filter(s => s.id !== id);
+    });
+  };
+
   const handleSave = async () => {
     setSaving(true);
+    let uploadedPaths = [];
     try {
+      uploadedPaths = await uploadJournalScreenshots(screenshots.map(item => item.file));
       await base44.entities.TradeJournalEntry.create({
         completed_trade_id: trade.id,
         instrument: trade.instrument,
@@ -106,12 +144,16 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
         lesson_tags: lessonTags,
         what_happened: whatHappened || null,
         lesson: lesson || null,
+        screenshot_paths: uploadedPaths,
         created_at: new Date().toISOString(),
       });
       qc.invalidateQueries({ queryKey: ['journalEntries'] });
       setStep(3);
-    } catch {
-      toast.error('Failed to save journal entry');
+    } catch (error) {
+      if (uploadedPaths.length) {
+        await removeJournalScreenshots(uploadedPaths).catch(() => {});
+      }
+      toast.error(error?.message || 'Failed to save journal entry');
     }
     setSaving(false);
   };
@@ -129,7 +171,6 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
         style={{ maxHeight: 'calc(100vh - 60px)' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-3">
             <BookOpen className="w-4 h-4 text-primary" />
@@ -147,8 +188,6 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
         </div>
 
         <div className="p-4 space-y-4">
-
-          {/* Trade snapshot — always visible on steps 0-2 */}
           {step < 3 && (
             <div className={cn('rounded-xl border px-3 py-2.5', RESULT_COLORS[trade.result])}>
               <div className="flex items-center justify-between text-xs">
@@ -168,7 +207,6 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
             </div>
           )}
 
-          {/* ── STEP 0: What Happened ── */}
           {step === 0 && (
             <div className="space-y-3">
               <div className="text-sm font-bold">What happened?</div>
@@ -179,13 +217,62 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
                 rows={4}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
               />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold">Screenshots</div>
+                    <div className="text-[11px] text-muted-foreground">Charts, broker history, entry or exit evidence</div>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">{screenshots.length}/{MAX_JOURNAL_SCREENSHOTS}</span>
+                </div>
+
+                {screenshots.length > 0 && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {screenshots.map(item => (
+                      <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-secondary">
+                        <button type="button" onClick={() => setPreviewUrl(item.url)} className="w-full h-full">
+                          <img src={item.url} alt="Trade screenshot preview" className="w-full h-full object-cover" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Remove screenshot"
+                          onClick={() => removeScreenshot(item.id)}
+                          className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={e => addScreenshots(e.target.files)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  disabled={screenshots.length >= MAX_JOURNAL_SCREENSHOTS}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ImagePlus className="w-4 h-4" />
+                  {screenshots.length ? 'Add another screenshot' : 'Add screenshot'}
+                </Button>
+              </div>
+
               <Button className="w-full gap-2" onClick={() => setStep(1)}>
                 Next <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           )}
 
-          {/* ── STEP 1: Did I follow the plan? ── */}
           {step === 1 && (
             <div className="space-y-4">
               <div className="text-sm font-bold">Did I follow the plan?</div>
@@ -228,7 +315,6 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
             </div>
           )}
 
-          {/* ── STEP 2: Lesson ── */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="text-sm font-bold">What's the lesson?</div>
@@ -253,13 +339,12 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
                 <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
                 <Button className="flex-1 gap-2" onClick={handleSave} disabled={saving}>
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
-                  {saving ? 'Saving…' : 'Save Journal'}
+                  {saving ? (screenshots.length ? 'Uploading & saving…' : 'Saving…') : 'Save Journal'}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* ── STEP 3: Done ── */}
           {step === 3 && (
             <div className="space-y-4 text-center py-4">
               <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto">
@@ -279,6 +364,23 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
           )}
         </div>
       </div>
+
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/90 flex items-center justify-center p-4"
+          onClick={(e) => { e.stopPropagation(); setPreviewUrl(null); }}
+        >
+          <button
+            type="button"
+            aria-label="Close screenshot preview"
+            onClick={() => setPreviewUrl(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img src={previewUrl} alt="Trade screenshot full preview" className="max-w-full max-h-full object-contain rounded-lg" />
+        </div>
+      )}
     </div>
   );
 }
