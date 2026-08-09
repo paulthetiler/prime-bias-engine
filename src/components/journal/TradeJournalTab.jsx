@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { X, BookOpen } from 'lucide-react';
+import { X, BookOpen, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { signedJournalScreenshotUrls } from '@/lib/journalScreenshots';
 
 const RESULT_COLORS = {
   win: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
@@ -16,7 +17,28 @@ const GRADE_COLORS = { A: 'text-emerald-400', B: 'text-blue-400', C: 'text-yello
 const PLAN_LABELS = { followed: '✅ Followed', partial: '🟡 Partial', broke_rules: '❌ Broke Rules', not_taken: '🚫 Not Taken' };
 
 function JournalEntryDetail({ entry, onClose }) {
+  const [screenshots, setScreenshots] = useState([]);
+  const [screenshotsLoading, setScreenshotsLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const dirColor = entry.direction === 'BUY' ? 'text-emerald-400' : entry.direction === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+
+  useEffect(() => {
+    let active = true;
+    const paths = Array.isArray(entry.screenshot_paths) ? entry.screenshot_paths.filter(Boolean) : [];
+    if (!paths.length) {
+      setScreenshots([]);
+      return undefined;
+    }
+
+    setScreenshotsLoading(true);
+    signedJournalScreenshotUrls(paths)
+      .then(items => { if (active) setScreenshots(items); })
+      .catch(() => { if (active) setScreenshots([]); })
+      .finally(() => { if (active) setScreenshotsLoading(false); });
+
+    return () => { active = false; };
+  }, [entry.screenshot_paths]);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
@@ -24,7 +46,7 @@ function JournalEntryDetail({ entry, onClose }) {
         style={{ marginBottom: 'calc(64px + var(--safe-area-bottom))', maxHeight: 'calc(100vh - 120px)' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-card border-b border-border px-4 py-3 flex items-center justify-between rounded-t-2xl">
+        <div className="sticky top-0 bg-card border-b border-border px-4 py-3 flex items-center justify-between rounded-t-2xl z-10">
           <div>
             <div className="text-base font-bold">{entry.instrument}</div>
             <div className="text-xs text-muted-foreground">{entry.created_at ? format(new Date(entry.created_at), 'dd MMM yyyy HH:mm') : '—'}</div>
@@ -32,7 +54,6 @@ function JournalEntryDetail({ entry, onClose }) {
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-4 space-y-4">
-          {/* Header stats */}
           <div className="grid grid-cols-4 gap-2 text-center text-xs">
             <div className="bg-secondary rounded-lg p-2">
               <div className={cn('font-bold', RESULT_COLORS[entry.result]?.split(' ')[0])}>{RESULT_LABELS[entry.result]}</div>
@@ -66,6 +87,30 @@ function JournalEntryDetail({ entry, onClose }) {
             </div>
           )}
 
+          {(screenshotsLoading || screenshots.length > 0) && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Screenshots</div>
+              {screenshotsLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading screenshots…
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {screenshots.map(item => (
+                    <button
+                      key={item.path}
+                      type="button"
+                      onClick={() => setPreviewUrl(item.url)}
+                      className="aspect-square rounded-lg overflow-hidden border border-border bg-secondary"
+                    >
+                      <img src={item.url} alt="Trade journal screenshot" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {entry.mistake_tags?.length > 0 && (
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Execution Tags</div>
@@ -96,6 +141,23 @@ function JournalEntryDetail({ entry, onClose }) {
           )}
         </div>
       </div>
+
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4"
+          onClick={(e) => { e.stopPropagation(); setPreviewUrl(null); }}
+        >
+          <button
+            type="button"
+            aria-label="Close screenshot preview"
+            onClick={() => setPreviewUrl(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img src={previewUrl} alt="Trade journal screenshot preview" className="max-w-full max-h-full object-contain rounded-lg" />
+        </div>
+      )}
     </div>
   );
 }
@@ -124,38 +186,46 @@ export default function TradeJournalTab() {
 
   return (
     <div className="space-y-2 pt-2">
-      {entries.map(entry => (
-        <button
-          key={entry.id}
-          onClick={() => setSelected(entry)}
-          className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:bg-accent/50 transition-colors text-left"
-        >
-          <div className={cn('px-2.5 py-1 rounded-lg border text-xs font-bold shrink-0', RESULT_COLORS[entry.result])}>
-            {RESULT_LABELS[entry.result] || '—'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm">{entry.instrument}</span>
-              <span className={cn('text-xs font-bold', GRADE_COLORS[entry.grade])}>{entry.grade}</span>
-              <span className={cn('text-xs font-semibold', entry.direction === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>{entry.direction}</span>
+      {entries.map(entry => {
+        const screenshotCount = Array.isArray(entry.screenshot_paths) ? entry.screenshot_paths.length : 0;
+        return (
+          <button
+            key={entry.id}
+            onClick={() => setSelected(entry)}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:bg-accent/50 transition-colors text-left"
+          >
+            <div className={cn('px-2.5 py-1 rounded-lg border text-xs font-bold shrink-0', RESULT_COLORS[entry.result])}>
+              {RESULT_LABELS[entry.result] || '—'}
             </div>
-            <div className="flex items-center gap-2 mt-0.5">
-              {entry.followed_plan && (
-                <span className="text-[10px] text-muted-foreground">{PLAN_LABELS[entry.followed_plan]}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm">{entry.instrument}</span>
+                <span className={cn('text-xs font-bold', GRADE_COLORS[entry.grade])}>{entry.grade}</span>
+                <span className={cn('text-xs font-semibold', entry.direction === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>{entry.direction}</span>
+                {screenshotCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <ImageIcon className="w-3 h-3" /> {screenshotCount}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                {entry.followed_plan && (
+                  <span className="text-[10px] text-muted-foreground">{PLAN_LABELS[entry.followed_plan]}</span>
+                )}
+                {entry.mistake_tags?.slice(0, 2).map(t => (
+                  <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">{t}</span>
+                ))}
+              </div>
+              {entry.lesson && (
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{entry.lesson}</p>
               )}
-              {entry.mistake_tags?.slice(0, 2).map(t => (
-                <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">{t}</span>
-              ))}
             </div>
-            {entry.lesson && (
-              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{entry.lesson}</p>
-            )}
-          </div>
-          <div className="text-[10px] text-muted-foreground shrink-0 text-right">
-            {entry.created_at ? format(new Date(entry.created_at), 'dd MMM') : ''}
-          </div>
-        </button>
-      ))}
+            <div className="text-[10px] text-muted-foreground shrink-0 text-right">
+              {entry.created_at ? format(new Date(entry.created_at), 'dd MMM') : ''}
+            </div>
+          </button>
+        );
+      })}
 
       {selected && <JournalEntryDetail entry={selected} onClose={() => setSelected(null)} />}
     </div>
