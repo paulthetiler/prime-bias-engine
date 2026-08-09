@@ -11,8 +11,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
+import { ChevronDown, ChevronUp, Trash2, Check, ChevronsUpDown, CheckCircle2, Loader2, AlertCircle, RotateCcw, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getSettings } from '@/lib/userSettings';
@@ -50,6 +50,25 @@ function loadExtraCheckForInstrument(instrument) {
   if (!instrument) return { h1: null, m15: null };
   const inputs = getInputStore();
   return inputs[instrument]?.extraCheck || { h1: null, m15: null };
+}
+
+// ── Favourite instruments (persisted separately from active/analysis state) ──
+// A favourite is just an instrument the user wants quick access to. It is
+// independent of whether the instrument is currently added to / analysed in the
+// Bias Tool, so removing an instrument from the tool never touches this list.
+const FAVOURITES_KEY = 'primebias_favourite_instruments';
+
+function getFavourites() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FAVOURITES_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFavourites(favourites) {
+  localStorage.setItem(FAVOURITES_KEY, JSON.stringify(favourites));
 }
 
 // Turn a raw Supabase/PostgREST error into a short, actionable reason the user
@@ -101,6 +120,10 @@ export default function Input() {
     const extra = JSON.parse(localStorage.getItem('primebias_extra_assets') || '[]');
     return [...top, ...extra];
   });
+
+  // Favourite instruments (starred in the selector) — persisted, independent of
+  // the active/analysis state so they survive removing an instrument and reloads.
+  const [favourites, setFavourites] = useState(() => getFavourites());
 
   const autoSaveTimerRef = useRef(null);
   const isLoadingRef = useRef(false); // true while we are loading inputs for an instrument switch
@@ -320,6 +343,19 @@ export default function Input() {
     setExtraCheck(prev => ({ ...prev, [key]: value }));
   };
 
+  // Toggle an instrument's favourite status. This only touches the favourites
+  // list — it must not select the instrument, close the dropdown, or affect the
+  // current analysis.
+  const toggleFavourite = (asset) => {
+    setFavourites(prev => {
+      const next = prev.includes(asset)
+        ? prev.filter(a => a !== asset)
+        : [...prev, asset];
+      saveFavourites(next);
+      return next;
+    });
+  };
+
   const handleRemoveInstrument = () => {
     const removed = instrument;
 
@@ -481,21 +517,59 @@ export default function Input() {
               <CommandInput placeholder="Search instruments..." />
               <CommandEmpty>No instrument found.</CommandEmpty>
               <CommandList>
-                <CommandGroup>
-                  {ASSETS.map(asset => (
-                    <CommandItem
-                      key={asset}
-                      value={asset}
-                      onSelect={val => {
-                        switchInstrument(val === instrument ? '' : val);
-                        setOpen(false);
-                      }}
-                    >
-                      <Check className={cn('mr-2 h-4 w-4', instrument === asset ? 'opacity-100' : 'opacity-0')} />
-                      {asset}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
+                {/* Favourites float to the top; the rest keep their original order.
+                    The star only toggles favourite status — it must not select the
+                    instrument or close the dropdown. */}
+                {(() => {
+                  const renderAssetItem = asset => {
+                    const isFavourite = favourites.includes(asset);
+                    return (
+                      <CommandItem
+                        key={asset}
+                        value={asset}
+                        onSelect={val => {
+                          switchInstrument(val === instrument ? '' : val);
+                          setOpen(false);
+                        }}
+                      >
+                        <Check className={cn('mr-2 h-4 w-4', instrument === asset ? 'opacity-100' : 'opacity-0')} />
+                        {asset}
+                        <button
+                          type="button"
+                          aria-label={isFavourite ? `Remove ${asset} from favourites` : `Add ${asset} to favourites`}
+                          aria-pressed={isFavourite}
+                          onPointerDown={e => e.stopPropagation()}
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={e => {
+                            // Keep the click from reaching the row (which would select
+                            // the instrument and close the popover).
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleFavourite(asset);
+                          }}
+                          className="ml-auto flex h-7 w-7 items-center justify-center rounded-md hover:bg-accent"
+                        >
+                          <Star className={cn('h-4 w-4', isFavourite ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40')} />
+                        </button>
+                      </CommandItem>
+                    );
+                  };
+                  const favouriteAssets = ASSETS.filter(a => favourites.includes(a));
+                  const otherAssets = ASSETS.filter(a => !favourites.includes(a));
+                  return (
+                    <>
+                      {favouriteAssets.length > 0 && (
+                        <CommandGroup heading="Favourites">
+                          {favouriteAssets.map(renderAssetItem)}
+                        </CommandGroup>
+                      )}
+                      {favouriteAssets.length > 0 && otherAssets.length > 0 && <CommandSeparator />}
+                      <CommandGroup>
+                        {otherAssets.map(renderAssetItem)}
+                      </CommandGroup>
+                    </>
+                  );
+                })()}
               </CommandList>
             </Command>
           </PopoverContent>
