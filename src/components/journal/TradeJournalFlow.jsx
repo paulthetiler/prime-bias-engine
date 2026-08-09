@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -87,10 +87,6 @@ export default function TradeJournalFlow({ trade, onClose, onDone }) {
   const [screenshots, setScreenshots] = useState([]);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => () => {
-    screenshots.forEach(item => URL.revokeObjectURL(item.url));
-  }, [screenshots]);
 
   if (!trade) return null;
 
