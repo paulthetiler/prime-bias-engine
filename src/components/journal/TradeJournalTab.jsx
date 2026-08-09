@@ -1,16 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { X, BookOpen, Image as ImageIcon, Loader2, Archive, RotateCcw, Trash2, Pencil } from 'lucide-react';
+import { X, BookOpen, Image as ImageIcon, Loader2, Archive, RotateCcw, Trash2, Pencil, ImagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { removeJournalScreenshots, signedJournalScreenshotUrls } from '@/lib/journalScreenshots';
+import {
+  MAX_JOURNAL_SCREENSHOTS,
+  removeJournalScreenshots,
+  signedJournalScreenshotUrls,
+  uploadJournalScreenshots,
+  validateJournalScreenshots,
+} from '@/lib/journalScreenshots';
 
 const RESULT_COLORS = {
   win: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
@@ -56,12 +62,40 @@ function TagButton({ label, selected, onToggle }) {
   );
 }
 
-function JournalEntryEditForm({ entry, onCancel, onSave, saving }) {
+function JournalEntryEditForm({ entry, onCancel, onSave, onPreview, busy }) {
+  const fileInputRef = useRef(null);
   const [whatHappened, setWhatHappened] = useState(entry.what_happened || '');
   const [followedPlan, setFollowedPlan] = useState(entry.followed_plan || '');
   const [mistakeTags, setMistakeTags] = useState(Array.isArray(entry.mistake_tags) ? entry.mistake_tags : []);
   const [lessonTags, setLessonTags] = useState(Array.isArray(entry.lesson_tags) ? entry.lesson_tags : []);
   const [lesson, setLesson] = useState(entry.lesson || '');
+  // Existing screenshots already stored for this entry: { path, url }.
+  const [existing, setExisting] = useState([]);
+  const [existingLoading, setExistingLoading] = useState(false);
+  // Newly picked files not yet uploaded: { id, file, url }.
+  const [newFiles, setNewFiles] = useState([]);
+  const newFilesRef = useRef([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const paths = Array.isArray(entry.screenshot_paths) ? entry.screenshot_paths.filter(Boolean) : [];
+    if (!paths.length) {
+      setExisting([]);
+      return undefined;
+    }
+    setExistingLoading(true);
+    signedJournalScreenshotUrls(paths)
+      .then(items => { if (active) setExisting(items); })
+      .catch(() => { if (active) setExisting([]); })
+      .finally(() => { if (active) setExistingLoading(false); });
+    return () => { active = false; };
+  }, [entry.screenshot_paths]);
+
+  // Track the current picks so unmount cleanup revokes only what's still around,
+  // without revoking URLs still in use each time the list changes.
+  useEffect(() => { newFilesRef.current = newFiles; }, [newFiles]);
+  useEffect(() => () => newFilesRef.current.forEach(f => URL.revokeObjectURL(f.url)), []);
 
   const toggleTag = (setter, tag) =>
     setter(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
@@ -70,15 +104,72 @@ function JournalEntryEditForm({ entry, onCancel, onSave, saving }) {
   const mistakeOptions = [...MISTAKE_TAGS, ...mistakeTags.filter(t => !MISTAKE_TAGS.includes(t))];
   const lessonOptions = [...LESSON_TAGS, ...lessonTags.filter(t => !LESSON_TAGS.includes(t))];
 
-  const handleSave = () => {
-    onSave({
+  const totalScreenshots = existing.length + newFiles.length;
+
+  const addScreenshots = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    if (!incoming.length) return;
+    const combined = [...newFiles.map(f => f.file), ...incoming];
+    const validationError = validateJournalScreenshots(combined);
+    if (validationError) {
+      toast.error(validationError);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    if (existing.length + combined.length > MAX_JOURNAL_SCREENSHOTS) {
+      toast.error(`You can attach up to ${MAX_JOURNAL_SCREENSHOTS} screenshots per journal entry.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    const added = incoming.map(file => ({
+      id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+      file,
+      url: URL.createObjectURL(file),
+    }));
+    setNewFiles(prev => [...prev, ...added]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeExisting = (path) => setExisting(prev => prev.filter(item => item.path !== path));
+  const removeNewFile = (id) => setNewFiles(prev => {
+    const item = prev.find(f => f.id === id);
+    if (item) URL.revokeObjectURL(item.url);
+    return prev.filter(f => f.id !== id);
+  });
+
+  const handleSave = async () => {
+    const noteValues = {
       what_happened: whatHappened.trim() || null,
       followed_plan: followedPlan || null,
       mistake_tags: mistakeTags,
       lesson_tags: lessonTags,
       lesson: lesson.trim() || null,
-    });
+    };
+
+    setSaving(true);
+    let uploadedPaths = [];
+    try {
+      if (newFiles.length) uploadedPaths = await uploadJournalScreenshots(newFiles.map(f => f.file));
+      const keptPaths = existing.map(item => item.path);
+      const finalPaths = [...keptPaths, ...uploadedPaths];
+      const ok = await onSave({ ...noteValues, screenshot_paths: finalPaths });
+      if (!ok) {
+        if (uploadedPaths.length) await removeJournalScreenshots(uploadedPaths).catch(() => {});
+        setSaving(false);
+        return;
+      }
+      // Persisted — now purge screenshots the user removed from storage.
+      const originalPaths = Array.isArray(entry.screenshot_paths) ? entry.screenshot_paths.filter(Boolean) : [];
+      const removed = originalPaths.filter(p => !finalPaths.includes(p));
+      if (removed.length) await removeJournalScreenshots(removed).catch(() => {});
+    } catch (error) {
+      if (uploadedPaths.length) await removeJournalScreenshots(uploadedPaths).catch(() => {});
+      toast.error(error?.message || 'Failed to save changes');
+      setSaving(false);
+    }
   };
+
+  const disabled = saving || busy;
 
   return (
     <div className="space-y-4">
@@ -91,6 +182,75 @@ function JournalEntryEditForm({ entry, onCancel, onSave, saving }) {
           rows={4}
           className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
         />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Screenshots</div>
+          <span className="text-[10px] text-muted-foreground">{totalScreenshots}/{MAX_JOURNAL_SCREENSHOTS}</span>
+        </div>
+
+        {existingLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading screenshots…
+          </div>
+        ) : (totalScreenshots > 0 && (
+          <div className="grid grid-cols-3 gap-2 mb-2">
+            {existing.map(item => (
+              <div key={item.path} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-secondary">
+                <button type="button" onClick={() => onPreview(item.url)} className="w-full h-full">
+                  <img src={item.url} alt="Trade journal screenshot" className="w-full h-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Remove screenshot"
+                  disabled={disabled}
+                  onClick={() => removeExisting(item.path)}
+                  className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+            {newFiles.map(item => (
+              <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden border border-primary/40 bg-secondary">
+                <button type="button" onClick={() => onPreview(item.url)} className="w-full h-full">
+                  <img src={item.url} alt="New screenshot preview" className="w-full h-full object-cover" />
+                </button>
+                <span className="absolute bottom-1 left-1 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary/80 text-primary-foreground">New</span>
+                <button
+                  type="button"
+                  aria-label="Remove screenshot"
+                  disabled={disabled}
+                  onClick={() => removeNewFile(item.id)}
+                  className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ))}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={e => addScreenshots(e.target.files)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full gap-2"
+          disabled={disabled || totalScreenshots >= MAX_JOURNAL_SCREENSHOTS}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <ImagePlus className="w-4 h-4" />
+          {totalScreenshots ? 'Add another screenshot' : 'Add screenshot'}
+        </Button>
       </div>
 
       <div>
@@ -143,10 +303,10 @@ function JournalEntryEditForm({ entry, onCancel, onSave, saving }) {
       </div>
 
       <div className="border-t border-border pt-3 flex gap-2">
-        <Button variant="outline" size="sm" className="flex-1" disabled={saving} onClick={onCancel}>Cancel</Button>
-        <Button size="sm" className="flex-1 gap-1.5" disabled={saving} onClick={handleSave}>
+        <Button variant="outline" size="sm" className="flex-1" disabled={disabled} onClick={onCancel}>Cancel</Button>
+        <Button size="sm" className="flex-1 gap-1.5" disabled={disabled} onClick={handleSave}>
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-          {saving ? 'Saving…' : 'Save changes'}
+          {saving ? (newFiles.length ? 'Uploading & saving…' : 'Saving…') : 'Save changes'}
         </Button>
       </div>
     </div>
@@ -164,6 +324,7 @@ function JournalEntryDetail({ entry, onClose, onArchive, onRestore, onDelete, on
   const handleSaveEdits = async (values) => {
     const ok = await onSave(entry, values);
     if (ok) setEditing(false);
+    return ok;
   };
 
   useEffect(() => {
@@ -238,9 +399,10 @@ function JournalEntryDetail({ entry, onClose, onArchive, onRestore, onDelete, on
             <div className="p-4">
               <JournalEntryEditForm
                 entry={entry}
-                saving={busy}
+                busy={busy}
                 onCancel={() => setEditing(false)}
                 onSave={handleSaveEdits}
+                onPreview={setPreviewUrl}
               />
             </div>
           ) : (
