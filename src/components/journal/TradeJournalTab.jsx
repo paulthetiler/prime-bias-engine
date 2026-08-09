@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { X, BookOpen, Image as ImageIcon, Loader2, Archive, RotateCcw, Trash2 } from 'lucide-react';
+import { X, BookOpen, Image as ImageIcon, Loader2, Archive, RotateCcw, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -22,12 +22,149 @@ const RESULT_LABELS = { win: 'Win', loss: 'Loss', breakeven: 'B/E', not_taken: '
 const GRADE_COLORS = { A: 'text-emerald-400', B: 'text-blue-400', C: 'text-yellow-400', D: 'text-orange-400', F: 'text-red-400' };
 const PLAN_LABELS = { followed: '✅ Followed', partial: '🟡 Partial', broke_rules: '❌ Broke Rules', not_taken: '🚫 Not Taken' };
 
-function JournalEntryDetail({ entry, onClose, onArchive, onRestore, onDelete, busy }) {
+const FOLLOWED_PLAN_OPTIONS = [
+  { value: 'followed',    label: 'Followed Plan',  emoji: '✅', color: 'border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  { value: 'partial',     label: 'Partial',        emoji: '🟡', color: 'border-yellow-500 bg-yellow-500/15 text-yellow-700 dark:text-yellow-400' },
+  { value: 'broke_rules', label: 'Broke Rules',    emoji: '❌', color: 'border-red-500 bg-red-500/15 text-red-600 dark:text-red-400' },
+  { value: 'not_taken',   label: 'Not Taken',      emoji: '🚫', color: 'border-muted-foreground/50 bg-secondary text-muted-foreground' },
+];
+
+const MISTAKE_TAGS = [
+  'Entered early', 'Entered late', 'Hesitated', 'Chased', 'Took clear setup',
+  'Ignored warning', 'Good patience', 'Bad exit', 'Good exit',
+];
+
+const LESSON_TAGS = [
+  'Wait for cleaner entry', 'Trust the grade', 'Avoid weak alignment',
+  'Stop after daily target', 'Less is more', 'Good trade, repeat it', 'Poor trade, avoid it',
+];
+
+function TagButton({ label, selected, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(label)}
+      className={cn(
+        'px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
+        selected
+          ? 'bg-primary text-primary-foreground border-primary'
+          : 'bg-secondary border-border text-muted-foreground hover:border-primary/50'
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function JournalEntryEditForm({ entry, onCancel, onSave, saving }) {
+  const [whatHappened, setWhatHappened] = useState(entry.what_happened || '');
+  const [followedPlan, setFollowedPlan] = useState(entry.followed_plan || '');
+  const [mistakeTags, setMistakeTags] = useState(Array.isArray(entry.mistake_tags) ? entry.mistake_tags : []);
+  const [lessonTags, setLessonTags] = useState(Array.isArray(entry.lesson_tags) ? entry.lesson_tags : []);
+  const [lesson, setLesson] = useState(entry.lesson || '');
+
+  const toggleTag = (setter, tag) =>
+    setter(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+
+  // Surface any custom tags that aren't in the preset lists so editing never drops them.
+  const mistakeOptions = [...MISTAKE_TAGS, ...mistakeTags.filter(t => !MISTAKE_TAGS.includes(t))];
+  const lessonOptions = [...LESSON_TAGS, ...lessonTags.filter(t => !LESSON_TAGS.includes(t))];
+
+  const handleSave = () => {
+    onSave({
+      what_happened: whatHappened.trim() || null,
+      followed_plan: followedPlan || null,
+      mistake_tags: mistakeTags,
+      lesson_tags: lessonTags,
+      lesson: lesson.trim() || null,
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">What Happened</div>
+        <textarea
+          value={whatHappened}
+          onChange={e => setWhatHappened(e.target.value)}
+          placeholder="Briefly describe the trade — setup, entry, outcome..."
+          rows={4}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+        />
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Followed Plan</div>
+        <div className="grid grid-cols-2 gap-2">
+          {FOLLOWED_PLAN_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setFollowedPlan(prev => prev === opt.value ? '' : opt.value)}
+              className={cn(
+                'rounded-xl border-2 py-2.5 px-2 text-xs font-bold transition-all active:scale-95',
+                followedPlan === opt.value ? opt.color : 'border-border bg-secondary text-foreground hover:border-primary/50'
+              )}
+            >
+              <div className="text-lg mb-0.5">{opt.emoji}</div>
+              <div>{opt.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Execution Tags</div>
+        <div className="flex flex-wrap gap-1.5">
+          {mistakeOptions.map(tag => (
+            <TagButton key={tag} label={tag} selected={mistakeTags.includes(tag)} onToggle={t => toggleTag(setMistakeTags, t)} />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Lesson Tags</div>
+        <div className="flex flex-wrap gap-1.5">
+          {lessonOptions.map(tag => (
+            <TagButton key={tag} label={tag} selected={lessonTags.includes(tag)} onToggle={t => toggleTag(setLessonTags, t)} />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Lesson / Reflection</div>
+        <textarea
+          value={lesson}
+          onChange={e => setLesson(e.target.value)}
+          placeholder="Your own reflection..."
+          rows={3}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+        />
+      </div>
+
+      <div className="border-t border-border pt-3 flex gap-2">
+        <Button variant="outline" size="sm" className="flex-1" disabled={saving} onClick={onCancel}>Cancel</Button>
+        <Button size="sm" className="flex-1 gap-1.5" disabled={saving} onClick={handleSave}>
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function JournalEntryDetail({ entry, onClose, onArchive, onRestore, onDelete, onSave, busy }) {
   const [screenshots, setScreenshots] = useState([]);
   const [screenshotsLoading, setScreenshotsLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [editing, setEditing] = useState(false);
   const dirColor = entry.direction === 'BUY' ? 'text-emerald-400' : entry.direction === 'SELL' ? 'text-red-400' : 'text-muted-foreground';
+
+  const handleSaveEdits = async (values) => {
+    const ok = await onSave(entry, values);
+    if (ok) setEditing(false);
+  };
 
   useEffect(() => {
     let active = true;
@@ -84,8 +221,29 @@ function JournalEntryDetail({ entry, onClose, onArchive, onRestore, onDelete, bu
               </div>
               <div className="text-xs text-muted-foreground">{entry.created_at ? format(new Date(entry.created_at), 'dd MMM yyyy HH:mm') : '—'}</div>
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4" /></button>
+            <div className="flex items-center gap-1">
+              {!editing && (
+                <button
+                  onClick={() => setEditing(true)}
+                  aria-label="Edit journal entry"
+                  className="p-1.5 rounded-lg hover:bg-secondary flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+                >
+                  <Pencil className="w-4 h-4" /> Edit
+                </button>
+              )}
+              <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg hover:bg-secondary"><X className="w-4 h-4" /></button>
+            </div>
           </div>
+          {editing ? (
+            <div className="p-4">
+              <JournalEntryEditForm
+                entry={entry}
+                saving={busy}
+                onCancel={() => setEditing(false)}
+                onSave={handleSaveEdits}
+              />
+            </div>
+          ) : (
           <div className="p-4 space-y-4">
             <div className="grid grid-cols-4 gap-2 text-center text-xs">
               <div className="bg-secondary rounded-lg p-2">
@@ -195,6 +353,7 @@ function JournalEntryDetail({ entry, onClose, onArchive, onRestore, onDelete, bu
               </Button>
             </div>
           </div>
+          )}
         </div>
 
         {previewUrl && (
@@ -253,6 +412,18 @@ export default function TradeJournalTab() {
     mutationFn: ({ id, values }) => base44.entities.TradeJournalEntry.update(id, values),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['journalEntries'] }),
   });
+
+  const saveEntry = async (entry, values) => {
+    try {
+      const updated = await updateEntry.mutateAsync({ id: entry.id, values });
+      setSelected(prev => (prev && prev.id === entry.id ? { ...prev, ...(updated || values) } : prev));
+      toast.success('Journal entry updated');
+      return true;
+    } catch {
+      toast.error('Failed to update journal entry');
+      return false;
+    }
+  };
 
   const archiveEntry = async (entry) => {
     try {
@@ -366,6 +537,7 @@ export default function TradeJournalTab() {
           onArchive={archiveEntry}
           onRestore={restoreEntry}
           onDelete={deleteEntry}
+          onSave={saveEntry}
           busy={updateEntry.isPending}
         />
       )}
