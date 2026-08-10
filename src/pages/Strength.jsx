@@ -11,6 +11,7 @@ const WINDOWS = [
 ];
 
 const STRENGTH_API_VERSION = '4';
+const MANUAL_REFRESH_FEEDBACK_MS = 650;
 
 function movementLabel(change) {
   if (change == null || change === 0) return { text: '—', className: 'text-muted-foreground' };
@@ -45,15 +46,25 @@ export default function Strength() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const load = async () => {
-    setLoading(true); setError('');
+  const load = async ({ manual = false } = {}) => {
+    const startedAt = Date.now();
+    setLoading(true);
+    setError('');
     try {
-      const response = await fetch(`/api/currency-strength?v=${STRENGTH_API_VERSION}`);
+      const refreshParam = manual ? `&refresh=${Date.now()}` : '';
+      const response = await fetch(`/api/currency-strength?v=${STRENGTH_API_VERSION}${refreshParam}`, manual ? { cache: 'no-store' } : undefined);
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error || 'Unable to load strength data');
       setData(body);
-    } catch (err) { setError(err?.message || 'Unable to load strength data'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err?.message || 'Unable to load strength data');
+    } finally {
+      if (manual) {
+        const remaining = MANUAL_REFRESH_FEEDBACK_MS - (Date.now() - startedAt);
+        if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
+      }
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -77,7 +88,7 @@ export default function Strength() {
   return (
     <div className="px-3 py-4 space-y-3">
       <div className="rounded-xl border border-border bg-card p-4">
-        <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" /><h1 className="text-lg font-black tracking-tight">Currency Strength</h1></div><p className="text-xs text-muted-foreground mt-1">8-currency relative basket. Separation suggests movement potential — not trade direction.</p></div><Button variant="outline" size="icon" className="h-9 w-9 shrink-0 focus-visible:ring-0 focus-visible:ring-offset-0" onClick={load} disabled={loading} aria-label="Refresh strength" onBlur={(event) => event.currentTarget.blur()}><RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} /></Button></div>
+        <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><Zap className="w-5 h-5 text-primary" /><h1 className="text-lg font-black tracking-tight">Currency Strength</h1></div><p className="text-xs text-muted-foreground mt-1">8-currency relative basket. Separation suggests movement potential — not trade direction.</p></div><Button variant="outline" size="icon" className={cn('h-9 w-9 shrink-0 focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors', loading ? 'bg-primary text-primary-foreground border-primary' : 'bg-primary/10 text-primary border-primary/25')} onClick={(event) => { event.currentTarget.blur(); load({ manual: true }); }} disabled={loading} aria-label={loading ? 'Refreshing strength' : 'Refresh strength'}><RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} /></Button></div>
         <div className="grid grid-cols-3 gap-2 mt-4">{WINDOWS.map(item => <button key={item.key} type="button" onClick={() => setWindowKey(item.key)} className={cn('rounded-lg border py-2 text-xs font-bold transition-colors', windowKey === item.key ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary/60 text-muted-foreground border-border')}>{item.label}</button>)}</div>
       </div>
       {error && <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
