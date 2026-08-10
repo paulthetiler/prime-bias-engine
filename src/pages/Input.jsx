@@ -22,6 +22,39 @@ import { syncLog, syncError } from '@/lib/syncLog';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Default/zero value for a single timeframe's indicators (matches getDefaultInputs).
+const DEFAULT_TF = { close: 0, macd: 0, rsi: 0, boli: 0 };
+// Timeframe keys per section, derived from the engine's canonical grouping so the
+// Reset buttons stay in sync if the groups ever change.
+const BROADSTROKE_KEYS = TIMEFRAMES.filter(tf => tf.group === 'broadstroke').map(tf => tf.key);
+const TRIGGER_KEYS = TIMEFRAMES.filter(tf => tf.group === 'trigger').map(tf => tf.key);
+
+// True when every indicator across the given timeframe keys is already at its
+// default/zero value — used to fade the section Reset button when there's nothing
+// to clear.
+function isSectionAtDefault(inputs, keys) {
+  return keys.every(k => {
+    const ind = inputs[k] || {};
+    return ind.close === 0 && ind.macd === 0 && ind.rsi === 0 && ind.boli === 0;
+  });
+}
+
+// Compact muted Reset button for a section heading — mirrors the Extra Check
+// Reset styling. Purely clears inputs; no scoring/engine logic here.
+function SectionResetButton({ onReset, disabled, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onReset}
+      disabled={disabled}
+      className="rounded-md border border-border bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-40"
+      aria-label={label}
+    >
+      Reset
+    </button>
+  );
+}
+
 function getActiveStore() {
   return JSON.parse(localStorage.getItem('primebias_active') || '{}');
 }
@@ -343,6 +376,19 @@ export default function Input() {
     setExtraCheck(prev => ({ ...prev, [key]: value }));
   };
 
+  // Reset a single section's timeframes back to default/zero. This only clears the
+  // given timeframe inputs — it never touches the other section or Extra Check, and
+  // it does not alter any scoring/engine logic (results simply recompute from the
+  // cleared inputs, exactly as if the user had zeroed them by hand).
+  const resetSection = (keys) => {
+    isLoadingRef.current = false; // definitely a user edit
+    setInputs(prev => {
+      const next = { ...prev };
+      keys.forEach(k => { next[k] = { ...DEFAULT_TF }; });
+      return next;
+    });
+  };
+
   // Toggle an instrument's favourite status. This only touches the favourites
   // list — it must not select the instrument, close the dropdown, or affect the
   // current analysis.
@@ -597,7 +643,14 @@ export default function Input() {
       {/* Broadstroke Section */}
       {instrument && (
         <div>
-          <div className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5 px-1">Broadstroke — Deep Trend</div>
+          <div className="flex items-center justify-between mb-1.5 px-1">
+            <div className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">Broadstroke — Deep Trend</div>
+            <SectionResetButton
+              onReset={() => resetSection(BROADSTROKE_KEYS)}
+              disabled={isSectionAtDefault(inputs, BROADSTROKE_KEYS)}
+              label="Reset Broadstroke timeframes to default"
+            />
+          </div>
           <div className="space-y-1">
             {TIMEFRAMES.filter(tf => tf.group === 'broadstroke').map(tf => (
               <TimeframeRow
@@ -616,7 +669,14 @@ export default function Input() {
       {/* Trigger Section */}
       {instrument && (
         <div>
-          <div className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5 px-1">Trigger — Execution</div>
+          <div className="flex items-center justify-between mb-1.5 px-1">
+            <div className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">Trigger — Execution</div>
+            <SectionResetButton
+              onReset={() => resetSection(TRIGGER_KEYS)}
+              disabled={isSectionAtDefault(inputs, TRIGGER_KEYS)}
+              label="Reset Trigger timeframes to default"
+            />
+          </div>
           <div className="space-y-1">
             {TIMEFRAMES.filter(tf => tf.group === 'trigger').map(tf => (
               <TimeframeRow
