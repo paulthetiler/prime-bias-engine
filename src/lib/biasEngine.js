@@ -175,7 +175,9 @@ function calcStatus({ winningScore, rawGrade, ddBias, nowBias, h1Result, m15Resu
   if (rawGrade === 'F' || rawGrade === 'D') return 'NO';
   if (ddBias === nowBias && h1Result === m5Result && m5Rsi === h1Result) return 'YES';
   if (ddBias === nowBias && h1Result === m15Result && m5Rsi !== h1Result) return 'Wait';
-  if (nowDir === directionNumber(tradeDirection) && m5Rsi === h1Result) return 'Scalp';
+  // A blank DD/Dominant Direction is not a valid Scalp setup. Scruff's sheet
+  // returns No for this state even when NOW and the 5m RSI agree with 1H.
+  if (ddBias && nowDir === directionNumber(tradeDirection) && m5Rsi === h1Result) return 'Scalp';
   return 'No';
 }
 
@@ -185,6 +187,7 @@ function calcReadiness({ m5Rsi, blockTrend, tradeDirection, status }) {
   if (blockTrend !== tradeDirection) return 'Trend Off';
   if (status === 'YES' || status === 'Scalp') return 'Ready';
   if (status === 'Wait') return 'Trend Off';
+  if (status === 'No' || status === 'NO') return 'No';
   return 'Ready';
 }
 
