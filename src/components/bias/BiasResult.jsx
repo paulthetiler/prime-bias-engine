@@ -19,9 +19,9 @@ function MacdTrafficLights({ timeframes = {} }) {
   ];
 
   return (
-    <div className="flex items-center gap-1.5" aria-label="MACD timeframe alignment">
+    <div className="flex items-center gap-2" aria-label="MACD timeframe alignment">
       {lights.map(light => (
-        <div key={light.key} className="flex flex-col items-center gap-0.5" title={`${light.label}: ${light.value === 1 ? 'Up' : light.value === -1 ? 'Down' : 'Neutral'}`}>
+        <div key={light.key} className="flex flex-col items-center gap-1" title={`${light.label}: ${light.value === 1 ? 'Up' : light.value === -1 ? 'Down' : 'Neutral'}`}>
           <span className="text-[7px] font-bold uppercase tracking-wide text-muted-foreground leading-none">{light.label}</span>
           <span
             className={cn(
@@ -69,8 +69,8 @@ export default function BiasResult({ results, settings }) {
             <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight">{gradeLabel}</span>
           </div>
 
-          <div className="flex flex-col justify-center px-3 py-3 flex-1 gap-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex flex-col justify-center px-3 py-3 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap pb-2">
               <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Status</span>
               <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
                 {status || '—'}
@@ -78,30 +78,32 @@ export default function BiasResult({ results, settings }) {
               {isExtendedCaution(results) && <ExtendedCautionPill />}
             </div>
 
-            <div className="grid items-center gap-y-0.5" style={{ gridTemplateColumns: '80px 1fr' }}>
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5">Trade</span>
-              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit my-1', actionBadge(tradeAction))}>
-                {actionLabel(tradeAction)}
+            <div className="grid items-stretch" style={{ gridTemplateColumns: '80px 1fr' }}>
+              <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2">Trade</span>
+              <span className="flex items-center py-2">
+                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded w-fit', actionBadge(tradeAction))}>
+                  {actionLabel(tradeAction)}
+                </span>
               </span>
 
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5 border-t border-border/45">Readiness</span>
-              <span className="text-[11px] font-semibold text-foreground py-1.5 border-t border-border/45">{readiness || '—'}</span>
+              <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2 border-t border-border/45">Readiness</span>
+              <span className="flex items-center text-[11px] font-semibold text-foreground py-2 border-t border-border/45">{readiness || '—'}</span>
 
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5 border-t border-border/45">Extra Check</span>
-              <span className="py-1 border-t border-border/45">
+              <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2 border-t border-border/45">Extra Check</span>
+              <span className="flex items-center py-2 border-t border-border/45">
                 <span className={cn('text-[9px] font-semibold px-2 py-0.5 rounded inline-flex w-fit', extraCheck.badge)}>
                   {extraCheckLabel}
                 </span>
               </span>
 
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5 border-t border-border/45">Setup Quality</span>
-              <span className="text-[11px] font-mono font-semibold text-foreground py-1.5 border-t border-border/45">{targetNote || '—'}</span>
+              <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2 border-t border-border/45">Setup Quality</span>
+              <span className="flex items-center text-[11px] font-mono font-semibold text-foreground py-2 border-t border-border/45">{targetNote || '—'}</span>
 
               {(extraDirection || extraQuality) && <>
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5 border-t border-border/45">MACD Extra</span>
-                <div className="flex items-end gap-2 flex-wrap py-1.5 border-t border-border/45">
+                <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2.5 border-t border-border/45">MACD Extra</span>
+                <div className="flex items-center gap-3 flex-wrap py-2.5 border-t border-border/45">
                   <MacdTrafficLights timeframes={timeframes} />
-                  <span className="text-[11px] font-mono font-semibold text-foreground pb-px">
+                  <span className="text-[11px] font-mono font-semibold text-foreground leading-none">
                     {[extraQuality, extraDirection].filter(Boolean).join(' ')}
                   </span>
                 </div>
