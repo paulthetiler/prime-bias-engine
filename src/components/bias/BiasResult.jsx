@@ -10,6 +10,33 @@ function userFacingWarning(warning) {
   return warning;
 }
 
+function MacdTrafficLights({ timeframes = {} }) {
+  const lights = [
+    { key: 'm5', label: '5', value: timeframes.m5?.indicators?.macd ?? 0 },
+    { key: 'm15', label: '15', value: timeframes.m15?.indicators?.macd ?? 0 },
+    { key: 'h1', label: 'H1', value: timeframes.h1?.indicators?.macd ?? 0 },
+    { key: 'h4', label: 'H4', value: timeframes.h4?.indicators?.macd ?? 0 },
+  ];
+
+  return (
+    <div className="flex items-center gap-1.5" aria-label="MACD timeframe alignment">
+      {lights.map(light => (
+        <div key={light.key} className="flex flex-col items-center gap-0.5" title={`${light.label}: ${light.value === 1 ? 'Up' : light.value === -1 ? 'Down' : 'Neutral'}`}>
+          <span className="text-[7px] font-bold uppercase tracking-wide text-muted-foreground leading-none">{light.label}</span>
+          <span
+            className={cn(
+              'w-3 h-3 rounded-full border',
+              light.value === 1 && 'bg-emerald-500 border-emerald-600/60',
+              light.value === -1 && 'bg-red-500 border-red-600/60',
+              light.value !== 1 && light.value !== -1 && 'bg-secondary border-border'
+            )}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function BiasResult({ results, settings }) {
   if (!results) return null;
 
@@ -17,7 +44,7 @@ export default function BiasResult({ results, settings }) {
     mainDirection, grade, gradeLabel, tradeAction, readiness, status,
     deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength,
     winningScore, warnings, targetNote, extraCheckConfirmation,
-    extraDirection, extraQuality,
+    extraDirection, extraQuality, timeframes,
   } = results;
   const extraCheck = extraCheckStyle(extraCheckConfirmation);
 
@@ -70,9 +97,12 @@ export default function BiasResult({ results, settings }) {
 
               {(extraDirection || extraQuality) && <>
                 <span className="text-[9px] uppercase tracking-widest text-muted-foreground">MACD Extra</span>
-                <span className="text-[11px] font-mono font-semibold text-foreground">
-                  {[extraQuality, extraDirection].filter(Boolean).join(' ')}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <MacdTrafficLights timeframes={timeframes} />
+                  <span className="text-[11px] font-mono font-semibold text-foreground">
+                    {[extraQuality, extraDirection].filter(Boolean).join(' ')}
+                  </span>
+                </div>
               </>}
             </div>
           </div>
