@@ -71,6 +71,7 @@ export default function BiasResult({ results, settings }) {
 
           <div className="flex flex-col justify-center px-3 py-3 flex-1 gap-2">
             <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Status</span>
               <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
                 {status || '—'}
               </span>

@@ -1,17 +1,19 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-// Tri-state button: null → +1 → -1 → null
+// Four-state button: null → +1 → 0 → -1 → null
 function TriButton({ label, value, onChange }) {
   const cycle = () => {
     if (value === null) onChange(1);
-    else if (value === 1) onChange(-1);
+    else if (value === 1) onChange(0);
+    else if (value === 0) onChange(-1);
     else onChange(null);
   };
 
-  const display = value === 1 ? '+1' : value === -1 ? '-1' : '—';
+  const display = value === 1 ? '+1' : value === -1 ? '-1' : value === 0 ? '0' : '—';
   const color = value === 1 ? 'text-emerald-400 border-emerald-500/50 bg-emerald-500/10'
               : value === -1 ? 'text-red-400 border-red-500/50 bg-red-500/10'
+              : value === 0 ? 'text-foreground border-border bg-background'
               : 'text-muted-foreground border-border bg-secondary';
 
   return (
@@ -27,16 +29,20 @@ function TriButton({ label, value, onChange }) {
 
 export default function ExtraCheck({ h1, m15, onChange }) {
   // Light reflects the AGREED direction:
-  //   both BUY  → green light  ·  both SELL → red light  ·  anything else → no confirmation
-  let result = 'none'; // 'buy' | 'sell' | 'conflict' | 'none'
+  //   both BUY  → green light  ·  both SELL → red light  ·  both 0 → neutral checked
+  //   differing populated values → conflict  ·  any null → not checked
+  let result = 'none'; // 'buy' | 'sell' | 'neutral' | 'conflict' | 'none'
   if (h1 !== null && m15 !== null) {
-    if (h1 === m15) result = h1 === 1 ? 'buy' : 'sell';
+    if (h1 === 1 && m15 === 1) result = 'buy';
+    else if (h1 === -1 && m15 === -1) result = 'sell';
+    else if (h1 === 0 && m15 === 0) result = 'neutral';
     else result = 'conflict';
   }
 
   const light = {
     buy:      { box: 'bg-emerald-500/10 border-emerald-500/30', dot: 'bg-emerald-400', text: 'text-emerald-700 dark:text-emerald-300', label: 'Buy confirmed' },
     sell:     { box: 'bg-red-500/10 border-red-500/30',         dot: 'bg-red-400',     text: 'text-red-700 dark:text-red-300',         label: 'Sell confirmed' },
+    neutral:  { box: 'bg-secondary border-border',              dot: 'bg-muted-foreground', text: 'text-foreground',                    label: 'Checked — neutral' },
     conflict: { box: 'bg-yellow-500/10 border-yellow-500/30',   dot: 'bg-yellow-400',  text: 'text-yellow-700 dark:text-yellow-300',   label: '1H / 15M disagree' },
     none:     { box: 'bg-secondary border-border',              dot: 'bg-muted-foreground', text: 'text-muted-foreground',            label: 'Not checked' },
   }[result];
