@@ -41,22 +41,24 @@ export default function BiasResult({ results, settings }) {
   if (!results) return null;
 
   const {
-    mainDirection, grade, gradeLabel, tradeAction, readiness, status,
+    grade, gradeLabel, tradeAction, readiness, status,
     deepTrend, deepStrength, ddBias, ddStrength, nowBias, nowStrength,
     winningScore, warnings, targetNote, extraCheckConfirmation,
     extraDirection, extraQuality, timeframes,
   } = results;
   const extraCheck = extraCheckStyle(extraCheckConfirmation);
 
-  const dirColor = mainDirection === 'BUY' ? 'text-primary'
-    : mainDirection === 'SELL' ? 'text-destructive'
-    : 'text-muted-foreground';
-
   const statusBadge = status === 'YES' || status === 'Scalp'
     ? 'bg-primary/15 text-primary border-primary/30'
     : status === 'Wait'
     ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
     : 'bg-secondary text-muted-foreground border-border';
+
+  const extraCheckLabel = extraCheckConfirmation === 'CONFIRMS'
+    ? 'Confirms'
+    : extraCheckConfirmation === 'CONFLICTS'
+    ? 'Conflicts'
+    : extraCheck.label;
 
   return (
     <div className="space-y-2.5">
@@ -75,31 +77,30 @@ export default function BiasResult({ results, settings }) {
               {isExtendedCaution(results) && <ExtendedCautionPill />}
             </div>
 
-            <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '80px 1fr' }}>
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Direction</span>
-              <span className={cn('text-sm font-bold', dirColor)}>{mainDirection}</span>
-
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Trade</span>
-              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>
+            <div className="grid items-center gap-y-0.5" style={{ gridTemplateColumns: '80px 1fr' }}>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5">Trade</span>
+              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded self-start w-fit my-1', actionBadge(tradeAction))}>
                 {actionLabel(tradeAction)}
               </span>
 
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Readiness</span>
-              <span className="text-[11px] font-semibold text-foreground">{readiness || '—'}</span>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5 border-t border-border/45">Readiness</span>
+              <span className="text-[11px] font-semibold text-foreground py-1.5 border-t border-border/45">{readiness || '—'}</span>
 
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Extra Check</span>
-              <span className={cn('text-[9px] font-semibold px-2 py-0.5 rounded self-start w-fit', extraCheck.badge)}>
-                {extraCheck.label}
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5 border-t border-border/45">Extra Check</span>
+              <span className="py-1 border-t border-border/45">
+                <span className={cn('text-[9px] font-semibold px-2 py-0.5 rounded inline-flex w-fit', extraCheck.badge)}>
+                  {extraCheckLabel}
+                </span>
               </span>
 
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Setup Quality</span>
-              <span className="text-[11px] font-mono font-semibold text-foreground">{targetNote || '—'}</span>
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5 border-t border-border/45">Setup Quality</span>
+              <span className="text-[11px] font-mono font-semibold text-foreground py-1.5 border-t border-border/45">{targetNote || '—'}</span>
 
               {(extraDirection || extraQuality) && <>
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">MACD Extra</span>
-                <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground py-1.5 border-t border-border/45">MACD Extra</span>
+                <div className="flex items-end gap-2 flex-wrap py-1.5 border-t border-border/45">
                   <MacdTrafficLights timeframes={timeframes} />
-                  <span className="text-[11px] font-mono font-semibold text-foreground">
+                  <span className="text-[11px] font-mono font-semibold text-foreground pb-px">
                     {[extraQuality, extraDirection].filter(Boolean).join(' ')}
                   </span>
                 </div>
