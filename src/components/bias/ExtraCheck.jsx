@@ -47,11 +47,29 @@ export default function ExtraCheck({ h1, m15, onChange }) {
     none:     { box: 'bg-secondary border-border',              dot: 'bg-muted-foreground', text: 'text-muted-foreground',            label: 'Not checked' },
   }[result];
 
+  const reset = () => {
+    onChange('h1', null);
+    onChange('m15', null);
+  };
+
+  const canReset = h1 !== null || m15 !== null;
+
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2">
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-widest text-foreground">Extra Check</div>
-        <div className="text-[10px] text-muted-foreground">red light / green light</div>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-widest text-foreground">Extra Check</div>
+          <div className="text-[10px] text-muted-foreground">red light / green light</div>
+        </div>
+        <button
+          type="button"
+          onClick={reset}
+          disabled={!canReset}
+          className="rounded-md border border-border bg-secondary px-2.5 py-1 text-[10px] font-semibold text-muted-foreground transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-40"
+          aria-label="Reset Extra Check to not checked"
+        >
+          Reset
+        </button>
       </div>
 
       <div className="grid grid-cols-[64px_64px_minmax(0,1fr)] gap-2">
