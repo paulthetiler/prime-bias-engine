@@ -112,11 +112,37 @@ describe('Prime Bias — canonical workbook parity', () => {
     inputs.h4.boli = 1;
     inputs.m15.rsi = 1;
     inputs.m5.boli = 1;
-    // This reaches the final P10 branch. In the workbook AK6 is numeric NOW,
-    // while AK8 is text "1"/"-1", so AK6=AK8 is FALSE and Status is No.
     const r = calculateBias(inputs, null);
     expect(r.scoreDirection).toBe('BUY');
     expect(r.status).toBe('No');
+  });
+
+  it('locks the workbook type mismatch in both BUY and SELL directions', () => {
+    for (const side of [1, -1]) {
+      const inputs = getDefaultInputs();
+      inputs.h4.boli = side;
+      inputs.m15.rsi = side;
+      inputs.m5.boli = side;
+      const r = calculateBias(inputs, null);
+      expect(r.scoreDirection).toBe(side === 1 ? 'BUY' : 'SELL');
+      expect(r.status).toBe('No');
+      expect(r.status).not.toBe('Scalp');
+    }
+  });
+
+  it('keeps Status and PLUS 1 MIN 1 as independent workbook outputs', () => {
+    const inputs = getDefaultInputs();
+    inputs.h4.macd = -1;
+    inputs.h1.macd = -1;
+    inputs.m15.macd = -1;
+    inputs.m5.macd = -1;
+    inputs.h1.rsi = -1;
+    inputs.m15.rsi = -1;
+    inputs.m5.rsi = -1;
+    const r = calculateBias(inputs, null);
+    expect(['YES', 'No', 'NO', 'Wait', 'Extended']).toContain(r.status);
+    expect(r.extraDirection).toBe('SELL');
+    expect(r.extraQuality).toBe('GOOD');
   });
 
   it('P12/Q12 PLUS 1 MINUS 1 is surfaced separately', () => {
@@ -129,6 +155,25 @@ describe('Prime Bias — canonical workbook parity', () => {
     const r = calculateBias(inputs, null);
     expect(r.extraDirection).toBe('BUY');
     expect(r.extraQuality).toBe('GOOD');
+  });
+
+  it('locks PLUS 1 MIN 1 quality branches for BUY and SELL', () => {
+    const cases = [
+      { vals: [1, 1, 1, -1], dir: 'BUY', quality: 'GOOD' },
+      { vals: [-1, -1, -1, 1], dir: 'SELL', quality: 'GOOD' },
+      { vals: [-1, 1, 1, 1], dir: 'BUY', quality: 'Scalp' },
+      { vals: [1, -1, -1, -1], dir: 'SELL', quality: 'Scalp' },
+      { vals: [1, 1, -1, 1], dir: 'BUY', quality: 'CAREFUL' },
+      { vals: [-1, -1, 1, -1], dir: 'SELL', quality: 'CAREFUL' },
+    ];
+    for (const { vals, dir, quality } of cases) {
+      const inputs = getDefaultInputs();
+      [inputs.h4.macd, inputs.h1.macd, inputs.m15.macd, inputs.m5.macd] = vals;
+      inputs.m5.rsi = dir === 'BUY' ? -1 : 1;
+      const r = calculateBias(inputs, null);
+      expect(r.extraDirection).toBe(dir);
+      expect(r.extraQuality).toBe(quality);
+    }
   });
 
   it('grade cap Q10 forces C when P9 and Q11 disagree', () => {
