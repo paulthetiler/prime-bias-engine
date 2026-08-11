@@ -47,7 +47,6 @@ const WEIGHTS = {
 const DIRECTION_THRESHOLD = 35;
 const TF_SCORE_WEIGHTS = { month: 2, week: 5, day: 10, h4: 30, h1: 33, m15: 10, m5: 5 };
 const LIGHTS_WEIGHT = 5;
-const BLOCK_TREND_WEIGHTS = { deep: 10, dd: 49, now: 41 };
 const EXTENDED_SCORE = 90;
 const DEFAULT_THRESHOLDS = { extended: 92, risky: 80, A: 75, B: 55, C: 45, D: 40 };
 
@@ -142,6 +141,19 @@ function directionNumber(direction) {
   if (direction === 'BUY') return 1;
   if (direction === 'SELL') return -1;
   return null;
+}
+
+// Winston's supplied Scruff cases prove that a directional Dominant Direction
+// takes precedence for Trend. GBP/JPY is the decisive case: DEEP=SELL,
+// DD=BUY, NOW=SELL, yet Scruff shows Trend=BUY. When DD is blank/neutral,
+// retain the previous DEEP/NOW weighted fallback; EUR/USD proves that blank DD
+// can still resolve to NOW=SELL.
+function calcBlockTrend(deepDir, ddDir, nowDir) {
+  if (ddDir === 1) return 'BUY';
+  if (ddDir === -1) return 'SELL';
+  const fallbackBuy = (deepDir === 1 ? 10 : 0) + (nowDir === 1 ? 41 : 0);
+  const fallbackSell = (deepDir === -1 ? 10 : 0) + (nowDir === -1 ? 41 : 0);
+  return fallbackBuy > fallbackSell ? 'BUY' : fallbackSell > fallbackBuy ? 'SELL' : 'Neutral';
 }
 
 // Excel K12. Blank/unset manual checks still calculate as No Trade.
@@ -258,9 +270,7 @@ function calculateBias(inputs, extraCheck = null, _options = {}) {
   const winningScore = scoreDirection === 'BUY' ? buyScore : scoreDirection === 'SELL' ? sellScore : 0;
   const rawGrade = calcGrade(winningScore);
 
-  const blockBuy = (deepDir === 1 ? 10 : 0) + (ddDir === 1 ? 49 : 0) + (nowDir === 1 ? 41 : 0);
-  const blockSell = (deepDir === -1 ? 10 : 0) + (ddDir === -1 ? 49 : 0) + (nowDir === -1 ? 41 : 0);
-  const blockTrend = blockBuy > blockSell ? 'BUY' : blockSell > blockBuy ? 'SELL' : 'Neutral';
+  const blockTrend = calcBlockTrend(deepDir, ddDir, nowDir);
   const effectiveGrade = blockTrend === scoreDirection ? rawGrade : 'C';
 
   const m5Rsi = inputs.m5?.rsi;
