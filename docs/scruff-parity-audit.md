@@ -13,7 +13,7 @@ Two supplied comparisons prove the current app labels are not Scruff's wording:
 
 Current `calcGradeLabel()` therefore reinterprets canonical wording and should be corrected at engine level, not in the component.
 
-### 2. GBP/JPY false Scalp
+### 2. GBP/JPY Trend precedence and false Scalp
 
 Supplied GBP/JPY marks:
 
@@ -31,14 +31,27 @@ Scruff shows:
 - DEEP SELL / weak
 - Dominant Direction BUY / weak
 - NOW SELL / strong
+- **Trend BUY**
 - Status/ready path: **No / Trend Off**, grade **C**
 - No Scalp output
 
-Prime Bias currently produces a Scalp path for this state. The existing Scalp guard only requires DD to be non-blank; this case proves that is insufficient because DD is present but opposes the trade direction.
+This is decisive evidence against Prime Bias's previous unconditional `DEEP 10 / DD 49 / NOW 41` winner calculation. That calculation gives SELL (10 + 41 versus 49), while the supplied Scruff sheet gives BUY. A directional Dominant Direction therefore has precedence for Trend in the observed canonical case.
 
-Minimum safe hardening: a Scalp must never be generated when Dominant Direction opposes the trade direction. Add this as an engine invariant and regression fixture. Do not add a UI-only exception.
+The existing Scalp guard was also too weak. A Scalp must never be generated when Dominant Direction opposes the trade direction.
 
-### 3. Naming: `PLUS 1 MINUS 1`, not `MACD Extra`
+### 3. Blank Dominant Direction fallback — EUR/USD
+
+A prior Winston/Scruff EUR/USD comparison adds the missing fallback case:
+
+- DEEP = BUY / strong
+- Dominant Direction = blank (all three DD inputs resolve differently)
+- NOW = SELL / strong
+- Scruff Trend = **SELL**
+- Scruff Ready = **No**, grade **C**
+
+Together with GBP/JPY this proves the safe observed rule used by the engine hardening: when DD is directional, it owns Trend; when DD is blank/neutral, the existing DEEP/NOW fallback can resolve Trend. This avoids replacing one guessed weighting scheme with another.
+
+### 4. Naming: `PLUS 1 MINUS 1`, not `MACD Extra`
 
 Scruff labels the separate lower-row MACD-derived output **PLUS 1 MINUS 1**. Prime Bias currently labels the same presented field **MACD Extra**. The supplied GBP/USD case shows the output itself as SELL / Scalp and Prime Bias also reaches SELL / Scalp, so this screenshot does **not** prove the underlying P12/Q12 calculation is wrong. It proves the terminology differs.
 
@@ -56,13 +69,14 @@ Marks reproduce SELL, A, Ready/YES, MED SELL and the separate SELL / Scalp outpu
 
 ## Architecture hardening
 
-1. `biasEngine.js` remains the only owner of canonical grade/status/readiness/target/PLUS 1 MINUS 1 values.
+1. `biasEngine.js` remains the only owner of canonical grade/status/readiness/Trend/target/PLUS 1 MINUS 1 values.
 2. Components render returned values only; they must not recreate canonical decisions.
-3. Add table-driven regression fixtures for FTSE, GBP/USD and GBP/JPY from Winston's screenshots.
-4. Add a Scalp invariant test: blank DD or DD opposite trade direction cannot produce Scalp.
-5. Add canonical label tests: A -> Good, B -> Fair.
-6. Add a terminology test in the Bias Result component for `PLUS 1 MINUS 1` so `MACD Extra` cannot reappear as user-facing wording.
-7. Keep ATR/target-pip value differences out of parity assertions when the tester has supplied different daily ATR values.
+3. Add table-driven regression fixtures for FTSE, GBP/USD, GBP/JPY and EUR/USD from Winston's screenshots.
+4. Add a Trend invariant fixture: directional DD takes precedence in the proven GBP/JPY conflict case; blank DD falls back correctly in EUR/USD.
+5. Add a Scalp invariant test: blank DD or DD opposite trade direction cannot produce Scalp.
+6. Add canonical label tests: A -> Good, B -> Fair.
+7. Add a terminology test in the Bias Result component for `PLUS 1 MINUS 1` so `MACD Extra` cannot reappear as user-facing wording.
+8. Keep ATR/target-pip value differences out of parity assertions when the tester has supplied different daily ATR values.
 
 ## Important limit of this audit
 
