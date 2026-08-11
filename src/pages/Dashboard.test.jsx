@@ -58,8 +58,19 @@ describe('Dashboard — Summary follows the favourite-instrument order', () => {
   });
 });
 
+describe('Dashboard — Status is a labelled Summary row', () => {
+  it('shows STATUS beside the canonical engine status on each card', async () => {
+    renderDashboard();
+    await screen.findByText('EUR/USD');
+
+    expect(screen.getByText('Status')).toBeInTheDocument();
+    // The seeded day-only case resolves to the canonical status value rendered
+    // by the card; this guards against reverting to an unlabelled badge.
+    expect(screen.getByText(/^(No|NO|YES|Wait|Extended|Scalp)$/)).toBeInTheDocument();
+  });
+});
+
 describe('Dashboard — Extended caution pill on the summary card', () => {
-  // All-BUY across every timeframe → winning score 95 → grade F / status Extended.
   const strongBuy = {
     month: { close: 1, macd: 1, rsi: 1, boli: 1 },
     week:  { close: 1, macd: 1, rsi: 1, boli: 1 },
@@ -72,14 +83,13 @@ describe('Dashboard — Extended caution pill on the summary card', () => {
 
   it('shows the amber CAUTION pill for an Extended/F card, but not for a normal one', async () => {
     localStorage.setItem('primebias_active', JSON.stringify({
-      'GBP/JPY': { ...card('GBP/JPY'), inputs: strongBuy },   // → Extended / F
-      'EUR/USD': card('EUR/USD'),                             // day-only → not Extended
+      'GBP/JPY': { ...card('GBP/JPY'), inputs: strongBuy },
+      'EUR/USD': card('EUR/USD'),
     }));
 
     renderDashboard();
     await screen.findByText('GBP/JPY');
 
-    // Exactly one caution pill — on the Extended card only.
     const pills = screen.getAllByText(/caution/i);
     expect(pills).toHaveLength(1);
     expect(pills[0].className).toMatch(/amber/);
@@ -92,15 +102,12 @@ describe('Dashboard — clear all requires confirmation', () => {
     const user = userEvent.setup();
     renderDashboard();
 
-    // The seeded analysis is visible.
     expect(await screen.findByText('EUR/USD')).toBeInTheDocument();
 
-    // Click the clear (trash) button → confirmation appears, nothing cleared yet.
     await user.click(screen.getByRole('button', { name: 'Clear all analyses' }));
     expect(await screen.findByText('Clear all analyses?')).toBeInTheDocument();
     expect(localStorage.getItem('primebias_active')).not.toBeNull();
 
-    // Cancel → storage intact.
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByText('Clear all analyses?')).not.toBeInTheDocument());
     expect(JSON.parse(localStorage.getItem('primebias_active'))).toEqual(activeSeed);
@@ -113,7 +120,6 @@ describe('Dashboard — clear all requires confirmation', () => {
 
     await user.click(screen.getByRole('button', { name: 'Clear all analyses' }));
     await screen.findByText('Clear all analyses?');
-    // The confirm action button inside the dialog.
     await user.click(screen.getByRole('button', { name: 'Clear all' }));
 
     await waitFor(() => expect(localStorage.getItem('primebias_active')).toBeNull());
