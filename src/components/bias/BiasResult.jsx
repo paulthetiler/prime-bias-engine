@@ -100,7 +100,7 @@ export default function BiasResult({ results, settings }) {
               <span className="flex items-center text-[11px] font-mono font-semibold text-foreground py-2 border-t border-border/45">{targetNote || '—'}</span>
 
               {(extraDirection || extraQuality) && <>
-                <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2.5 border-t border-border/45">MACD Extra</span>
+                <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2.5 border-t border-border/45">PLUS 1 MINUS 1</span>
                 <div className="flex items-center gap-3 flex-wrap py-2.5 border-t border-border/45">
                   <MacdTrafficLights timeframes={timeframes} />
                   <span className="text-[11px] font-mono font-semibold text-foreground leading-none">
