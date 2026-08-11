@@ -92,7 +92,6 @@ function calcTFResult(tfKey, ind) {
   return 0;
 }
 
-// Excel O4/O6/O8 = IFERROR(MODE(...),""). All-three-different is blank.
 function calcBlockDir(r0, r1, r2) {
   const arr = [r0, r1, r2];
   for (const v of [1, -1, 0]) if (arr.filter(x => x === v).length >= 2) return v;
@@ -114,7 +113,6 @@ function calcAnchoredStrength(anchor, other1, other2, blockDir) {
   return 'WEAK';
 }
 
-// Excel AC35.
 function calcGrade(score) {
   if (score > 91) return 'F';
   if (score >= 80) return 'C';
@@ -124,7 +122,6 @@ function calcGrade(score) {
   return 'D';
 }
 
-// Canonical wording shown in the current workbook grade table.
 function calcGradeLabel(grade) {
   if (grade === 'A') return 'Very Good';
   if (grade === 'B') return 'Good';
@@ -147,8 +144,6 @@ function directionNumber(direction) {
   return null;
 }
 
-// Excel AI4:AJ8 / AI8. Each directional block contributes its workbook weight;
-// the larger BUY/SELL total wins. Neutral/blank blocks contribute nothing.
 function calcBlockTrend(deepDir, ddDir, nowDir) {
   const buy =
     (deepDir === 1 ? BLOCK_TREND_WEIGHTS.deep : 0) +
@@ -161,7 +156,6 @@ function calcBlockTrend(deepDir, ddDir, nowDir) {
   return buy > sell ? 'BUY' : sell > buy ? 'SELL' : 'Neutral';
 }
 
-// Excel K12. Blank/unset manual checks calculate as No Trade.
 function calcExtraCheckResult(extraCheck) {
   const h1 = extraCheck?.h1 ?? null;
   const m15 = extraCheck?.m15 ?? null;
@@ -170,13 +164,11 @@ function calcExtraCheckResult(extraCheck) {
   return 'NO_TRADE';
 }
 
-// UX-only rendering state. It does not alter workbook maths.
 function calcExtraCheckConfirmation(extraCheckResult, tradeDirection, extraCheck) {
   if (extraCheck?.h1 == null || extraCheck?.m15 == null) return 'NOT_CHECKED';
   return extraCheckResult === tradeDirection ? 'CONFIRMS' : 'CONFLICTS';
 }
 
-// Excel O11.
 function calcTargetQuality(deepTrend, ddBias, nowBias, h1Bias) {
   if (!h1Bias) return '';
   if (deepTrend === 'BULL' && ddBias === 'BUY' && nowBias === 'BUY') return 'GOOD';
@@ -186,7 +178,8 @@ function calcTargetQuality(deepTrend, ddBias, nowBias, h1Bias) {
   return 'Min';
 }
 
-// Excel P10, transcribed branch-for-branch.
+// Excel P10. The Scalp branch is AND(AK6=AK8,H10=J8): NOW direction must
+// equal the trade direction, and raw 5m RSI must equal the 1H timeframe result.
 function calcStatus({ winningScore, rawGrade, ddBias, nowBias, h1Result, m15Result, m5Result, m5Rsi, nowDir, tradeDirection }) {
   if (m5Rsi == null) return '';
   if (winningScore > EXTENDED_SCORE) return 'Extended';
@@ -197,8 +190,6 @@ function calcStatus({ winningScore, rawGrade, ddBias, nowBias, h1Result, m15Resu
   return 'No';
 }
 
-// Excel M10, transcribed branch-for-branch. Note that workbook status No/NO does
-// not itself force Readiness=No; when Trend is aligned, the workbook returns Ready.
 function calcReadiness({ m5Rsi, blockTrend, tradeDirection, status }) {
   if (m5Rsi == null) return '';
   if (blockTrend !== tradeDirection) return 'Trend Off';
@@ -207,7 +198,6 @@ function calcReadiness({ m5Rsi, blockTrend, tradeDirection, status }) {
   return 'Ready';
 }
 
-// Excel P12/Q12 — PLUS 1 MINUS 1.
 function calcMacdExtra(inputs, status) {
   const g7 = inputs.h4?.macd ?? 0;
   const g8 = inputs.h1?.macd ?? 0;
@@ -263,7 +253,6 @@ function calculateBias(inputs, extraCheck = null, _options = {}) {
   if (extraCheckResult === 'BUY') { buyScore += LIGHTS_WEIGHT; lightsActive = true; }
   else if (extraCheckResult === 'SELL') { sellScore += LIGHTS_WEIGHT; lightsActive = true; }
 
-  // Excel AC34: score winner, then 1H score row as tie-break, otherwise NILL.
   let scoreDirection = 'NILL';
   if (buyScore > sellScore) scoreDirection = 'BUY';
   else if (sellScore > buyScore) scoreDirection = 'SELL';
