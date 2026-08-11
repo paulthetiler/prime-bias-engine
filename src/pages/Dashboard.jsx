@@ -97,20 +97,21 @@ function AssetCard({ analysis, onOpen, onComplete, settings, compact, strengthSn
         </div>
 
         <div className="flex flex-col justify-center px-4 py-3 flex-1 gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusClass(status))}>{status}</span>
-            {isExtendedCaution(results) && <ExtendedCautionPill />}
-            {separationBadge && (
-              <span
-                className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
-                title={`Currency strength separation ${separationBadge.separation.toFixed(2)}%. Movement potential only — not direction.`}
-              >
-                <Zap className="w-3 h-3" /> {separationBadge.label} SEP
-              </span>
-            )}
-          </div>
-
           <div className="grid items-center gap-y-1.5" style={{ gridTemplateColumns: '1fr minmax(90px, auto)', columnGap: '12px' }}>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Status</span>
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              <span className={cn('text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusClass(status))}>{status || '—'}</span>
+              {isExtendedCaution(results) && <ExtendedCautionPill />}
+              {separationBadge && (
+                <span
+                  className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
+                  title={`Currency strength separation ${separationBadge.separation.toFixed(2)}%. Movement potential only — not direction.`}
+                >
+                  <Zap className="w-3 h-3" /> {separationBadge.label} SEP
+                </span>
+              )}
+            </div>
+
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Trade</span>
             <span className={cn('text-xs font-bold px-1.5 py-0.5 rounded self-start w-fit', actionBadge(tradeAction))}>{actionLabel(tradeAction)}</span>
 
