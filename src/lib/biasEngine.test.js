@@ -14,7 +14,7 @@ import {
 } from './biasEngine';
 
 // Canonical reference: current Scruff Plus Tools Prime Bias.xlsx, "Bias Tool".
-// These tests assert the workbook formulas, not an app interpretation of them.
+// These tests assert the workbook formulas, including Excel value types, not an app interpretation of them.
 
 const SNAPSHOT = {
   month: { close: 1, macd: 1, rsi: 0, boli: 0 },
@@ -107,16 +107,16 @@ describe('Prime Bias — canonical workbook parity', () => {
     expect(r.targetQuality).toBe(r.deepTrend === 'BULL' ? 'GOOD' : 'MED');
   });
 
-  it('P10 Scalp is formula-driven, not synonymous with grade C', () => {
+  it('P10 preserves workbook AK6 numeric vs AK8 text comparison', () => {
     const inputs = getDefaultInputs();
     inputs.h4.boli = 1;
     inputs.m15.rsi = 1;
     inputs.m5.boli = 1;
-    // 1H result = Neutral, 5m RSI raw input = Neutral, while NOW/trade = BUY.
-    // This makes the workbook fall through to its explicit Scalp branch.
+    // This reaches the final P10 branch. In the workbook AK6 is numeric NOW,
+    // while AK8 is text "1"/"-1", so AK6=AK8 is FALSE and Status is No.
     const r = calculateBias(inputs, null);
     expect(r.scoreDirection).toBe('BUY');
-    expect(r.status).toBe('Scalp');
+    expect(r.status).toBe('No');
   });
 
   it('P12/Q12 PLUS 1 MINUS 1 is surfaced separately', () => {
@@ -166,7 +166,7 @@ describe('immutable settings/version', () => {
   });
 
   it('uses the canonical version identifier', () => {
-    expect(ENGINE_VERSION).toBe('prime-bias-excel-canonical-v3');
+    expect(ENGINE_VERSION).toBe('prime-bias-excel-canonical-v4');
   });
 
   it('snapshots canonical outputs', () => {
