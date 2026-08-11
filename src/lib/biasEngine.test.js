@@ -13,7 +13,7 @@ import {
   BASE_ATR,
 } from './biasEngine';
 
-// Canonical reference: uploaded Prime Bias.xlsx, "Bias Tool".
+// Canonical reference: current Scruff Plus Tools Prime Bias.xlsx, "Bias Tool".
 // These tests assert the workbook formulas, not an app interpretation of them.
 
 const SNAPSHOT = {
@@ -119,7 +119,7 @@ describe('Prime Bias — canonical workbook parity', () => {
     expect(r.status).toBe('Scalp');
   });
 
-  it('P12/Q12 MACD Extra is surfaced separately', () => {
+  it('P12/Q12 PLUS 1 MINUS 1 is surfaced separately', () => {
     const inputs = getDefaultInputs();
     inputs.h4.macd = 1;
     inputs.h1.macd = 1;
@@ -166,7 +166,7 @@ describe('immutable settings/version', () => {
   });
 
   it('uses the canonical version identifier', () => {
-    expect(ENGINE_VERSION).toBe('prime-bias-excel-canonical-v2');
+    expect(ENGINE_VERSION).toBe('prime-bias-excel-canonical-v3');
   });
 
   it('snapshots canonical outputs', () => {

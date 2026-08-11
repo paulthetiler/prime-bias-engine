@@ -1,23 +1,24 @@
 // Prime Bias canonical engine.
 //
-// Source of truth: the uploaded "Prime Bias.xlsx" workbook, sheet "Bias Tool".
-// The workbook is canonical. This file intentionally mirrors its formulas;
-// app UX may present the outputs differently, but must not reinterpret the maths.
+// Source of truth: the current Scruff Plus Tools "Prime Bias.xlsx" workbook,
+// sheet "Bias Tool". This file mirrors that workbook formula-for-formula.
+// App UX may present outputs differently, but must never reinterpret the maths.
 //
 // Canonical cells:
 //   J4:J10 / AD:AE  timeframe directions
 //   O4/P4/Q4         DEEP
 //   O6/P6/Q6         DD
 //   O8/P8/Q8         NOW
+//   AI4:AJ8 / P9     block-weighted Trend (DEEP 10 / DD 49 / NOW 41)
 //   AC24:AD33        BUY/SELL score tallies (+5 Extra Check lights)
 //   AC34             Trade direction
 //   AB35 / AC35      winning score / raw grade
-//   P9 / Q10         block trend / capped grade
+//   Q10              capped/effective grade
 //   P10              Status
 //   M10              Readiness
 //   O11 / Q11        Target quality / trade direction
 //   K12              manual Extra Check
-//   P12 / Q12        MACD Extra direction / quality
+//   P12 / Q12        PLUS 1 MINUS 1 direction / quality
 
 import { calcAlignment } from './alignmentUtils';
 import { CURRENT_ENGINE_VERSION } from './engineConfig';
@@ -47,6 +48,7 @@ const WEIGHTS = {
 const DIRECTION_THRESHOLD = 35;
 const TF_SCORE_WEIGHTS = { month: 2, week: 5, day: 10, h4: 30, h1: 33, m15: 10, m5: 5 };
 const LIGHTS_WEIGHT = 5;
+const BLOCK_TREND_WEIGHTS = { deep: 10, dd: 49, now: 41 };
 const EXTENDED_SCORE = 90;
 const DEFAULT_THRESHOLDS = { extended: 92, risky: 80, A: 75, B: 55, C: 45, D: 40 };
 
@@ -90,7 +92,7 @@ function calcTFResult(tfKey, ind) {
   return 0;
 }
 
-// Excel O4/O6/O8 = IFERROR(MODE(...),""). All-three-different is blank, not Neutral.
+// Excel O4/O6/O8 = IFERROR(MODE(...),""). All-three-different is blank.
 function calcBlockDir(r0, r1, r2) {
   const arr = [r0, r1, r2];
   for (const v of [1, -1, 0]) if (arr.filter(x => x === v).length >= 2) return v;
@@ -112,6 +114,7 @@ function calcAnchoredStrength(anchor, other1, other2, blockDir) {
   return 'WEAK';
 }
 
+// Excel AC35.
 function calcGrade(score) {
   if (score > 91) return 'F';
   if (score >= 80) return 'C';
@@ -121,9 +124,10 @@ function calcGrade(score) {
   return 'D';
 }
 
+// Canonical wording shown in the current workbook grade table.
 function calcGradeLabel(grade) {
-  if (grade === 'A') return 'Good';
-  if (grade === 'B') return 'Fair';
+  if (grade === 'A') return 'Very Good';
+  if (grade === 'B') return 'Good';
   if (grade === 'C') return 'Risky';
   if (grade === 'D') return 'Dangerous';
   if (grade === 'F') return 'Fail';
@@ -143,20 +147,21 @@ function directionNumber(direction) {
   return null;
 }
 
-// Winston's supplied Scruff cases prove that a directional Dominant Direction
-// takes precedence for Trend. GBP/JPY is the decisive case: DEEP=SELL,
-// DD=BUY, NOW=SELL, yet Scruff shows Trend=BUY. When DD is blank/neutral,
-// retain the previous DEEP/NOW weighted fallback; EUR/USD proves that blank DD
-// can still resolve to NOW=SELL.
+// Excel AI4:AJ8 / AI8. Each directional block contributes its workbook weight;
+// the larger BUY/SELL total wins. Neutral/blank blocks contribute nothing.
 function calcBlockTrend(deepDir, ddDir, nowDir) {
-  if (ddDir === 1) return 'BUY';
-  if (ddDir === -1) return 'SELL';
-  const fallbackBuy = (deepDir === 1 ? 10 : 0) + (nowDir === 1 ? 41 : 0);
-  const fallbackSell = (deepDir === -1 ? 10 : 0) + (nowDir === -1 ? 41 : 0);
-  return fallbackBuy > fallbackSell ? 'BUY' : fallbackSell > fallbackBuy ? 'SELL' : 'Neutral';
+  const buy =
+    (deepDir === 1 ? BLOCK_TREND_WEIGHTS.deep : 0) +
+    (ddDir === 1 ? BLOCK_TREND_WEIGHTS.dd : 0) +
+    (nowDir === 1 ? BLOCK_TREND_WEIGHTS.now : 0);
+  const sell =
+    (deepDir === -1 ? BLOCK_TREND_WEIGHTS.deep : 0) +
+    (ddDir === -1 ? BLOCK_TREND_WEIGHTS.dd : 0) +
+    (nowDir === -1 ? BLOCK_TREND_WEIGHTS.now : 0);
+  return buy > sell ? 'BUY' : sell > buy ? 'SELL' : 'Neutral';
 }
 
-// Excel K12. Blank/unset manual checks still calculate as No Trade.
+// Excel K12. Blank/unset manual checks calculate as No Trade.
 function calcExtraCheckResult(extraCheck) {
   const h1 = extraCheck?.h1 ?? null;
   const m15 = extraCheck?.m15 ?? null;
@@ -165,6 +170,7 @@ function calcExtraCheckResult(extraCheck) {
   return 'NO_TRADE';
 }
 
+// UX-only rendering state. It does not alter workbook maths.
 function calcExtraCheckConfirmation(extraCheckResult, tradeDirection, extraCheck) {
   if (extraCheck?.h1 == null || extraCheck?.m15 == null) return 'NOT_CHECKED';
   return extraCheckResult === tradeDirection ? 'CONFIRMS' : 'CONFLICTS';
@@ -180,31 +186,28 @@ function calcTargetQuality(deepTrend, ddBias, nowBias, h1Bias) {
   return 'Min';
 }
 
-// Excel P10.
+// Excel P10, transcribed branch-for-branch.
 function calcStatus({ winningScore, rawGrade, ddBias, nowBias, h1Result, m15Result, m5Result, m5Rsi, nowDir, tradeDirection }) {
   if (m5Rsi == null) return '';
   if (winningScore > EXTENDED_SCORE) return 'Extended';
   if (rawGrade === 'F' || rawGrade === 'D') return 'NO';
   if (ddBias === nowBias && h1Result === m5Result && m5Rsi === h1Result) return 'YES';
   if (ddBias === nowBias && h1Result === m15Result && m5Rsi !== h1Result) return 'Wait';
-  // Scruff parity: Scalp cannot be generated when Dominant Direction is blank
-  // or opposes the trade. Winston's GBP/JPY case proves the old non-blank-only
-  // guard was too weak.
-  if (ddBias === tradeDirection && nowDir === directionNumber(tradeDirection) && m5Rsi === h1Result) return 'Scalp';
+  if (nowDir === directionNumber(tradeDirection) && m5Rsi === h1Result) return 'Scalp';
   return 'No';
 }
 
-// Excel M10.
+// Excel M10, transcribed branch-for-branch. Note that workbook status No/NO does
+// not itself force Readiness=No; when Trend is aligned, the workbook returns Ready.
 function calcReadiness({ m5Rsi, blockTrend, tradeDirection, status }) {
   if (m5Rsi == null) return '';
   if (blockTrend !== tradeDirection) return 'Trend Off';
   if (status === 'YES' || status === 'Scalp') return 'Ready';
   if (status === 'Wait') return 'Trend Off';
-  if (status === 'No' || status === 'NO') return 'No';
   return 'Ready';
 }
 
-// Excel P12/Q12: the separate MACD Extra calculation.
+// Excel P12/Q12 — PLUS 1 MINUS 1.
 function calcMacdExtra(inputs, status) {
   const g7 = inputs.h4?.macd ?? 0;
   const g8 = inputs.h1?.macd ?? 0;
@@ -282,7 +285,7 @@ function calculateBias(inputs, extraCheck = null, _options = {}) {
   const { extraDirection, extraQuality } = calcMacdExtra(inputs, status);
   const extraCheckConfirmation = calcExtraCheckConfirmation(extraCheckResult, scoreDirection, extraCheck);
 
-  const tradeAction = scoreDirection; // canonical Excel Trade = AC34
+  const tradeAction = scoreDirection;
   const mainDirection = scoreDirection;
 
   const warnings = [];

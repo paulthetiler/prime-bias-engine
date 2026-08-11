@@ -3,6 +3,8 @@ import { calculateBias } from './biasEngine';
 
 const row = (close, macd, rsi, boli) => ({ close, macd, rsi, boli });
 
+// Winston's comparison marks, now evaluated against the CURRENT Scruff Plus
+// Tools workbook rather than the older workbook version he originally used.
 const FTSE = {
   month: row(1, 1, 0, 0),
   week: row(-1, 1, 0, 0),
@@ -57,20 +59,22 @@ function macdOnly(h4, h1, m15, m5) {
   };
 }
 
-describe('Winston / Scruff parity regressions', () => {
-  it('uses Scruff grade wording for FTSE B', () => {
+describe('current Scruff Plus Tools workbook parity', () => {
+  it('FTSE reproduces B / Good / SELL / No with workbook readiness', () => {
     const result = calculateBias(FTSE, noTradeExtra);
     expect(result.grade).toBe('B');
-    expect(result.gradeLabel).toBe('Fair');
+    expect(result.gradeLabel).toBe('Good');
     expect(result.tradeDirection).toBe('SELL');
     expect(result.blockTrend).toBe('SELL');
     expect(result.status).toBe('No');
+    // M10 returns Ready whenever Trend is aligned unless status is Wait.
+    expect(result.readiness).toBe('Ready');
   });
 
-  it('uses Scruff grade wording and preserves PLUS 1 MINUS 1 output for GBP/USD A', () => {
+  it('GBP/USD reproduces A / Very Good / YES and PLUS 1 MINUS 1 Scalp SELL', () => {
     const result = calculateBias(GBPUSD, noTradeExtra);
     expect(result.grade).toBe('A');
-    expect(result.gradeLabel).toBe('Good');
+    expect(result.gradeLabel).toBe('Very Good');
     expect(result.tradeDirection).toBe('SELL');
     expect(result.blockTrend).toBe('SELL');
     expect(result.status).toBe('YES');
@@ -80,19 +84,20 @@ describe('Winston / Scruff parity regressions', () => {
     expect(result.extraQuality).toBe('Scalp');
   });
 
-  it('gives directional Dominant Direction precedence for GBP/JPY Trend', () => {
+  it('GBP/JPY uses workbook 10/49/41 Trend maths: SELL wins 51 to 49', () => {
     const result = calculateBias(GBPJPY, noTradeExtra);
     expect(result.deepTrend).toBe('BEAR');
     expect(result.ddBias).toBe('BUY');
     expect(result.nowBias).toBe('SELL');
     expect(result.tradeDirection).toBe('SELL');
-    expect(result.blockTrend).toBe('BUY');
-    expect(result.grade).toBe('C');
-    expect(result.readiness).toBe('Trend Off');
-    expect(result.status).toBe('No');
+    expect(result.blockTrend).toBe('SELL');
+    expect(result.grade).toBe('B');
+    expect(result.gradeLabel).toBe('Good');
+    expect(result.status).toBe('Scalp');
+    expect(result.readiness).toBe('Ready');
   });
 
-  it('falls back to NOW when Dominant Direction is blank, matching EUR/USD Scruff', () => {
+  it('EUR/USD blank DD still resolves Trend from weighted DEEP/NOW and allows workbook Scalp', () => {
     const result = calculateBias(EURUSD, { h1: -1, m15: 1 });
     expect(result.deepTrend).toBe('BULL');
     expect(result.ddBias).toBe('');
@@ -100,11 +105,13 @@ describe('Winston / Scruff parity regressions', () => {
     expect(result.blockTrend).toBe('SELL');
     expect(result.tradeDirection).toBe('SELL');
     expect(result.grade).toBe('C');
-    expect(result.status).toBe('No');
+    expect(result.gradeLabel).toBe('Risky');
+    expect(result.status).toBe('Scalp');
+    expect(result.readiness).toBe('Ready');
   });
 });
 
-describe('uploaded workbook P12/Q12 — PLUS 1 MINUS 1', () => {
+describe('current workbook P12/Q12 — PLUS 1 MINUS 1', () => {
   const cases = [
     { name: 'all sell MACD => GOOD SELL', macd: [-1, -1, -1, -1], direction: 'SELL', quality: 'GOOD' },
     { name: '4H neutral with H1/15m/5m sell => Scalp SELL', macd: [0, -1, -1, -1], direction: 'SELL', quality: 'Scalp' },
@@ -121,7 +128,6 @@ describe('uploaded workbook P12/Q12 — PLUS 1 MINUS 1', () => {
     it(testCase.name, () => {
       const [h4, h1, m15, m5] = testCase.macd;
       const result = calculateBias(macdOnly(h4, h1, m15, m5));
-      expect(result.status).not.toBe('Scalp');
       expect(result.extraDirection).toBe(testCase.direction);
       expect(result.extraQuality).toBe(testCase.quality);
     });
