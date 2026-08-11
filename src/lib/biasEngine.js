@@ -123,8 +123,8 @@ function calcGrade(score) {
 }
 
 function calcGradeLabel(grade) {
-  if (grade === 'A') return 'Very Good';
-  if (grade === 'B') return 'Good';
+  if (grade === 'A') return 'Good';
+  if (grade === 'B') return 'Fair';
   if (grade === 'C') return 'Risky';
   if (grade === 'D') return 'Dangerous';
   if (grade === 'F') return 'Fail';
@@ -175,9 +175,10 @@ function calcStatus({ winningScore, rawGrade, ddBias, nowBias, h1Result, m15Resu
   if (rawGrade === 'F' || rawGrade === 'D') return 'NO';
   if (ddBias === nowBias && h1Result === m5Result && m5Rsi === h1Result) return 'YES';
   if (ddBias === nowBias && h1Result === m15Result && m5Rsi !== h1Result) return 'Wait';
-  // A blank DD/Dominant Direction is not a valid Scalp setup. Scruff's sheet
-  // returns No for this state even when NOW and the 5m RSI agree with 1H.
-  if (ddBias && nowDir === directionNumber(tradeDirection) && m5Rsi === h1Result) return 'Scalp';
+  // Scruff parity: Scalp cannot be generated when Dominant Direction is blank
+  // or opposes the trade. Winston's GBP/JPY case proves the old non-blank-only
+  // guard was too weak.
+  if (ddBias === tradeDirection && nowDir === directionNumber(tradeDirection) && m5Rsi === h1Result) return 'Scalp';
   return 'No';
 }
 
