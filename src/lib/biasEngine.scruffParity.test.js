@@ -45,6 +45,18 @@ const EURUSD = {
 
 const noTradeExtra = { h1: 0, m15: -1 };
 
+function macdOnly(h4, h1, m15, m5) {
+  return {
+    month: row(0, 0, 0, 0),
+    week: row(0, 0, 0, 0),
+    day: row(0, 0, 0, 0),
+    h4: row(0, h4, 0, 0),
+    h1: row(0, h1, 0, 0),
+    m15: row(0, m15, 0, 0),
+    m5: row(0, m5, 0, 0),
+  };
+}
+
 describe('Winston / Scruff parity regressions', () => {
   it('uses Scruff grade wording for FTSE B', () => {
     const result = calculateBias(FTSE, noTradeExtra);
@@ -77,7 +89,7 @@ describe('Winston / Scruff parity regressions', () => {
     expect(result.blockTrend).toBe('BUY');
     expect(result.grade).toBe('C');
     expect(result.readiness).toBe('Trend Off');
-    expect(result.status).not.toBe('Scalp');
+    expect(result.status).toBe('No');
   });
 
   it('falls back to NOW when Dominant Direction is blank, matching EUR/USD Scruff', () => {
@@ -90,4 +102,28 @@ describe('Winston / Scruff parity regressions', () => {
     expect(result.grade).toBe('C');
     expect(result.status).toBe('No');
   });
+});
+
+describe('uploaded workbook P12/Q12 — PLUS 1 MINUS 1', () => {
+  const cases = [
+    { name: 'all sell MACD => GOOD SELL', macd: [-1, -1, -1, -1], direction: 'SELL', quality: 'GOOD' },
+    { name: '4H neutral with H1/15m/5m sell => Scalp SELL', macd: [0, -1, -1, -1], direction: 'SELL', quality: 'Scalp' },
+    { name: '15m neutral with 4H/H1/5m sell => CAREFUL SELL', macd: [-1, -1, 0, -1], direction: 'SELL', quality: 'CAREFUL' },
+    { name: '5m neutral with 4H/H1/15m sell => GOOD SELL', macd: [-1, -1, -1, 0], direction: 'SELL', quality: 'GOOD' },
+    { name: 'all buy MACD => GOOD BUY', macd: [1, 1, 1, 1], direction: 'BUY', quality: 'GOOD' },
+    { name: '4H neutral with H1/15m/5m buy => Scalp BUY', macd: [0, 1, 1, 1], direction: 'BUY', quality: 'Scalp' },
+    { name: '15m neutral with 4H/H1/5m buy => CAREFUL BUY', macd: [1, 1, 0, 1], direction: 'BUY', quality: 'CAREFUL' },
+    { name: 'only two matching H1 direction => blank', macd: [0, -1, -1, 0], direction: '', quality: '' },
+    { name: 'neutral H1 can never produce a direction', macd: [-1, 0, -1, -1], direction: '', quality: '' },
+  ];
+
+  for (const testCase of cases) {
+    it(testCase.name, () => {
+      const [h4, h1, m15, m5] = testCase.macd;
+      const result = calculateBias(macdOnly(h4, h1, m15, m5));
+      expect(result.status).not.toBe('Scalp');
+      expect(result.extraDirection).toBe(testCase.direction);
+      expect(result.extraQuality).toBe(testCase.quality);
+    });
+  }
 });
