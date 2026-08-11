@@ -33,6 +33,16 @@ const GBPJPY = {
   m5: row(0, -1, -1, 0),
 };
 
+const EURUSD = {
+  month: row(1, -1, 0, 0),
+  week: row(1, 1, 0, 0),
+  day: row(1, 1, 0, 1),
+  h4: row(1, 0, -1, 0),
+  h1: row(0, -1, -1, -1),
+  m15: row(0, -1, 1, -1),
+  m5: row(0, -1, -1, 0),
+};
+
 const noTradeExtra = { h1: 0, m15: -1 };
 
 describe('Winston / Scruff parity regressions', () => {
@@ -41,6 +51,7 @@ describe('Winston / Scruff parity regressions', () => {
     expect(result.grade).toBe('B');
     expect(result.gradeLabel).toBe('Fair');
     expect(result.tradeDirection).toBe('SELL');
+    expect(result.blockTrend).toBe('SELL');
     expect(result.status).toBe('No');
   });
 
@@ -49,6 +60,7 @@ describe('Winston / Scruff parity regressions', () => {
     expect(result.grade).toBe('A');
     expect(result.gradeLabel).toBe('Good');
     expect(result.tradeDirection).toBe('SELL');
+    expect(result.blockTrend).toBe('SELL');
     expect(result.status).toBe('YES');
     expect(result.readiness).toBe('Ready');
     expect(result.targetNote).toBe('MED SELL');
@@ -56,10 +68,26 @@ describe('Winston / Scruff parity regressions', () => {
     expect(result.extraQuality).toBe('Scalp');
   });
 
-  it('never invents Scalp when Dominant Direction opposes the trade', () => {
+  it('gives directional Dominant Direction precedence for GBP/JPY Trend', () => {
     const result = calculateBias(GBPJPY, noTradeExtra);
+    expect(result.deepTrend).toBe('BEAR');
     expect(result.ddBias).toBe('BUY');
+    expect(result.nowBias).toBe('SELL');
     expect(result.tradeDirection).toBe('SELL');
+    expect(result.blockTrend).toBe('BUY');
+    expect(result.grade).toBe('C');
+    expect(result.readiness).toBe('Trend Off');
     expect(result.status).not.toBe('Scalp');
+  });
+
+  it('falls back to NOW when Dominant Direction is blank, matching EUR/USD Scruff', () => {
+    const result = calculateBias(EURUSD, { h1: -1, m15: 1 });
+    expect(result.deepTrend).toBe('BULL');
+    expect(result.ddBias).toBe('');
+    expect(result.nowBias).toBe('SELL');
+    expect(result.blockTrend).toBe('SELL');
+    expect(result.tradeDirection).toBe('SELL');
+    expect(result.grade).toBe('C');
+    expect(result.status).toBe('No');
   });
 });
