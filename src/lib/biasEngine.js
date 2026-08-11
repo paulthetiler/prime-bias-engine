@@ -1,8 +1,9 @@
 // Prime Bias canonical engine.
 //
-// Source of truth: the current Scruff Plus Tools "Prime Bias.xlsx" workbook,
-// sheet "Bias Tool". This file mirrors that workbook formula-for-formula.
-// App UX may present outputs differently, but must never reinterpret the maths.
+// Source of truth: the canonical Scruff Plus Tools "Prime Bias.xlsx" workbook,
+// sheet "Bias Tool". This file mirrors that workbook formula-for-formula,
+// including Excel value types. App UX may present outputs differently, but must
+// never reinterpret, normalise or "fix" the workbook maths.
 //
 // Canonical cells:
 //   J4:J10 / AD:AE  timeframe directions
@@ -144,6 +145,15 @@ function directionNumber(direction) {
   return null;
 }
 
+// Excel equality is type-sensitive. In particular, numeric 1 is not equal to
+// text "1". Do not replace this with loose coercion; workbook cell types are
+// part of the canonical behaviour.
+function excelEquals(left, right) {
+  if (left == null || right == null) return left === right;
+  if (typeof left !== typeof right) return false;
+  return left === right;
+}
+
 function calcBlockTrend(deepDir, ddDir, nowDir) {
   const buy =
     (deepDir === 1 ? BLOCK_TREND_WEIGHTS.deep : 0) +
@@ -178,15 +188,22 @@ function calcTargetQuality(deepTrend, ddBias, nowBias, h1Bias) {
   return 'Min';
 }
 
-// Excel P10. The Scalp branch is AND(AK6=AK8,H10=J8): NOW direction must
-// equal the trade direction, and raw 5m RSI must equal the 1H timeframe result.
+// Excel P10 exactly:
+//   ... IF(AND(AK6=AK8,H10=J8),"Scalp","No")
+// AK6 = O8 (numeric NOW result: -1/0/+1).
+// AK8 = IF(Q11="BUY","1",IF(Q11="SELL","-1","")) (TEXT "1"/"-1").
+// Excel therefore treats AK6=AK8 as FALSE for numeric ±1 versus text ±1.
+// This type mismatch is canonical workbook behaviour and must be preserved.
 function calcStatus({ winningScore, rawGrade, ddBias, nowBias, h1Result, m15Result, m5Result, m5Rsi, nowDir, tradeDirection }) {
   if (m5Rsi == null) return '';
   if (winningScore > EXTENDED_SCORE) return 'Extended';
   if (rawGrade === 'F' || rawGrade === 'D') return 'NO';
   if (ddBias === nowBias && h1Result === m5Result && m5Rsi === h1Result) return 'YES';
   if (ddBias === nowBias && h1Result === m15Result && m5Rsi !== h1Result) return 'Wait';
-  if (nowDir === directionNumber(tradeDirection) && m5Rsi === h1Result) return 'Scalp';
+
+  const ak6 = nowDir;
+  const ak8 = tradeDirection === 'BUY' ? '1' : tradeDirection === 'SELL' ? '-1' : '';
+  if (excelEquals(ak6, ak8) && m5Rsi === h1Result) return 'Scalp';
   return 'No';
 }
 
