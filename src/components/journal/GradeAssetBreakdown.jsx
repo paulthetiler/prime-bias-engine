@@ -35,6 +35,10 @@ export default function GradeAssetBreakdown({ grades, assets }) {
   const best = assets[0];
   const worst = assets.length > 1 ? assets[assets.length - 1] : null;
 
+  // Nothing decisive yet — render nothing rather than empty placeholder cards.
+  // The page shows a single whole-tier "unlock these stats" message instead.
+  if (!best && gradesWithData.length === 0) return null;
+
   return (
     <div className="space-y-3">
       {/* Best / weakest asset */}
@@ -63,14 +67,13 @@ export default function GradeAssetBreakdown({ grades, assets }) {
         </div>
       )}
 
-      {/* Win rate by grade */}
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Win Rate by Grade</div>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          Do higher grades actually win more? This is your engine's report card.
-        </p>
-        {gradesWithData.length > 0 ? (
-          <>
+      {/* Win rate by grade — only when at least one grade has decisive trades. */}
+      {gradesWithData.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Win Rate by Grade</div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Do higher grades actually win more? This is your engine's report card.
+          </p>
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={gradesWithData} margin={{ top: 10, right: 6, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border" opacity={0.4} vertical={false} />
@@ -86,21 +89,16 @@ export default function GradeAssetBreakdown({ grades, assets }) {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <div className="mt-1 flex justify-around">
-              {gradesWithData.map(g => (
-                <div key={g.grade} className="text-center">
-                  <div className={cn('text-xs font-bold', gradeText(g.grade))}>{g.rate}%</div>
-                  <div className="text-[9px] text-muted-foreground">{g.grade} · {g.count}</div>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="py-8 text-center text-xs text-muted-foreground">
-            Log a few WIN/LOSS results to compare grades.
+          <div className="mt-1 flex justify-around">
+            {gradesWithData.map(g => (
+              <div key={g.grade} className="text-center">
+                <div className={cn('text-xs font-bold', gradeText(g.grade))}>{g.rate}%</div>
+                <div className="text-[9px] text-muted-foreground">{g.grade} · {g.count}</div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

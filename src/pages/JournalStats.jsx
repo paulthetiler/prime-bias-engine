@@ -6,7 +6,7 @@ import { ChevronLeft, BarChart3, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   computeStats, filterByTimeframe, windowStart,
-  computeGradeBreakdown, computeAssetRanking,
+  computeGradeBreakdown, computeAssetRanking, TIME_FILTERS,
 } from '@/lib/journalStats';
 import {
   withDerivedFinancials, tradeInAccount, activeAccounts,
@@ -21,6 +21,7 @@ import {
   tradingDrawdown, tradingEquityCurve, resolveFilterValue, KEYERS,
 } from '@/lib/performance';
 import PerformanceSummary from '@/components/journal/PerformanceSummary';
+import DeepDiveStats from '@/components/journal/DeepDiveStats';
 import GradeAssetBreakdown from '@/components/journal/GradeAssetBreakdown';
 import BreakdownGroup from '@/components/journal/BreakdownGroup';
 import TradingEquityCurve from '@/components/journal/TradingEquityCurve';
@@ -37,6 +38,7 @@ export default function JournalStats() {
   const [timeframe, setTimeframe] = useState('all');
   const [account, setAccount] = useState('all');       // 'all' | accountId
   const [instrument, setInstrument] = useState('all');       // 'all' | symbol
+  const [tab, setTab] = useState('summary');           // 'summary' | 'deep' | 'account'
 
   const { data: rawTrades = [], isLoading } = useQuery({
     queryKey: ['completedTrades'],
@@ -176,7 +178,34 @@ export default function JournalStats() {
     month: breakdown(analysisTrades, KEYERS.month),
   }), [analysisTrades]);
 
+  // Group lists for the Deep dive tab. Empty breakdowns are dropped here so the
+  // page never renders a lone "No data in this scope" card — the whole-tier
+  // empty state below covers the case where nothing has data yet.
+  const engineGroups = useMemo(() => [
+    { title: 'Effective grade', rows: engineBreakdowns.grade },
+    { title: 'Raw grade (pre-cap)', rows: engineBreakdowns.rawGrade },
+    { title: 'Score band', subtitle: 'Bands on the saved score, not the grade.', rows: engineBreakdowns.scoreBand },
+    { title: 'Deep strength', rows: engineBreakdowns.deep },
+    { title: 'DD strength', rows: engineBreakdowns.dd },
+    { title: 'Now strength', rows: engineBreakdowns.now },
+    { title: 'Alignment', rows: engineBreakdowns.alignment },
+    { title: 'Engine direction', rows: engineBreakdowns.engineDir },
+    { title: 'Traded with / against engine', rows: engineBreakdowns.withAgainst },
+  ].filter(g => g.rows.length > 0), [engineBreakdowns]);
+
+  const behaviourGroups = useMemo(() => [
+    { title: 'Executed direction', rows: behaviourBreakdowns.executed },
+    { title: 'Instrument', rows: behaviourBreakdowns.asset },
+    { title: 'Mood', rows: behaviourBreakdowns.mood },
+    { title: 'Reason tags', rows: behaviourBreakdowns.tags },
+    { title: 'Hour of day', rows: behaviourBreakdowns.hour },
+    { title: 'Day of week', rows: behaviourBreakdowns.day },
+    { title: 'Month', rows: behaviourBreakdowns.month },
+  ].filter(g => g.rows.length > 0), [behaviourBreakdowns]);
+
   const bgProps = { currency: scope.currency, monetaryEnabled };
+  // A tier "has data" when at least one current-engine trade is in analysis scope.
+  const hasAnalysis = stats.totalTrades > 0;
 
   return (
     <div className="p-4 space-y-4 pb-24 max-w-2xl mx-auto">
@@ -196,6 +225,18 @@ export default function JournalStats() {
           ))}
         </div>
       )}
+      {/* Date-period filter (applies to every tab: account + date). */}
+      {!isLoading && trades.length > 0 && (
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {TIME_FILTERS.map(f => (
+            <button key={f.id} onClick={() => setTimeframe(f.id)}
+              className={cn('shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95',
+                timeframe === f.id ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-primary/40')}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
       {!isLoading && trades.length > 0 && instrumentsInScope.length > 1 && (
         <div className="flex flex-wrap gap-2">
           <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -211,7 +252,7 @@ export default function JournalStats() {
 
       {isLoading ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">{[...Array(8)].map((_, i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)}</div>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">{[...Array(4)].map((_, i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)}</div>
           <div className="h-48 rounded-2xl bg-secondary animate-pulse" />
         </div>
       ) : trades.length === 0 ? (
@@ -226,87 +267,127 @@ export default function JournalStats() {
             <Banner>Your accounts use different currencies, so monetary totals aren’t combined. Pick a single account to see Net P/L, ROI and balance. Non-money stats (win rate, counts) still apply.</Banner>
           )}
 
-          {/* ── Overview (trade analysis) ── */}
-          <SectionTitle sub="Trade analysis: current-engine trades only, for the selected account, period and instrument.">Overview</SectionTitle>
-          <PerformanceSummary
-            stats={stats} perf={overview}
-            timeframe={timeframe} onTimeframe={setTimeframe}
-            currency={scope.currency} monetaryEnabled={monetaryEnabled}
-          />
-          {monetaryEnabled && <TradingEquityCurve values={tradingCurve} currency={scope.currency} />}
-          <GradeAssetBreakdown grades={grades} assets={assets} />
-
-          {/* ── Engine performance ── */}
-          <SectionTitle sub="How the engine's own signals actually performed. Small samples are muted; sort with the control on each card.">Engine performance</SectionTitle>
-          <div className="space-y-2.5">
-            <BreakdownGroup title="Effective grade" rows={engineBreakdowns.grade} {...bgProps} />
-            <BreakdownGroup title="Raw grade (pre-cap)" rows={engineBreakdowns.rawGrade} {...bgProps} />
-            <BreakdownGroup title="Score band" subtitle="Bands on the saved score, not the grade." rows={engineBreakdowns.scoreBand} {...bgProps} />
-            <BreakdownGroup title="Deep strength" rows={engineBreakdowns.deep} {...bgProps} />
-            <BreakdownGroup title="DD strength" rows={engineBreakdowns.dd} {...bgProps} />
-            <BreakdownGroup title="Now strength" rows={engineBreakdowns.now} {...bgProps} />
-            <BreakdownGroup title="Alignment" rows={engineBreakdowns.alignment} {...bgProps} />
-            <BreakdownGroup title="Engine direction" rows={engineBreakdowns.engineDir} {...bgProps} />
-            <BreakdownGroup title="Traded with / against engine" rows={engineBreakdowns.withAgainst} {...bgProps} />
+          {/* Three-tier navigation: glance → deep dive → account ledger. */}
+          <div className="flex gap-2 rounded-lg bg-secondary p-1">
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={cn('flex-1 rounded-md py-1.5 text-sm font-semibold transition-colors',
+                  tab === t.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground')}>
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          {/* ── Trade behaviour ── */}
-          <SectionTitle sub={crossAssetPips ? 'Note: pips/points totals combine multiple instruments and are informational only — point values are not directly comparable. Filter by instrument for a valid total.' : undefined}>Trade behaviour</SectionTitle>
-          <div className="space-y-2.5">
-            <BreakdownGroup title="Executed direction" rows={behaviourBreakdowns.executed} {...bgProps} />
-            <BreakdownGroup title="Instrument" rows={behaviourBreakdowns.asset} {...bgProps} />
-            <BreakdownGroup title="Mood" rows={behaviourBreakdowns.mood} {...bgProps} />
-            <BreakdownGroup title="Reason tags" rows={behaviourBreakdowns.tags} {...bgProps} />
-            <BreakdownGroup title="Hour of day" rows={behaviourBreakdowns.hour} {...bgProps} />
-            <BreakdownGroup title="Day of week" rows={behaviourBreakdowns.day} {...bgProps} />
-            <BreakdownGroup title="Month" rows={behaviourBreakdowns.month} {...bgProps} />
-          </div>
-
-          {/* ── Account & cashflow (account ledger) ── */}
-          <SectionTitle sub="Account ledger: selected account and period only. The instrument filter does not apply here, and every trade's realised money counts (including historical records excluded from the engine stats above) — cash movement is not per-engine. External cash (deposits/withdrawals/wages) is kept separate from trading P&L.">Account &amp; cashflow</SectionTitle>
-          {monetaryEnabled && perf ? (
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-1.5 text-sm">
-              <CashRow label="Opening balance" value={fmtMoney(perf.openingBalance, scope.currency)} />
-              <CashRow label="Trading net P&L" value={fmtMoney(perf.netPnl, scope.currency)} tone={perf.netPnl > 0 ? 'up' : perf.netPnl < 0 ? 'down' : ''} />
-              <CashRow label="ROI (period)" value={roi?.roiPct == null ? '—' : `${roi.roiPct >= 0 ? '+' : '−'}${Math.abs(roi.roiPct).toFixed(1)}%`} tone={roi?.roiPct == null ? '' : roi.roiPct >= 0 ? 'up' : 'down'} />
-              <CashRow label="Deposits" value={fmtMoney(perf.deposits, scope.currency)} />
-              <CashRow label="Withdrawals" value={fmtMoney(perf.withdrawals ? -perf.withdrawals : 0, scope.currency)} />
-              <CashRow label="Wage withdrawals" value={fmtMoney(perf.wages ? -perf.wages : 0, scope.currency)} />
-              <CashRow label="Adjustments" value={fmtMoney(perf.adjustments, scope.currency)} />
-              <div className="border-t border-border my-1" />
-              <CashRow label="Current balance" value={fmtMoney(currentBalance, scope.currency)} strong />
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
-              Money totals are unavailable for a mixed-currency scope. Pick a single account to see the ledger.
-            </div>
-          )}
-          {monetaryEnabled && (
-            <EquityCurve series={series} hasPnl={stats.hasPnl} currentBalance={currentBalance} currency={scope.currency} />
-          )}
-
-          {/* Reconciliation */}
-          {monetaryEnabled && recon && (
-            <div className={cn('rounded-2xl border p-4 shadow-sm text-sm',
-              recon.reconciled ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-red-500/40 bg-red-500/5')}>
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldAlert className={cn('w-4 h-4', recon.reconciled ? 'text-emerald-500' : 'text-red-500')} />
-                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Reconciliation · {recon.reconciled ? 'balanced' : 'discrepancy'}
-                </span>
-              </div>
-              <CashRow label="Expected closing" value={fmtMoney(recon.expectedClosing, scope.currency)} />
-              <CashRow label="Rebuilt closing" value={fmtMoney(recon.actualClosing, scope.currency)} />
-              <CashRow label="Difference" value={fmtMoney(recon.difference, scope.currency)} tone={recon.reconciled ? '' : 'down'} strong />
-              {!recon.reconciled && (
-                <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">
-                  Ledger does not reconcile. An admin can investigate at <code className="font-mono">/admin/integrity</code>. No automatic repair is performed.
+          {/* ── Tier 1: Summary (glance and know) ── */}
+          {tab === 'summary' && (
+            hasAnalysis ? (
+              <div className="space-y-1.5">
+                <p className="text-[11px] text-muted-foreground">
+                  Trade analysis: current-engine trades only, for the selected account, period and instrument.
                 </p>
+                <PerformanceSummary stats={stats} currency={scope.currency} monetaryEnabled={monetaryEnabled} />
+              </div>
+            ) : <TierEmpty />
+          )}
+
+          {/* ── Tier 2: Deep dive (engine + behaviour) ── */}
+          {tab === 'deep' && (
+            hasAnalysis ? (
+              <div className="space-y-4">
+                <DeepDiveStats stats={stats} perf={overview} currency={scope.currency} monetaryEnabled={monetaryEnabled} />
+                {monetaryEnabled && <TradingEquityCurve values={tradingCurve} currency={scope.currency} />}
+                <GradeAssetBreakdown grades={grades} assets={assets} />
+
+                {engineGroups.length > 0 && (
+                  <>
+                    <SectionTitle sub="How the engine's own signals actually performed. Small samples are muted; sort with the control on each card.">Engine performance</SectionTitle>
+                    <div className="space-y-2.5">
+                      {engineGroups.map(g => (
+                        <BreakdownGroup key={g.title} title={g.title} subtitle={g.subtitle} rows={g.rows} {...bgProps} />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {behaviourGroups.length > 0 && (
+                  <>
+                    <SectionTitle sub={crossAssetPips ? 'Note: pips/points totals combine multiple instruments and are informational only — point values are not directly comparable. Filter by instrument for a valid total.' : undefined}>Trade behaviour</SectionTitle>
+                    <div className="space-y-2.5">
+                      {behaviourGroups.map(g => (
+                        <BreakdownGroup key={g.title} title={g.title} subtitle={g.subtitle} rows={g.rows} {...bgProps} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : <TierEmpty />
+          )}
+
+          {/* ── Tier 3: Account & cashflow (account ledger) ── */}
+          {tab === 'account' && (
+            <div className="space-y-4">
+              <SectionTitle sub="Account ledger: selected account and period only. The instrument filter does not apply here, and every trade's realised money counts (including historical records excluded from the engine stats above) — cash movement is not per-engine. External cash (deposits/withdrawals/wages) is kept separate from trading P&L.">Account &amp; cashflow</SectionTitle>
+              {monetaryEnabled && perf ? (
+                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-1.5 text-sm">
+                  <CashRow label="Opening balance" value={fmtMoney(perf.openingBalance, scope.currency)} />
+                  <CashRow label="Trading net P&L" value={fmtMoney(perf.netPnl, scope.currency)} tone={perf.netPnl > 0 ? 'up' : perf.netPnl < 0 ? 'down' : ''} />
+                  <CashRow label="ROI (period)" value={roi?.roiPct == null ? '—' : `${roi.roiPct >= 0 ? '+' : '−'}${Math.abs(roi.roiPct).toFixed(1)}%`} tone={roi?.roiPct == null ? '' : roi.roiPct >= 0 ? 'up' : 'down'} />
+                  <CashRow label="Deposits" value={fmtMoney(perf.deposits, scope.currency)} />
+                  <CashRow label="Withdrawals" value={fmtMoney(perf.withdrawals ? -perf.withdrawals : 0, scope.currency)} />
+                  <CashRow label="Wage withdrawals" value={fmtMoney(perf.wages ? -perf.wages : 0, scope.currency)} />
+                  <CashRow label="Adjustments" value={fmtMoney(perf.adjustments, scope.currency)} />
+                  <div className="border-t border-border my-1" />
+                  <CashRow label="Current balance" value={fmtMoney(currentBalance, scope.currency)} strong />
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground">
+                  Money totals are unavailable for a mixed-currency scope. Pick a single account to see the ledger.
+                </div>
+              )}
+              {monetaryEnabled && (
+                <EquityCurve series={series} hasPnl={stats.hasPnl} currentBalance={currentBalance} currency={scope.currency} />
+              )}
+
+              {/* Reconciliation */}
+              {monetaryEnabled && recon && (
+                <div className={cn('rounded-2xl border p-4 shadow-sm text-sm',
+                  recon.reconciled ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-red-500/40 bg-red-500/5')}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldAlert className={cn('w-4 h-4', recon.reconciled ? 'text-emerald-500' : 'text-red-500')} />
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                      Reconciliation · {recon.reconciled ? 'balanced' : 'discrepancy'}
+                    </span>
+                  </div>
+                  <CashRow label="Expected closing" value={fmtMoney(recon.expectedClosing, scope.currency)} />
+                  <CashRow label="Rebuilt closing" value={fmtMoney(recon.actualClosing, scope.currency)} />
+                  <CashRow label="Difference" value={fmtMoney(recon.difference, scope.currency)} tone={recon.reconciled ? '' : 'down'} strong />
+                  {!recon.reconciled && (
+                    <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">
+                      Ledger does not reconcile. An admin can investigate at <code className="font-mono">/admin/integrity</code>. No automatic repair is performed.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+const TABS = [
+  { id: 'summary', label: 'Summary' },
+  { id: 'deep', label: 'Deep dive' },
+  { id: 'account', label: 'Account' },
+];
+
+// A single whole-tier empty state, shown in place of a scroll of per-card
+// "no data" placeholders when a tier has nothing to report yet.
+function TierEmpty() {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card/50 px-4 py-10 text-center text-sm text-muted-foreground">
+      Log a few trades to unlock these stats.
     </div>
   );
 }

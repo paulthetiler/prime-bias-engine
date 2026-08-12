@@ -496,42 +496,54 @@ Legacy trades predate the immutable snapshot columns (migration `0005`), so thei
 inputs cannot be re-graded reliably; they are kept in history and omitted from
 current-engine metrics rather than recalculated.
 
-## 11. Performance page & engine-quality breakdown UI (phase 7)
+## 11. Performance page & engine-quality breakdown UI (phase 7, restructured)
 
-The Performance page (`pages/JournalStats.jsx`) is organised into sections that
-consume `lib/performance.js` — **no metric is computed in a component**.
+The Performance page (`pages/JournalStats.jsx`) consumes `lib/performance.js` —
+**no metric is computed in a component**. It is organised into **three tiers
+behind a tab bar** so the default view is a no-scroll "glance and know" layer and
+the deeper analysis is opt-in. Global filters (account, date period, instrument)
+sit **above** the tab bar and apply across every tab. Each tier still carries an
+explicit **scope label** so no two adjacent tiles refer to different populations:
 
-Each section carries an explicit **scope label** so no two adjacent tiles refer
-to different populations:
-
-- **Overview** — *trade-analysis scope* (selected account, period, engine
-  version and instrument). **Trade-performance tiles only**: net P&L, win rate,
-  profit factor, Avg R, streaks via `computeStats`; Avg Win/Loss, expectancy,
-  trading max drawdown, total pips, worst-loss streak via
-  `computePerformance`/`tradeSummary`. Followed by the **trading-equity curve**
-  (`tradingEquityCurve`, excludes cashflows) and the win-rate-by-grade chart.
-  ROI, opening/current balance, wages and the cash **Account Balance** curve are
-  **not** rendered here — they are account-wide (they ignore engine-version and
-  instrument filters), so they live in Account & cashflow instead.
-- **Engine performance** — `BreakdownGroup` for effective grade, raw grade, score
-  band, engine version, Deep/DD/Now strength, alignment, engine direction, and
-  traded-with/against-engine.
-- **Trade behaviour** — executed direction, instrument, mood, reason tags, hour,
-  day, month.
-- **Account & cashflow** — *account-ledger scope* (selected account and period
-  only). Opening balance, trading net P&L, **ROI (period)**, deposits, ordinary
+- **Summary** *(default tab — trade-analysis scope)* — the four headline tiles
+  only: **Net P/L, Win Rate, Profit Factor, Total Trades** (`computeStats`,
+  `PerformanceSummary`). This is the entire first-glance layer; a missing value
+  renders a muted `—`, never a verbose per-card hint.
+- **Deep dive** *(trade-analysis scope)* — everything else engine/grade/behaviour:
+  the secondary tiles Avg R, streaks, Avg Win/Loss, expectancy, trading max
+  drawdown, total pips, worst-loss streak (`DeepDiveStats`); the **trading-equity
+  curve** (`tradingEquityCurve`, excludes cashflows); the win-rate-by-grade chart
+  and best/weakest asset (`GradeAssetBreakdown`); **Engine performance**
+  `BreakdownGroup`s (effective grade, raw grade, score band, Deep/DD/Now strength,
+  alignment, engine direction, traded-with/against-engine); and **Trade behaviour**
+  `BreakdownGroup`s (executed direction, instrument, mood, reason tags, hour, day,
+  month).
+- **Account** *(account-ledger scope — selected account and period only)* —
+  opening balance, trading net P&L, **ROI (period)**, deposits, ordinary
   withdrawals, wage withdrawals, adjustments, **current balance**, the cash
   **Account Balance** curve, and a **reconciliation panel** (expected vs rebuilt
   closing, difference, balanced/discrepancy; links admins to `/admin/integrity`
-  when it doesn't reconcile — no auto-repair). The engine-version and instrument
-  filters deliberately do not apply here.
+  when it doesn't reconcile — no auto-repair). The instrument filter deliberately
+  does not apply here — cash movement isn't "per engine version" or per instrument.
+
+### Empty-state rule
+Individual "No data in this scope" / "add trade results to unlock this stat"
+cards are **not** rendered. Instead:
+- A metric tile with no value shows a muted `—` (never a fabricated `0`).
+- Empty `BreakdownGroup`s and the grade/asset cards are dropped entirely rather
+  than rendered as placeholders.
+- If a whole trade-analysis tier has no trades in scope, it shows a single
+  collapsed message — *"Log a few trades to unlock these stats."* (`TierEmpty`) —
+  in place of the tiles.
 
 ### Filters
-Account (chips), date period (chips: today/7/30/90/all), **engine version** and
-**instrument** (selects, shown only when >1 exists). Account + date scope
-everything. Engine-version + instrument scope the analysis (Overview tiles,
-trading chart, all breakdowns); the Account & cashflow / reconciliation panel is
-deliberately account+date only (cash isn't "per engine version") and says so.
+Account (chips), date period (chips: today/7/30/90/all) and **instrument**
+(select, shown only when >1 exists) all live above the tab bar. Account + date
+scope everything. The instrument filter scopes the analysis tiers (Summary +
+Deep dive tiles, trading chart, all breakdowns); the Account tab / reconciliation
+panel is deliberately account+date only (cash isn't "per engine version") and
+says so. Obsolete/legacy engine records are always excluded from the analysis
+tiers (current-engine only) but still counted in the account ledger.
 
 ### Breakdown rows (`BreakdownGroup`)
 Each row shows label, sample badge, directional count, outcome win rate and net
@@ -549,8 +561,9 @@ default never promotes tiny samples; insufficient rows are muted and badged
   non-money stats still show.
 - **Cross-asset pips** → total pips are flagged **informational** with an
   instrument filter, because point values aren't comparable across assets.
-- **Missing data** → `—`/empty-state hints, never a fake `0` (no trades,
-  outcome-only, no risk, no account, no snapshot, no pips all handled).
+- **Missing data** → a muted `—` on a tile, or the tile/card/tier omitted, never
+  a fake `0` (no trades, outcome-only, no risk, no account, no snapshot, no pips
+  all handled — see the empty-state rule above).
 - **Stale filters can't hide data** → when an account or date change removes the
   selected engine version or instrument from scope, the filter resets to *All*
   (`resolveFilterValue` + `useEffect` on the in-scope lists). The selector also
