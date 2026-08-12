@@ -70,17 +70,17 @@ export default function BiasResult({ results, settings }) {
           </div>
 
           <div className="flex flex-col justify-center px-3 py-3 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap pb-2">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Status</span>
-              <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
-                {status || '—'}
-              </span>
-              {isExtendedCaution(results) && <ExtendedCautionPill />}
-            </div>
-
             <div className="grid items-stretch" style={{ gridTemplateColumns: '80px 1fr' }}>
-              <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2">Trade</span>
-              <span className="flex items-center py-2">
+              <span className="flex items-center text-[9px] font-bold uppercase tracking-wider text-muted-foreground py-2">Status</span>
+              <span className="flex items-center gap-1.5 flex-wrap py-2">
+                <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border', statusBadge)}>
+                  {status || '—'}
+                </span>
+                {isExtendedCaution(results) && <ExtendedCautionPill />}
+              </span>
+
+              <span className="flex items-center text-[9px] uppercase tracking-widest text-muted-foreground py-2 border-t border-border/45">Trade</span>
+              <span className="flex items-center py-2 border-t border-border/45">
                 <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded w-fit', actionBadge(tradeAction))}>
                   {actionLabel(tradeAction)}
                 </span>
