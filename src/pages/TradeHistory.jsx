@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Trash2, RotateCcw, SlidersHorizontal, X, ExternalLink } from 'lucide-react';
+import { Trash2, RotateCcw, SlidersHorizontal, X, ExternalLink, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -26,7 +26,7 @@ const resultColors = {
 };
 const resultLabels = { win: 'Win', loss: 'Loss', breakeven: 'B/E', not_taken: 'Not Taken' };
 
-function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onEdit }) {
+function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onEdit, hasJournal, onJournal }) {
   if (!trade) return null;
   const complete = hasFinancialResult(trade);
   const directional = trade.result === 'win' || trade.result === 'loss';
@@ -113,6 +113,11 @@ function TradeDetailModal({ trade, onClose, onRestore, onArchive, onDelete, onEd
 
           {/* Actions */}
           <div className="flex flex-col gap-2 pt-1">
+            {hasJournal && (
+              <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={onJournal}>
+                <BookOpen className="w-3.5 h-3.5" /> Open journal entry
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => onRestore(trade)}>
               <RotateCcw className="w-3.5 h-3.5" /> Restore to Summary
             </Button>
@@ -310,7 +315,11 @@ export default function TradeHistory() {
   });
   const trades = rawTrades.map(t => normalizeTrade(withDerivedFinancials(t)));
 
-
+  const { data: journalEntries = [] } = useQuery({
+    queryKey: ['journalEntries'],
+    queryFn: () => base44.entities.TradeJournalEntry.list('-created_at', 200),
+  });
+  const journalTradeIds = new Set(journalEntries.map(entry => entry.completed_trade_id).filter(Boolean));
 
   const updateMutation = useMutation({
     mutationFn: /** @param {{ id: string, data: any }} vars */ ({ id, data }) => base44.entities.CompletedTrade.update(id, data),
@@ -323,11 +332,6 @@ export default function TradeHistory() {
   });
 
   const handleRestore = async (trade) => {
-    // Put back into active localStorage.
-    // A fresh analysisId is essential: the Dashboard filters active analyses by
-    // `!isAnalysisLocked(analysisId)`, and completion locks are keyed by analysisId.
-    // Without one, the restored card can never be cleared by completing it and each
-    // completion would insert a duplicate trade record.
     const active = JSON.parse(localStorage.getItem('primebias_active') || '{}');
     active[trade.instrument] = buildRestoredAnalysis(trade);
     localStorage.setItem('primebias_active', JSON.stringify(active));
@@ -344,7 +348,6 @@ export default function TradeHistory() {
     toast.success('Trade archived');
   };
 
-  // Open a confirmation first — delete is permanent and can't be undone.
   const handleDelete = (trade) => {
     setSelected(null);
     setConfirmDelete(trade);
@@ -362,8 +365,6 @@ export default function TradeHistory() {
     setEditing(trade);
   };
 
-  // Journal edit: updates the intended row via the shared realised-fields model.
-  // The immutable engine snapshot is never included, so it cannot be overwritten.
   const editMutation = useMutation({
     mutationFn: /** @param {{ id: string, details: any }} vars */ ({ id, details }) => updateCompletedTrade(id, details),
     onSuccess: () => {
@@ -392,7 +393,6 @@ export default function TradeHistory() {
 
   return (
     <div className="p-4 space-y-4 pb-24">
-      {/* Header */}
       <div className="flex items-center justify-between pt-2">
         <div>
           <h1 className="text-lg font-bold tracking-tight">Trade History</h1>
@@ -414,11 +414,9 @@ export default function TradeHistory() {
         </button>
       </div>
 
-      {/* Filters */}
       {showFilters && (
         <div className="space-y-2 rounded-xl border border-border bg-card p-3">
           <div className="grid grid-cols-2 gap-2">
-            {/* Result */}
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Result</div>
               <div className="flex flex-wrap gap-1">
@@ -432,7 +430,6 @@ export default function TradeHistory() {
                 ))}
               </div>
             </div>
-            {/* Grade */}
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Grade</div>
               <div className="flex flex-wrap gap-1">
@@ -448,7 +445,6 @@ export default function TradeHistory() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {/* Direction */}
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Direction</div>
               <div className="flex gap-1">
@@ -462,7 +458,6 @@ export default function TradeHistory() {
                 ))}
               </div>
             </div>
-            {/* Asset */}
             <div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Asset</div>
               <select
@@ -482,7 +477,6 @@ export default function TradeHistory() {
         </div>
       )}
 
-      {/* List */}
       {isLoading ? (
         <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 rounded-xl bg-secondary animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
@@ -497,17 +491,14 @@ export default function TradeHistory() {
               onClick={() => setSelected(trade)}
               className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:bg-accent/50 transition-colors text-left"
             >
-              {/* Result badge */}
               <div className={cn('px-2.5 py-1 rounded-lg border text-xs font-bold shrink-0', resultColors[trade.result])}>
                 {resultLabels[trade.result] || '—'}
               </div>
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{trade.instrument}</span>
                   <span className={cn('text-xs font-bold', gradeText(trade.grade))}>{trade.grade}</span>
                   <span className={cn('text-xs font-semibold', trade.direction === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>{trade.direction}</span>
-
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   {trade.completed_at ? format(new Date(trade.completed_at), 'dd MMM yyyy HH:mm') : '—'}
@@ -520,7 +511,6 @@ export default function TradeHistory() {
                   )}
                 </div>
               </div>
-              {/* Score */}
               <div className="text-right shrink-0">
                 <div className="font-mono text-xs font-bold">{trade.score}</div>
                 <div className="text-[10px] text-muted-foreground">score</div>
@@ -538,6 +528,11 @@ export default function TradeHistory() {
           onArchive={handleArchive}
           onDelete={handleDelete}
           onEdit={handleEdit}
+          hasJournal={journalTradeIds.has(selected.id)}
+          onJournal={() => {
+            setSelected(null);
+            window.location.assign('/journal');
+          }}
         />
       )}
 
