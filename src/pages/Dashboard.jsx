@@ -20,6 +20,7 @@ import CompleteTradeModal from '@/components/bias/CompleteTradeModal';
 import TradeJournalFlow from '@/components/journal/TradeJournalFlow';
 import { InstallBanner } from '@/components/InstallApp';
 import { separationLabel } from '@/lib/strengthContext';
+import { getNewsExposure } from '@/lib/newsExposure';
 
 const STRENGTH_API_VERSION = '4';
 
@@ -54,13 +55,6 @@ function getSeparationBadge(instrument, snapshot) {
   return label === 'VERY HIGH' || label === 'HIGH' ? { label, separation: row.separation } : null;
 }
 
-function instrumentCurrencies(instrument) {
-  const clean = String(instrument || '').replace(/[^A-Z]/g, '');
-  if (clean.length >= 6) return [clean.slice(0, 3), clean.slice(3, 6)];
-  if (['US30', 'NAS100', 'SPX500'].includes(clean)) return ['USD'];
-  return [];
-}
-
 function minutesUntil(dateValue) {
   const when = new Date(dateValue).getTime();
   if (!Number.isFinite(when)) return null;
@@ -77,7 +71,7 @@ function formatCountdown(minutes) {
 }
 
 function EconomicNewsStrip({ instrument, events, status }) {
-  const currencies = instrumentCurrencies(instrument);
+  const currencies = getNewsExposure(instrument);
   const relevant = (events || [])
     .map(event => ({ ...event, minutes: minutesUntil(event.date) }))
     .filter(event => currencies.includes(event.country) && event.minutes != null && event.minutes >= -30)
@@ -87,16 +81,20 @@ function EconomicNewsStrip({ instrument, events, status }) {
 
   return (
     <div className="border-t border-border/40 px-3 py-2.5 bg-background" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          <CalendarDays className="w-3.5 h-3.5" /> Economic news
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+          <span className="shrink-0">Economic news</span>
+          {currencies.length > 0 && (
+            <span className="truncate text-[9px] normal-case tracking-normal font-semibold text-muted-foreground/80">· {currencies.join(' · ')}</span>
+          )}
         </div>
-        <span className="text-[9px] text-muted-foreground">Forex Factory</span>
+        <span className="text-[9px] text-muted-foreground shrink-0">Forex Factory</span>
       </div>
 
       {status === 'loading' && <div className="text-[10px] text-muted-foreground">Loading calendar…</div>}
       {status === 'error' && <div className="text-[10px] font-semibold text-destructive">Calendar unavailable</div>}
-      {status === 'ready' && !currencies.length && <div className="text-[10px] text-muted-foreground">No supported currencies for this instrument</div>}
+      {status === 'ready' && !currencies.length && <div className="text-[10px] text-muted-foreground">No supported news exposure for this instrument</div>}
       {status === 'ready' && currencies.length > 0 && relevant.length === 0 && <div className="text-[10px] text-muted-foreground">No high/medium impact news upcoming</div>}
 
       {relevant.length > 0 && (
