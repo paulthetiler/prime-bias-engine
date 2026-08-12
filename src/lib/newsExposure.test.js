@@ -12,6 +12,13 @@ describe('getNewsExposure', () => {
     expect(getNewsExposure('XAU/USD')).toEqual(['USD']);
   });
 
+  it('maps Bitcoin to USD news', () => {
+    expect(getNewsExposure('BITCOIN')).toEqual(['USD']);
+    expect(getNewsExposure('BTC')).toEqual(['USD']);
+    expect(getNewsExposure('BTC/USD')).toEqual(['USD']);
+    expect(getNewsExposure('BTCUSD')).toEqual(['USD']);
+  });
+
   it('maps indices to their configured exposures', () => {
     expect(getNewsExposure('DAX')).toEqual(['EUR', 'USD']);
     expect(getNewsExposure('NAS100')).toEqual(['USD']);
