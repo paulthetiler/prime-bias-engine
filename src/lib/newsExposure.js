@@ -1,6 +1,13 @@
 const FX_CURRENCIES = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'NZD', 'CAD']);
 
 const NEWS_EXPOSURE = {
+  // Crypto is predominantly USD-priced in Prime Bias, so major USD macro news
+  // (CPI, NFP, FOMC, GDP, etc.) is relevant even when the UI label is simply
+  // "Bitcoin" rather than BTC/USD.
+  BITCOIN: ['USD'],
+  BTC: ['USD'],
+  BTCUSD: ['USD'],
+  BTCUSDT: ['USD'],
   GOLDUSD: ['USD'],
   XAUUSD: ['USD'],
   SILVERUSD: ['USD'],
