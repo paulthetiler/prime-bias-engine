@@ -5,6 +5,8 @@ import TimeframeRow from '@/components/bias/TimeframeRow';
 import BiasResult from '@/components/bias/BiasResult';
 import ExtraCheck from '@/components/bias/ExtraCheck';
 import AssetQuickSwitch from '@/components/bias/AssetQuickSwitch';
+import EconomicNewsStrip from '@/components/bias/EconomicNewsStrip';
+import useEconomicCalendar from '@/hooks/useEconomicCalendar';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -128,6 +130,7 @@ function describeSaveError(err) {
 
 export default function Input() {
   const navigate = useNavigate();
+  const { events: newsEvents, status: newsStatus } = useEconomicCalendar();
 
   // Initialise instrument from localStorage immediately — no empty string default
   const [instrument, setInstrument] = useState(() => localStorage.getItem('primebias_instrument') || '');
@@ -733,6 +736,11 @@ export default function Input() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Relevant economic calendar */}
+      {instrument && (
+        <EconomicNewsStrip instrument={instrument} events={newsEvents} status={newsStatus} />
       )}
     </div>
   );
