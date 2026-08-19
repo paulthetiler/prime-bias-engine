@@ -23,6 +23,7 @@ import { separationLabel } from '@/lib/strengthContext';
 import { getNewsExposure } from '@/lib/newsExposure';
 
 const STRENGTH_API_VERSION = '4';
+const SUMMARY_FILTERS_STORAGE_KEY = 'primebias_summary_filters';
 
 function statusClass(status) {
   if (status === 'YES' || status === 'Scalp') return 'bg-primary/15 text-primary border-primary/30';
@@ -143,6 +144,28 @@ function FilterBar({ filters, onChange }) {
   return <div className="flex gap-2 flex-wrap">{items.map(f => <button key={f.key} onClick={() => onChange({ ...filters, [f.key]: !filters[f.key] })} className={cn('px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors',filters[f.key] ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-muted-foreground border-border hover:border-primary/50')}>{f.label}</button>)}</div>;
 }
 
+function getInitialFilters() {
+  const settings = getSettings();
+  const defaults = {
+    filterABOnly: settings.filterABOnly,
+    filterHideWait: settings.filterHideWait,
+    filterHideExtended: settings.filterHideExtended,
+    filterAlignedOnly: settings.filterAlignedOnly,
+  };
+  try {
+    const stored = JSON.parse(localStorage.getItem(SUMMARY_FILTERS_STORAGE_KEY) || 'null');
+    if (!stored || typeof stored !== 'object') return defaults;
+    return {
+      filterABOnly: typeof stored.filterABOnly === 'boolean' ? stored.filterABOnly : defaults.filterABOnly,
+      filterHideWait: typeof stored.filterHideWait === 'boolean' ? stored.filterHideWait : defaults.filterHideWait,
+      filterHideExtended: typeof stored.filterHideExtended === 'boolean' ? stored.filterHideExtended : defaults.filterHideExtended,
+      filterAlignedOnly: typeof stored.filterAlignedOnly === 'boolean' ? stored.filterAlignedOnly : defaults.filterAlignedOnly,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeAssets, setActiveAssets] = useState({});
@@ -158,7 +181,8 @@ export default function Dashboard() {
   const [strengthData, setStrengthData] = useState(null);
   const [newsEvents, setNewsEvents] = useState([]);
   const [newsStatus, setNewsStatus] = useState('loading');
-  const [filters, setFilters] = useState(() => { const s = getSettings(); return { filterABOnly: s.filterABOnly, filterHideWait: s.filterHideWait, filterHideExtended: s.filterHideExtended, filterAlignedOnly: s.filterAlignedOnly }; });
+  const [filters, setFilters] = useState(getInitialFilters);
+  useEffect(() => { localStorage.setItem(SUMMARY_FILTERS_STORAGE_KEY, JSON.stringify(filters)); }, [filters]);
   useEffect(() => { const load = () => { const opts = engineOptionsFromSettings(getSettings()); const active = JSON.parse(localStorage.getItem('primebias_active') || '{}'); Object.keys(active).forEach(key => { if (active[key]?.inputs) active[key].results = calculateBias(active[key].inputs, active[key].extraCheck || null, opts); }); setActiveAssets(active); setCompleteAnalysis(prev => (!prev || !(prev.instrument in active)) ? null : prev); }; load(); ['biasUpdated', 'storage', 'settingsUpdated', 'instrumentOrderUpdated'].forEach(e => window.addEventListener(e, load)); return () => ['biasUpdated', 'storage', 'settingsUpdated', 'instrumentOrderUpdated'].forEach(e => window.removeEventListener(e, load)); }, []);
   useEffect(() => { const loadStrength = async () => { try { const response = await fetch(`/api/currency-strength?v=${STRENGTH_API_VERSION}`); if (response.ok) setStrengthData(await response.json()); } catch {} }; loadStrength(); const interval = setInterval(loadStrength, 15 * 60 * 1000); return () => clearInterval(interval); }, []);
   useEffect(() => { const loadNews = async () => { setNewsStatus('loading'); try { const response = await fetch('/api/economic-calendar'); const payload = await response.json().catch(() => null); if (!response.ok || !payload) { setNewsEvents([]); setNewsStatus('error'); return; } setNewsEvents(Array.isArray(payload.events) ? payload.events : []); setNewsStatus('ready'); } catch { setNewsEvents([]); setNewsStatus('error'); } }; loadNews(); const interval = setInterval(loadNews, 60 * 60 * 1000); return () => clearInterval(interval); }, []);
@@ -172,7 +196,7 @@ export default function Dashboard() {
   if (filters.filterABOnly) analyses = analyses.filter(a => ['A', 'B'].includes(a.results?.grade));
   if (filters.filterHideWait) analyses = analyses.filter(a => a.results?.status !== 'Wait');
   if (filters.filterHideExtended) analyses = analyses.filter(a => a.results?.status !== 'Extended');
-  if (filters.filterAlignedOnly) analyses = analyses.filter(a => ['HIGH', 'MEDIUM'].includes(calcAlignment(a.results).label));
+  if (filters.filterAlignedOnly) analyses = analyses.filter(a => calcAlignment(a.results)?.aligned);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const waitCount = analyses.filter(a => a.results?.status === 'Wait').length;
   const directionalCount = analyses.filter(a => ['BUY', 'SELL'].includes(a.results?.tradeAction)).length;
